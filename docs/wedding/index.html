@@ -189,9 +189,14 @@
     <section id="bgm-section" class="panel disabled">
       <h2>4. BGMを追加</h2>
       <p class="hint">先に音声なしムービーを作成すると、この欄が使えるようになります。動画と同じ長さで書き出し直します。複数曲を選ぶと選んだ順にクロスフェードしながら再生し、動画の長さに足りない分は自動で繰り返します（末尾はフェードアウトします）。</p>
+      <p class="hint">
+        スマホで音楽ファイルを選ぶ画面がうまく開かない場合は、LINEなど他のアプリ内で開いたリンクではなく、
+        Safari／Chromeで直接このページを開いているかご確認ください（アプリ内ブラウザではファイル選択が
+        正しく動作しないことがあります）。
+      </p>
       <div id="bgm-dropzone" class="dropzone bgm-dropzone">
         <p>ここに音楽ファイルをドラッグ＆ドロップ（複数可）<br />またはクリックして選択</p>
-        <input id="bgm-input" type="file" accept="audio/*" multiple hidden />
+        <input id="bgm-input" type="file" multiple hidden />
       </div>
       <div id="bgm-list" class="bgm-list"></div>
 
