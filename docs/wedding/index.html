@@ -37,12 +37,12 @@
 
     <!-- スタンダード: 写真 -->
     <section class="panel" id="standard-photos-section">
-      <h2>1. 写真を追加</h2>
+      <h2>1. 写真・動画を追加</h2>
       <div id="dropzone" class="dropzone">
-        <p>ここに写真をドラッグ＆ドロップ<br />またはクリックして選択</p>
-        <input id="file-input" type="file" accept="image/*" multiple hidden />
+        <p>ここに写真・動画をドラッグ＆ドロップ<br />またはクリックして選択</p>
+        <input id="file-input" type="file" accept="image/*,video/*" multiple hidden />
       </div>
-      <p class="hint">複数選択できます。並び順はサムネイルをドラッグして入れ替えられます。（目安: 100枚以下推奨）<br />各写真の下の欄にひとことキャプションを入れると、その写真が表示されている間だけ文字が重なって表示されます。</p>
+      <p class="hint">複数選択できます。並び順はサムネイルをドラッグして入れ替えられます。（目安: 写真100枚以下推奨、動画1本200MBまで）<br />動画は「使用秒数」欄でムービー内で使う長さ（最大15秒）を調整できます。動画自体の音声は収録されません（BGMのみ収録）。<br />各サムネイルの下の欄にひとことキャプションを入れると、表示されている間だけ文字が重なって表示されます。</p>
       <div id="photo-grid" class="photo-grid"></div>
     </section>
 
@@ -69,7 +69,7 @@
             <option value="green">グリーン×アイボリー</option>
           </select>
         </label>
-        <label>1枚あたりの表示時間（秒）
+        <label>1枚あたりの表示時間（秒・写真のみ）
           <input id="photo-duration" type="number" min="1.5" max="10" step="0.5" value="4" />
         </label>
         <label>切り替え効果
@@ -118,7 +118,7 @@
             <option value="yellow">ネオンイエロー</option>
           </select>
         </label>
-        <label>1枚あたりの表示時間（秒）
+        <label>1枚あたりの表示時間（秒・写真のみ）
           <input id="op-photo-duration" type="number" min="0.4" max="3" step="0.1" value="1" />
         </label>
         <label>切り替え効果
@@ -145,26 +145,27 @@
 
     <!-- オープニング演出: 写真（パートごと） -->
     <section class="panel hidden" id="opening-photos-section">
-      <h2>2. 写真を追加（パートごと）</h2>
+      <h2>2. 写真・動画を追加（パートごと）</h2>
+      <p class="hint">各パートに写真・動画をまとめて追加できます。動画は「使用秒数」欄でムービー内で使う長さ（最大15秒）を調整できます。動画自体の音声は収録されません（BGMのみ収録）。</p>
 
       <h3>新郎パート</h3>
       <div id="groom-dropzone" class="dropzone">
-        <p>新郎の写真をドラッグ＆ドロップ<br />またはクリックして選択</p>
-        <input id="groom-file-input" type="file" accept="image/*" multiple hidden />
+        <p>新郎の写真・動画をドラッグ＆ドロップ<br />またはクリックして選択</p>
+        <input id="groom-file-input" type="file" accept="image/*,video/*" multiple hidden />
       </div>
       <div id="groom-grid" class="photo-grid"></div>
 
       <h3>新婦パート</h3>
       <div id="bride-dropzone" class="dropzone">
-        <p>新婦の写真をドラッグ＆ドロップ<br />またはクリックして選択</p>
-        <input id="bride-file-input" type="file" accept="image/*" multiple hidden />
+        <p>新婦の写真・動画をドラッグ＆ドロップ<br />またはクリックして選択</p>
+        <input id="bride-file-input" type="file" accept="image/*,video/*" multiple hidden />
       </div>
       <div id="bride-grid" class="photo-grid"></div>
 
       <h3>2人の思い出パート</h3>
       <div id="together-dropzone" class="dropzone">
-        <p>2人が一緒に写っている写真をドラッグ＆ドロップ<br />またはクリックして選択</p>
-        <input id="together-file-input" type="file" accept="image/*" multiple hidden />
+        <p>2人が一緒に写っている写真・動画をドラッグ＆ドロップ<br />またはクリックして選択</p>
+        <input id="together-file-input" type="file" accept="image/*,video/*" multiple hidden />
       </div>
       <div id="together-grid" class="photo-grid"></div>
     </section>

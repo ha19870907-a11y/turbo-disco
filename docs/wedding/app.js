@@ -35,6 +35,10 @@ const MAX_AUDIO_BYTES = 150 * 1024 * 1024; // 150MB/曲
 const MAX_BGM_TRACKS = 20;
 const MAX_IMAGE_LONG_EDGE = 2400; // 書き出しに必要な解像度を大きく超える画像はここまで縮小して保持する
 const MAX_CAPTION_LENGTH = 40;
+const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // 200MB/本
+const MAX_VIDEOS_PER_GROUP = 15; // 動画はデコード負荷が高いため写真より低い上限にする
+const MAX_VIDEO_CLIP_SECONDS = 15; // 1クリップが動画内で使われる長さの上限
+const DEFAULT_VIDEO_CLIP_SECONDS = 5;
 
 const state = {
   bgmFiles: [], // { id, file }
@@ -154,9 +158,38 @@ function loadImage(url) {
 
 function intrinsicSize(imgLike) {
   return {
-    width: imgLike.naturalWidth || imgLike.width,
-    height: imgLike.naturalHeight || imgLike.height,
+    width: imgLike.naturalWidth || imgLike.videoWidth || imgLike.width,
+    height: imgLike.naturalHeight || imgLike.videoHeight || imgLike.height,
   };
+}
+
+// 動画ファイル1つ分のメタデータを読み込む。実際の再生用<video>要素をそのまま
+// サムネイル表示にも書き出し描画にも使い回す（BGMの自身の音声は含めないよう常にミュート）。
+function loadVideoItem(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const videoEl = document.createElement("video");
+    videoEl.src = url;
+    videoEl.muted = true;
+    videoEl.playsInline = true;
+    videoEl.preload = "auto";
+    videoEl.addEventListener(
+      "loadedmetadata",
+      () => {
+        const naturalDuration = isFinite(videoEl.duration) && videoEl.duration > 0 ? videoEl.duration : DEFAULT_VIDEO_CLIP_SECONDS;
+        resolve({ url, videoEl, naturalDuration, clipSeconds: Math.min(naturalDuration, DEFAULT_VIDEO_CLIP_SECONDS) });
+      },
+      { once: true }
+    );
+    videoEl.addEventListener(
+      "error",
+      () => {
+        URL.revokeObjectURL(url);
+        reject(new Error("動画を読み込めませんでした"));
+      },
+      { once: true }
+    );
+  });
 }
 
 // 長辺がMAX_IMAGE_LONG_EDGEを超える画像は、書き出し解像度(1280x720)に対して
@@ -194,9 +227,20 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
       const thumb = document.createElement("div");
       thumb.className = "photo-thumb";
 
-      const img = document.createElement("img");
-      img.src = photo.url;
-      thumb.appendChild(img);
+      if (photo.kind === "video") {
+        photo.videoEl.className = "media-thumb-el";
+        thumb.appendChild(photo.videoEl);
+
+        const mediaBadge = document.createElement("span");
+        mediaBadge.className = "media-badge";
+        mediaBadge.textContent = "🎬";
+        thumb.appendChild(mediaBadge);
+      } else {
+        const img = document.createElement("img");
+        img.className = "media-thumb-el";
+        img.src = photo.url;
+        thumb.appendChild(img);
+      }
 
       const badge = document.createElement("span");
       badge.className = "order-badge";
@@ -208,6 +252,7 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
       removeBtn.type = "button";
       removeBtn.textContent = "×";
       removeBtn.addEventListener("click", () => {
+        if (photo.kind === "video") photo.videoEl.pause();
         URL.revokeObjectURL(photo.url);
         group.photos = group.photos.filter((p) => p.id !== photo.id);
         render();
@@ -215,6 +260,28 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
       });
       thumb.appendChild(removeBtn);
       item.appendChild(thumb);
+
+      if (photo.kind === "video") {
+        const clipLabel = document.createElement("label");
+        clipLabel.className = "video-clip-label";
+        clipLabel.textContent = "使用秒数";
+        const clipInput = document.createElement("input");
+        clipInput.type = "number";
+        clipInput.className = "video-clip-input";
+        clipInput.min = "0.5";
+        clipInput.max = String(Math.min(photo.naturalDuration, MAX_VIDEO_CLIP_SECONDS));
+        clipInput.step = "0.5";
+        clipInput.value = photo.clipSeconds;
+        clipInput.draggable = false;
+        clipInput.title = `動画本編の長さ: 約${photo.naturalDuration.toFixed(1)}秒`;
+        clipInput.addEventListener("input", () => {
+          const maxAllowed = Math.min(photo.naturalDuration, MAX_VIDEO_CLIP_SECONDS);
+          photo.clipSeconds = Math.min(Math.max(Number(clipInput.value) || 1, 0.5), maxAllowed);
+          onChange();
+        });
+        clipLabel.appendChild(clipInput);
+        item.appendChild(clipLabel);
+      }
 
       const captionInput = document.createElement("input");
       captionInput.type = "text";
@@ -255,22 +322,44 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
   }
 
   async function addFiles(fileList) {
-    const incoming = Array.from(fileList).filter((f) => f.type.startsWith("image/"));
+    const incoming = Array.from(fileList).filter((f) => f.type.startsWith("image/") || f.type.startsWith("video/"));
     if (incoming.length === 0) return;
 
     const remainingSlots = MAX_PHOTOS - group.photos.length;
     if (remainingSlots <= 0) {
-      alert(`写真は最大${MAX_PHOTOS}枚まで追加できます`);
+      alert(`写真・動画は合計最大${MAX_PHOTOS}点まで追加できます`);
       return;
     }
     const toAdd = incoming.slice(0, remainingSlots);
     if (incoming.length > toAdd.length) {
-      alert(`写真は最大${MAX_PHOTOS}枚までのため、一部の写真は追加されませんでした`);
+      alert(`写真・動画は合計最大${MAX_PHOTOS}点までのため、一部は追加されませんでした`);
     }
 
     let skippedLarge = 0;
     let skippedInvalid = 0;
+    let skippedVideoLimit = 0;
+    let videoCount = group.photos.filter((p) => p.kind === "video").length;
+
     for (const file of toAdd) {
+      if (file.type.startsWith("video/")) {
+        if (file.size > MAX_VIDEO_BYTES) {
+          skippedLarge++;
+          continue;
+        }
+        if (videoCount >= MAX_VIDEOS_PER_GROUP) {
+          skippedVideoLimit++;
+          continue;
+        }
+        try {
+          const videoItem = await loadVideoItem(file);
+          group.photos.push({ id: group.nextId++, kind: "video", caption: "", ...videoItem });
+          videoCount++;
+        } catch (err) {
+          skippedInvalid++;
+        }
+        continue;
+      }
+
       if (file.size > MAX_PHOTO_BYTES) {
         skippedLarge++;
         continue;
@@ -279,17 +368,20 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
       try {
         const rawImg = await loadImage(url);
         const renderSource = capImageSize(rawImg);
-        group.photos.push({ id: group.nextId++, url, img: renderSource, caption: "" });
+        group.photos.push({ id: group.nextId++, kind: "image", url, img: renderSource, caption: "" });
       } catch (err) {
         skippedInvalid++;
         URL.revokeObjectURL(url);
       }
     }
     if (skippedLarge > 0) {
-      alert(`容量が大きすぎる写真${skippedLarge}枚は追加しませんでした（上限: ${Math.round(MAX_PHOTO_BYTES / 1024 / 1024)}MB/枚）`);
+      alert(`容量が大きすぎるファイルが${skippedLarge}件あり追加しませんでした（上限: 写真${Math.round(MAX_PHOTO_BYTES / 1024 / 1024)}MB/枚・動画${Math.round(MAX_VIDEO_BYTES / 1024 / 1024)}MB/本）`);
+    }
+    if (skippedVideoLimit > 0) {
+      alert(`動画は1グループあたり最大${MAX_VIDEOS_PER_GROUP}本までのため、${skippedVideoLimit}件は追加しませんでした`);
     }
     if (skippedInvalid > 0) {
-      alert(`読み込めない画像ファイルが${skippedInvalid}件あったためスキップしました`);
+      alert(`読み込めないファイルが${skippedInvalid}件あったためスキップしました`);
     }
     render();
     onChange();
@@ -510,11 +602,17 @@ function introLines(settings) {
   return lines;
 }
 
+// 動画クリップはその本編の長さ（ユーザーが調整した使用秒数）で表示し、
+// 写真は共通の photoDuration 設定で表示する。
+function mediaDuration(item, settings) {
+  return item.kind === "video" ? item.clipSeconds : settings.photoDuration;
+}
+
 function computeStandardTimeline(settings) {
   const segments = [];
   segments.push({ type: "title", duration: INTRO_DUR, lines: introLines(settings) });
   settings.photos.forEach((photo, i) => {
-    segments.push({ type: "photo", duration: settings.photoDuration, photo, variant: i % 4 });
+    segments.push({ type: "photo", duration: mediaDuration(photo, settings), photo, variant: i % 4 });
   });
   segments.push({ type: "title", duration: OUTRO_DUR, lines: [settings.endMessage] });
   return finalizeTimeline(segments, settings.transitionDuration);
@@ -551,7 +649,7 @@ function computeOpeningTimeline(settings) {
     { bigFontSize: 44, lineHeight: 54 }
   );
   settings.groomPhotos.forEach((photo, i) => {
-    segments.push({ type: "photo", duration: settings.photoDuration, photo, variant: i % 4 });
+    segments.push({ type: "photo", duration: mediaDuration(photo, settings), photo, variant: i % 4 });
   });
 
   // 3. 新婦パート
@@ -561,13 +659,13 @@ function computeOpeningTimeline(settings) {
     { bigFontSize: 44, lineHeight: 54 }
   );
   settings.bridePhotos.forEach((photo, i) => {
-    segments.push({ type: "photo", duration: settings.photoDuration, photo, variant: i % 4 });
+    segments.push({ type: "photo", duration: mediaDuration(photo, settings), photo, variant: i % 4 });
   });
 
   // 4. 2人の出会い〜思い出パート
   pushImpact(["TWO PATHS CROSS", "SPECIAL MEMORIES"], 2, { bigFontSize: 48 });
   settings.togetherPhotos.forEach((photo, i) => {
-    segments.push({ type: "photo", duration: settings.photoDuration, photo, variant: i % 4 });
+    segments.push({ type: "photo", duration: mediaDuration(photo, settings), photo, variant: i % 4 });
   });
 
   // 5. クライマックス: 一瞬の静寂 → 名前発表
@@ -600,7 +698,7 @@ function updateDurationEstimate() {
   const { total } = computeTimeline(settings);
   const mins = Math.floor(total / 60);
   const secs = Math.round(total % 60);
-  els.durationEstimate.textContent = `写真${countPhotos(settings)}枚 / 想定の動画の長さ: 約${mins > 0 ? mins + "分" : ""}${secs}秒`;
+  els.durationEstimate.textContent = `写真・動画 ${countPhotos(settings)}点 / 想定の動画の長さ: 約${mins > 0 ? mins + "分" : ""}${secs}秒`;
 }
 
 // --- 描画 ---
@@ -694,7 +792,21 @@ function drawCaption(ctx, text, localT, duration, theme) {
 }
 
 function drawPhoto(ctx, seg, localT, settings) {
-  const { img } = seg.photo;
+  const isVideo = seg.photo.kind === "video";
+  const img = isVideo ? seg.photo.videoEl : seg.photo.img;
+
+  if (isVideo && !seg._started) {
+    seg._started = true;
+    try {
+      img.currentTime = 0;
+    } catch (err) {
+      // seek前に呼ばれるブラウザもあるため失敗は無視する
+    }
+    img.play().catch(() => {
+      // 自動再生がブロックされても録画自体は続行する（無音のためポリシー上ほぼ問題にならない）
+    });
+  }
+
   const progress = Math.min(Math.max(localT / seg.duration, 0), 1);
   const zoomIn = seg.variant % 2 === 0;
   const scale = zoomIn ? 1 + ZOOM_AMOUNT * progress : 1 + ZOOM_AMOUNT * (1 - progress);
@@ -1191,6 +1303,16 @@ async function renderVideo({ audioFiles, onProgress } = {}) {
   recorder.stop();
   const blob = await stopped;
   if (audioCleanup) audioCleanup();
+  timeline.segments.forEach((seg) => {
+    if (seg.type === "photo" && seg.photo.kind === "video") {
+      seg.photo.videoEl.pause();
+      try {
+        seg.photo.videoEl.currentTime = 0;
+      } catch (err) {
+        // 何もしない（サムネイル表示が先頭フレームに戻らないだけ）
+      }
+    }
+  });
   return blob;
 }
 
