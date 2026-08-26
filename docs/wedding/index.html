@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>結婚式ムービー作成ツール</title>
   <meta name="description" content="写真を並べるだけでプロっぽい結婚式オープニング/エンドロールムービーを作成できるツール。BGMは後から追加できます。" />
+
+  <!-- このページは外部通信を一切行わない前提のため、CSPで明示的にブロックする。
+       将来のコード変更で誤って外部送信や外部スクリプト読み込みが混入しても、
+       ブラウザ側で遮断されるようにする多層防御。 -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob:; media-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none';" />
+  <meta http-equiv="Referrer-Policy" content="no-referrer" />
+
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>

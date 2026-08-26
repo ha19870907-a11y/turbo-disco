@@ -17,6 +17,13 @@ const OUTRO_DUR = 3.2;
 const FADE = 0.6;
 const ZOOM_AMOUNT = 0.16;
 
+// 入力ファイルに対する上限（悪意あるファイルやサイズの大きすぎるファイルで
+// タブがフリーズ・クラッシュするのを防ぐための安全策）
+const MAX_PHOTOS = 300;
+const MAX_PHOTO_BYTES = 30 * 1024 * 1024; // 30MB/枚
+const MAX_AUDIO_BYTES = 150 * 1024 * 1024; // 150MB
+const MAX_IMAGE_LONG_EDGE = 2400; // 書き出しに必要な解像度を大きく超える画像はここまで縮小して保持する
+
 const state = {
   photos: [], // { id, url, img }
   nextId: 1,
@@ -76,16 +83,67 @@ function loadImage(url) {
   });
 }
 
+function intrinsicSize(imgLike) {
+  return {
+    width: imgLike.naturalWidth || imgLike.width,
+    height: imgLike.naturalHeight || imgLike.height,
+  };
+}
+
+// 長辺がMAX_IMAGE_LONG_EDGEを超える画像は、書き出し解像度(1280x720)に対して
+// 過剰なメモリを消費するため、事前にキャンバスへ縮小コピーしてから保持する。
+// (スマホの高画素写真や、意図的にサイズの大きい画像を大量に読み込ませて
+// タブをクラッシュさせようとするケースへの対策)
+function capImageSize(img) {
+  const { width, height } = intrinsicSize(img);
+  const longEdge = Math.max(width, height);
+  if (longEdge <= MAX_IMAGE_LONG_EDGE || !longEdge) return img;
+  const scale = MAX_IMAGE_LONG_EDGE / longEdge;
+  const w = Math.max(1, Math.round(width * scale));
+  const h = Math.max(1, Math.round(height * scale));
+  const off = document.createElement("canvas");
+  off.width = w;
+  off.height = h;
+  off.getContext("2d").drawImage(img, 0, 0, w, h);
+  return off;
+}
+
 async function addFiles(fileList) {
-  const files = Array.from(fileList).filter((f) => f.type.startsWith("image/"));
-  for (const file of files) {
+  const incoming = Array.from(fileList).filter((f) => f.type.startsWith("image/"));
+  if (incoming.length === 0) return;
+
+  const remainingSlots = MAX_PHOTOS - state.photos.length;
+  if (remainingSlots <= 0) {
+    alert(`写真は最大${MAX_PHOTOS}枚まで追加できます`);
+    return;
+  }
+  const toAdd = incoming.slice(0, remainingSlots);
+  if (incoming.length > toAdd.length) {
+    alert(`写真は最大${MAX_PHOTOS}枚までのため、一部の写真は追加されませんでした`);
+  }
+
+  let skippedLarge = 0;
+  let skippedInvalid = 0;
+  for (const file of toAdd) {
+    if (file.size > MAX_PHOTO_BYTES) {
+      skippedLarge++;
+      continue;
+    }
     const url = URL.createObjectURL(file);
     try {
-      const img = await loadImage(url);
-      state.photos.push({ id: state.nextId++, url, img });
+      const rawImg = await loadImage(url);
+      const renderSource = capImageSize(rawImg);
+      state.photos.push({ id: state.nextId++, url, img: renderSource });
     } catch (err) {
+      skippedInvalid++;
       URL.revokeObjectURL(url);
     }
+  }
+  if (skippedLarge > 0) {
+    alert(`容量が大きすぎる写真${skippedLarge}枚は追加しませんでした（上限: ${Math.round(MAX_PHOTO_BYTES / 1024 / 1024)}MB/枚）`);
+  }
+  if (skippedInvalid > 0) {
+    alert(`読み込めない画像ファイルが${skippedInvalid}件あったためスキップしました`);
   }
   renderPhotoGrid();
   updateDurationEstimate();
@@ -113,6 +171,7 @@ function renderPhotoGrid() {
     removeBtn.type = "button";
     removeBtn.textContent = "×";
     removeBtn.addEventListener("click", () => {
+      URL.revokeObjectURL(photo.url);
       state.photos = state.photos.filter((p) => p.id !== photo.id);
       renderPhotoGrid();
       updateDurationEstimate();
@@ -273,7 +332,8 @@ function drawPhoto(ctx, seg, localT) {
   const zoomIn = seg.variant % 2 === 0;
   const scale = zoomIn ? 1 + ZOOM_AMOUNT * progress : 1 + ZOOM_AMOUNT * (1 - progress);
 
-  const imgRatio = img.naturalWidth / img.naturalHeight;
+  const { width: imgW, height: imgH } = intrinsicSize(img);
+  const imgRatio = imgW / imgH;
   const canvasRatio = CANVAS_W / CANVAS_H;
   let baseW, baseH;
   if (imgRatio > canvasRatio) {
@@ -514,6 +574,14 @@ els.addBgmBtn.addEventListener("click", async () => {
   const file = els.bgmInput.files && els.bgmInput.files[0];
   if (!file) {
     alert("BGMファイルを選択してください");
+    return;
+  }
+  if (!file.type.startsWith("audio/")) {
+    alert("音声ファイルを選択してください");
+    return;
+  }
+  if (file.size > MAX_AUDIO_BYTES) {
+    alert(`音声ファイルの容量が大きすぎます（上限: ${Math.round(MAX_AUDIO_BYTES / 1024 / 1024)}MB）`);
     return;
   }
   els.addBgmBtn.disabled = true;
