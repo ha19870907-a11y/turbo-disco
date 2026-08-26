@@ -1,0 +1,18 @@
+{
+  "name": "kyotei-yosou",
+  "version": "1.0.0",
+  "description": "競艇（ボートレース）予想ツール - 出走表・直前情報・オッズをリアルタイムに反映",
+  "private": true,
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>競艇予想ツール</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚤</text></svg>" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>🚤 競艇予想ツール</h1>
+    <div class="header-controls">
+      <input type="date" id="date-input" />
+      <button id="sample-toggle" class="ghost-btn" type="button">サンプルデータ表示</button>
+      <span id="status-badge" class="status-badge">読込中…</span>
+    </div>
+  </header>
+
+  <main>
+    <section id="stadium-list" class="panel">
+      <h2>開催場</h2>
+      <div id="stadium-grid" class="stadium-grid"></div>
+    </section>
+
+    <section id="race-list" class="panel hidden">
+      <div class="panel-header">
+        <button id="back-to-stadiums" class="ghost-btn" type="button">← 開催場一覧</button>
+        <h2 id="race-list-title"></h2>
+      </div>
+      <div id="race-grid" class="race-grid"></div>
+    </section>
+
+    <section id="race-detail" class="panel hidden">
+      <div class="panel-header">
+        <button id="back-to-races" class="ghost-btn" type="button">← レース一覧</button>
+        <h2 id="race-detail-title"></h2>
+      </div>
+      <div id="race-meta" class="race-meta"></div>
+      <div id="weather-box" class="weather-box"></div>
+      <div id="racer-table-wrap"></div>
+      <div id="trifecta-box"></div>
+      <div id="result-box"></div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <p>
+      ※本ツールの予想は参考情報です。的中や利益を保証するものではありません。舟券の購入は自己責任で行ってください。<br />
+      データ提供: <a href="https://github.com/turnmark/api" target="_blank" rel="noopener">Turnmark Boatrace Open API</a>（非公式・約3分間隔で更新）
+    </p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
