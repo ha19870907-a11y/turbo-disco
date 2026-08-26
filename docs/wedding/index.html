@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>結婚式ムービー作成ツール</title>
+  <meta name="description" content="写真を並べるだけでプロっぽい結婚式オープニング/エンドロールムービーを作成できるツール。BGMは後から追加できます。" />
+
+  <!-- このページは外部通信を一切行わない前提のため、CSPで明示的にブロックする。
+       将来のコード変更で誤って外部送信や外部スクリプト読み込みが混入しても、
+       ブラウザ側で遮断されるようにする多層防御。 -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob:; media-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none';" />
+  <meta http-equiv="Referrer-Policy" content="no-referrer" />
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>💐 結婚式ムービー作成ツール</h1>
+    <p class="lead">写真を並べるだけで、Ken Burns風の動きとタイトルカード付きムービーを作成します。BGMは動画ができた後から追加できます。</p>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>1. 写真を追加</h2>
+      <div id="dropzone" class="dropzone">
+        <p>ここに写真をドラッグ＆ドロップ<br />またはクリックして選択</p>
+        <input id="file-input" type="file" accept="image/*" multiple hidden />
+      </div>
+      <p class="hint">複数選択できます。並び順はサムネイルをドラッグして入れ替えられます。（目安: 100枚以下推奨）</p>
+      <div id="photo-grid" class="photo-grid"></div>
+    </section>
+
+    <section class="panel">
+      <h2>2. タイトル・演出設定</h2>
+      <div class="form-grid">
+        <label>新郎・新婦の名前
+          <input id="title1" type="text" placeholder="例: 太郎" />
+        </label>
+        <label>&nbsp;
+          <input id="title2" type="text" placeholder="例: 花子" />
+        </label>
+        <label>日付・メッセージ（冒頭）
+          <input id="date-text" type="text" placeholder="例: 2026.10.4" />
+        </label>
+        <label>エンディングメッセージ
+          <input id="end-message" type="text" placeholder="例: Thank You" />
+        </label>
+        <label>テーマカラー
+          <select id="theme-select">
+            <option value="pink">ピンク×ゴールド</option>
+            <option value="navy">ネイビー×ゴールド</option>
+            <option value="green">グリーン×アイボリー</option>
+          </select>
+        </label>
+        <label>1枚あたりの表示時間（秒）
+          <input id="photo-duration" type="number" min="1.5" max="10" step="0.5" value="4" />
+        </label>
+        <label>切り替え（クロスフェード）の長さ（秒）
+          <input id="transition-duration" type="number" min="0.3" max="2" step="0.1" value="0.8" />
+        </label>
+      </div>
+      <p id="duration-estimate" class="hint"></p>
+    </section>
+
+    <section class="panel">
+      <h2>3. ムービーを作成</h2>
+      <button id="create-btn" class="primary-btn" type="button">ムービーを作成（音声なし）</button>
+      <div id="progress-box" class="progress-box hidden">
+        <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+        <span id="progress-label"></span>
+      </div>
+      <div id="preview-box" class="preview-box hidden">
+        <video id="preview-video" controls playsinline></video>
+        <a id="download-silent" class="ghost-btn" download="wedding-movie-silent.webm">ダウンロード（音声なし）</a>
+      </div>
+    </section>
+
+    <section id="bgm-section" class="panel disabled">
+      <h2>4. BGMを追加</h2>
+      <p class="hint">先に音声なしムービーを作成すると、この欄が使えるようになります。動画と同じ長さで書き出し直します（曲は自動でループ／末尾でフェードアウトします）。</p>
+      <input id="bgm-input" type="file" accept="audio/*" />
+      <button id="add-bgm-btn" class="primary-btn" type="button" disabled>BGM付きで書き出す</button>
+      <div id="bgm-progress-box" class="progress-box hidden">
+        <div class="progress-bar"><div id="bgm-progress-fill" class="progress-fill"></div></div>
+        <span id="bgm-progress-label"></span>
+      </div>
+      <div id="final-box" class="preview-box hidden">
+        <video id="final-video" controls playsinline></video>
+        <a id="download-final" class="ghost-btn" download="wedding-movie.webm">ダウンロード（BGM付き）</a>
+      </div>
+    </section>
+  </main>
+
+  <canvas id="render-canvas" width="1280" height="720" class="hidden-canvas"></canvas>
+
+  <footer class="app-footer">
+    <p>
+      すべての処理はブラウザ内で完結し、写真や音楽が外部に送信されることはありません。<br />
+      書き出しには Chrome または Edge の最新版を推奨します（対応形式: WebM）。動画の長さと同程度の生成時間がかかります。
+    </p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
