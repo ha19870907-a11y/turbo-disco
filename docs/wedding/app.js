@@ -165,6 +165,18 @@ function loadImage(url) {
   });
 }
 
+// スマホでクラウドストレージ経由などで選んだファイルは file.type が空文字になることがあり、
+// その場合 file.type.startsWith("audio/") 等の判定だけでは正しいファイルでも弾かれてしまう
+// （「音楽ファイルが選べない」という不具合の主な原因）。file.type が無いときは拡張子で補う。
+const AUDIO_EXTENSIONS = /\.(mp3|m4a|wav|aac|ogg|oga|flac|wma|opus|weba)$/i;
+const IMAGE_EXTENSIONS = /\.(jpe?g|png|gif|webp|heic|heif|bmp|tiff?|avif)$/i;
+const VIDEO_EXTENSIONS = /\.(mp4|mov|m4v|webm|avi|mkv|3gp|3gpp)$/i;
+
+function looksLikeType(file, mimePrefix, extRegex) {
+  if (file.type) return file.type.startsWith(mimePrefix);
+  return extRegex.test(file.name || "");
+}
+
 function intrinsicSize(imgLike) {
   return {
     width: imgLike.naturalWidth || imgLike.videoWidth || imgLike.width,
@@ -331,7 +343,9 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
   }
 
   async function addFiles(fileList) {
-    const incoming = Array.from(fileList).filter((f) => f.type.startsWith("image/") || f.type.startsWith("video/"));
+    const incoming = Array.from(fileList).filter(
+      (f) => looksLikeType(f, "image/", IMAGE_EXTENSIONS) || looksLikeType(f, "video/", VIDEO_EXTENSIONS)
+    );
     if (incoming.length === 0) return;
 
     const remainingSlots = MAX_PHOTOS - group.photos.length;
@@ -350,7 +364,7 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
     let videoCount = group.photos.filter((p) => p.kind === "video").length;
 
     for (const file of toAdd) {
-      if (file.type.startsWith("video/")) {
+      if (looksLikeType(file, "video/", VIDEO_EXTENSIONS)) {
         if (file.size > MAX_VIDEO_BYTES) {
           skippedLarge++;
           continue;
@@ -531,9 +545,9 @@ function updateAddBgmButtonState() {
 }
 
 function addBgmFiles(fileList) {
-  const incoming = Array.from(fileList).filter((f) => f.type.startsWith("audio/"));
+  const incoming = Array.from(fileList).filter((f) => looksLikeType(f, "audio/", AUDIO_EXTENSIONS));
   if (incoming.length === 0) {
-    if (fileList.length > 0) alert("音声ファイルを選択してください");
+    if (fileList.length > 0) alert("音声ファイルを選択してください（対応形式: mp3, m4a, wav, aac, ogg など）");
     return;
   }
 
