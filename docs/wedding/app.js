@@ -95,6 +95,8 @@ const els = {
   previewBox: document.getElementById("preview-box"),
   previewVideo: document.getElementById("preview-video"),
   downloadSilent: document.getElementById("download-silent"),
+  shareSilentBtn: document.getElementById("share-silent-btn"),
+  shareSilentHint: document.getElementById("share-silent-hint"),
   bgmSection: document.getElementById("bgm-section"),
   bgmDropzone: document.getElementById("bgm-dropzone"),
   bgmInput: document.getElementById("bgm-input"),
@@ -108,6 +110,8 @@ const els = {
   finalBox: document.getElementById("final-box"),
   finalVideo: document.getElementById("final-video"),
   downloadFinal: document.getElementById("download-final"),
+  shareFinalBtn: document.getElementById("share-final-btn"),
+  shareFinalHint: document.getElementById("share-final-hint"),
   canvas: document.getElementById("render-canvas"),
 };
 
@@ -1440,6 +1444,30 @@ function fixVideoDuration(videoEl) {
   });
 }
 
+// スマホのブラウザ標準の共有シート(Web Share API)経由でLINEなどに動画ファイルを
+// 直接渡せるようにする。サーバーには一切アップロードしない。対応していない
+// ブラウザ（多くのデスクトップブラウザ含む）では共有ボタン自体を表示しない。
+function updateShareButton(blob, filename, btnEl, hintEl) {
+  const file = new File([blob], filename, { type: blob.type || "video/webm" });
+  const supported = !!(navigator.canShare && navigator.canShare({ files: [file] }));
+  if (!supported) {
+    btnEl.classList.add("hidden");
+    hintEl.classList.add("hidden");
+    return;
+  }
+  btnEl.classList.remove("hidden");
+  hintEl.classList.add("hidden");
+  btnEl.onclick = async () => {
+    try {
+      await navigator.share({ files: [file], title: "結婚式ムービー", text: "結婚式ムービー" });
+    } catch (err) {
+      if (err && err.name === "AbortError") return; // 共有シートをキャンセルしただけなので何もしない
+      hintEl.textContent = `共有に失敗しました（${err.message || err}）。ダウンロードしたファイルをLINEアプリから送信してください。`;
+      hintEl.classList.remove("hidden");
+    }
+  };
+}
+
 els.createBtn.addEventListener("click", async () => {
   if (countPhotos(getSettings()) === 0) {
     alert("写真・動画を1つ以上追加してください");
@@ -1458,6 +1486,7 @@ els.createBtn.addEventListener("click", async () => {
     els.previewVideo.src = url;
     els.downloadSilent.href = url;
     els.previewBox.classList.remove("hidden");
+    updateShareButton(blob, "wedding-movie-silent.webm", els.shareSilentBtn, els.shareSilentHint);
     await fixVideoDuration(els.previewVideo);
     els.bgmSection.classList.remove("disabled");
     updateAddBgmButtonState();
@@ -1507,6 +1536,7 @@ els.addBgmBtn.addEventListener("click", async () => {
     els.finalVideo.src = url;
     els.downloadFinal.href = url;
     els.finalBox.classList.remove("hidden");
+    updateShareButton(blob, "wedding-movie.webm", els.shareFinalBtn, els.shareFinalHint);
     await fixVideoDuration(els.finalVideo);
     setProgress(els.bgmProgressFill, els.bgmProgressLabel, 1, "完成しました");
   } catch (err) {

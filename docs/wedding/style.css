@@ -280,6 +280,11 @@ main {
   cursor: pointer;
 }
 
+.share-hint {
+  margin: 8px 0 0;
+  max-width: 480px;
+}
+
 .progress-box {
   margin-top: 14px;
   display: flex;
