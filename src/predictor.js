@@ -167,7 +167,11 @@ function predictRace(race) {
     }
   }
 
-  const trifectaBox = buildTrifectaBox(results, odds);
+  const hasOdds = !!(odds && odds.win);
+  const trifectaBox = buildComboProbabilities(results.slice(0, 3).map((r) => r.entryNumber), 3, results, odds);
+  trifectaBox.sort((a, b) => b.probability - a.probability);
+
+  const ana = buildAnaPicks(results, odds, hasOdds);
 
   return {
     hasPreview,
@@ -184,29 +188,32 @@ function predictRace(race) {
       : null,
     racers: results,
     trifectaBox,
-    hasOdds: !!(odds && odds.win),
+    longshotRacers: ana.longshotRacers,
+    anaCombos: ana.anaCombos,
+    hasOdds,
   };
 }
 
-// Plackett-Luce モデルで3連単の組み合わせ確率を算出する（本命上位3艇のボックス買い目）
-function buildTrifectaBox(results, odds) {
-  const top3 = results.slice(0, 3);
-  if (top3.length < 3) return [];
+// 配列 arr から重複無しで k 個選んで並べる順列をすべて列挙する（k=3, arrの長さ=nなら n×(n-1)×(n-2) 通り）
+function permutationsOfSize(arr, k) {
+  if (k === 0) return [[]];
+  const out = [];
+  arr.forEach((item, i) => {
+    const rest = [...arr.slice(0, i), ...arr.slice(i + 1)];
+    for (const p of permutationsOfSize(rest, k - 1)) out.push([item, ...p]);
+  });
+  return out;
+}
+
+// entryNumbers の中から3艇を選ぶ全順列について、Plackett-Luceモデルで3連単の確率・
+// オッズ・期待値を算出する。
+function buildComboProbabilities(entryNumbers, size, results, odds) {
+  if (entryNumbers.length < size) return [];
   const strengths = {};
   for (const r of results) strengths[r.entryNumber] = Math.max(r.winProbability, 1e-6);
   const totalStrength = Object.values(strengths).reduce((a, b) => a + b, 0);
 
-  const permutations = (arr) => {
-    if (arr.length <= 1) return [arr];
-    const out = [];
-    arr.forEach((item, i) => {
-      const rest = [...arr.slice(0, i), ...arr.slice(i + 1)];
-      for (const p of permutations(rest)) out.push([item, ...p]);
-    });
-    return out;
-  };
-
-  const combos = permutations(top3.map((r) => r.entryNumber)).map((order) => {
+  return permutationsOfSize(entryNumbers, size).map((order) => {
     let remaining = totalStrength;
     let prob = 1;
     for (const entry of order) {
@@ -224,9 +231,27 @@ function buildTrifectaBox(results, odds) {
       expectedValue: typeof oddsValue === "number" ? prob * oddsValue : null,
     };
   });
+}
 
-  combos.sort((a, b) => b.probability - a.probability);
-  return combos;
+// 「穴」候補を抽出する。
+// - longshotRacers: 本命(1位)以外の艇のうち、単勝の期待値(オッズ公開後)または予想勝率が高い順
+// - anaCombos: 上位5艇の中から、1着が本命以外になる3連単の組み合わせを期待値/確率順に抽出
+// オッズが未公開の間は期待値を出せないため、予想勝率ベースの参考表示に留める。
+function buildAnaPicks(results, odds, hasOdds) {
+  const longshotRacers = results
+    .filter((r) => r.predictedRank >= 3)
+    .filter((r) => !hasOdds || typeof r.expectedValue === "number")
+    .sort((a, b) => (hasOdds ? (b.expectedValue ?? 0) - (a.expectedValue ?? 0) : b.winProbability - a.winProbability))
+    .slice(0, 3);
+
+  const topPickEntry = results[0]?.entryNumber;
+  const pool = results.slice(0, 5).map((r) => r.entryNumber);
+  const anaCombos = buildComboProbabilities(pool, 3, results, odds)
+    .filter((c) => Number(c.combination.split("-")[0]) !== topPickEntry)
+    .sort((a, b) => (hasOdds ? (b.expectedValue ?? 0) - (a.expectedValue ?? 0) : b.probability - a.probability))
+    .slice(0, 5);
+
+  return { longshotRacers, anaCombos };
 }
 
 module.exports = { predictRace, COURSE_WIN_RATE, WEIGHTS };

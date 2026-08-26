@@ -158,19 +158,49 @@ td.name-cell .rmeta { font-size: 0.72rem; color: var(--muted); }
 .mark-2 { color: #ffb54f; }
 .mark-3 { color: #4fd1c5; }
 
+/* 枠番バッジ: 競艇の公式カラー(1白/2黒/3赤/4青/5黄/6緑)をそのまま配色に使う */
+.waku-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 0.75rem;
+  line-height: 1;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  flex: none;
+}
+.combo-sep { color: var(--muted); margin: 0 2px; }
+
+.ana-tag {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--bg);
+  background: var(--accent);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
 .prob-bar-wrap { width: 100px; height: 8px; background: var(--panel-2); border-radius: 4px; overflow: hidden; margin: 0 auto; }
 .prob-bar { height: 100%; background: linear-gradient(90deg, var(--accent-2), var(--accent)); }
 
 .ev-good { color: var(--good); font-weight: 700; }
 .ev-bad { color: var(--muted); }
 
-.trifecta-box, .result-box {
+.trifecta-box, .ana-box, .result-box {
   margin-top: 18px;
   background: var(--panel-2);
   border-radius: var(--radius);
   padding: 14px;
 }
-.trifecta-box h3, .result-box h3 { margin-top: 0; font-size: 0.95rem; color: var(--accent-2); }
+.trifecta-box h3, .ana-box h3, .result-box h3 { margin-top: 0; font-size: 0.95rem; color: var(--accent-2); }
+.ana-subtitle { font-size: 0.78rem; color: var(--muted); margin: 10px 0 6px; }
+.ana-subtitle:first-of-type { margin-top: 0; }
 
 .combo-list { display: flex; flex-direction: column; gap: 6px; }
 .combo-row {
@@ -221,7 +251,8 @@ td.name-cell .rmeta { font-size: 0.72rem; color: var(--muted); }
   #racer-table-wrap table { min-width: 620px; }
   .prob-bar-wrap { width: 60px; }
 
-  .trifecta-box, .result-box { padding: 10px; margin-top: 14px; }
+  .trifecta-box, .ana-box, .result-box { padding: 10px; margin-top: 14px; }
+  .waku-badge { width: 20px; height: 20px; font-size: 0.7rem; }
   .combo-row { font-size: 0.78rem; padding: 6px 10px; }
 
   .app-footer { padding: 16px 12px 28px; font-size: 0.7rem; }

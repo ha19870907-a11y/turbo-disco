@@ -24,6 +24,7 @@ const el = {
   weatherBox: document.getElementById("weather-box"),
   racerTableWrap: document.getElementById("racer-table-wrap"),
   trifectaBox: document.getElementById("trifecta-box"),
+  anaBox: document.getElementById("ana-box"),
   resultBox: document.getElementById("result-box"),
   backToStadiums: document.getElementById("back-to-stadiums"),
   backToRaces: document.getElementById("back-to-races"),
@@ -41,6 +42,29 @@ function fmtPercent(v) {
 }
 function fmtNum(v, digits = 2) {
   return v === null || v === undefined ? "-" : Number(v).toFixed(digits);
+}
+
+// 枠番の色は競艇の公式カラー(1白/2黒/3赤/4青/5黄/6緑)に準拠
+const WAKU_COLORS = {
+  1: { bg: "#ffffff", fg: "#12182a" },
+  2: { bg: "#1a1a1a", fg: "#ffffff" },
+  3: { bg: "#e02424", fg: "#ffffff" },
+  4: { bg: "#1d4ed8", fg: "#ffffff" },
+  5: { bg: "#facc15", fg: "#12182a" },
+  6: { bg: "#16a34a", fg: "#ffffff" },
+};
+
+function wakuBadge(entryNumber) {
+  const c = WAKU_COLORS[entryNumber];
+  if (!c) return `<span class="waku-badge">${entryNumber}</span>`;
+  return `<span class="waku-badge" style="background:${c.bg};color:${c.fg}">${entryNumber}</span>`;
+}
+
+function coloredCombo(combination) {
+  return combination
+    .split("-")
+    .map((n) => wakuBadge(Number(n)))
+    .join('<span class="combo-sep">-</span>');
 }
 
 async function fetchDay(params = {}) {
@@ -167,12 +191,13 @@ function renderRacerTable(prediction) {
       const evText = r.expectedValue !== null && r.expectedValue !== undefined
         ? r.expectedValue.toFixed(2)
         : "-";
+      const isAna = r.predictedRank >= 3 && r.expectedValue !== null && r.expectedValue !== undefined && r.expectedValue >= 1.0;
       return `
       <tr>
         <td class="mark ${markClass}">${r.mark}</td>
-        <td>${r.entryNumber}</td>
+        <td>${wakuBadge(r.entryNumber)}</td>
         <td class="name-cell">
-          <div class="rname">${r.name}</div>
+          <div class="rname">${r.name}${isAna ? '<span class="ana-tag">穴</span>' : ""}</div>
           <div class="rmeta">${r.rank ?? ""} ${r.branch ?? ""}</div>
         </td>
         <td>${r.courseNumber ?? "-"}</td>
@@ -221,7 +246,7 @@ function renderTrifecta(prediction) {
         ? `期待値 ${c.expectedValue.toFixed(2)}`
         : "";
       return `<div class="combo-row">
-        <span class="combo">${c.combination}</span>
+        <span class="combo">${coloredCombo(c.combination)}</span>
         <span>予想確率 ${fmtPercent(c.probability)}</span>
         <span>${oddsText}</span>
         <span>${evText}</span>
@@ -235,13 +260,54 @@ function renderTrifecta(prediction) {
   `;
 }
 
+function renderAna(prediction) {
+  if (!prediction.hasOdds) {
+    el.anaBox.innerHTML = `
+      <h3>穴狙い</h3>
+      <div class="note">オッズが公開されると、期待値の高い穴候補がここに表示されます。</div>
+    `;
+    return;
+  }
+  const hasLongshots = prediction.longshotRacers && prediction.longshotRacers.length > 0;
+  const hasCombos = prediction.anaCombos && prediction.anaCombos.length > 0;
+  if (!hasLongshots && !hasCombos) {
+    el.anaBox.innerHTML = `<h3>穴狙い</h3><div class="note">期待値の高い穴候補は見つかりませんでした。</div>`;
+    return;
+  }
+
+  const racerRows = (prediction.longshotRacers || [])
+    .map((r) => `<div class="combo-row">
+      <span class="combo">${wakuBadge(r.entryNumber)} ${r.name}</span>
+      <span>予想勝率 ${fmtPercent(r.winProbability)}</span>
+      <span>単勝 ${r.winOdds ?? "-"}倍</span>
+      <span>${r.expectedValue !== null && r.expectedValue !== undefined ? `期待値 ${r.expectedValue.toFixed(2)}` : ""}</span>
+    </div>`)
+    .join("");
+
+  const comboRows = (prediction.anaCombos || [])
+    .map((c) => `<div class="combo-row">
+      <span class="combo">${coloredCombo(c.combination)}</span>
+      <span>予想確率 ${fmtPercent(c.probability)}</span>
+      <span>${c.odds !== null && c.odds !== undefined ? `${c.odds}倍` : "オッズ未公開"}</span>
+      <span>${c.expectedValue !== null && c.expectedValue !== undefined ? `期待値 ${c.expectedValue.toFixed(2)}` : ""}</span>
+    </div>`)
+    .join("");
+
+  el.anaBox.innerHTML = `
+    <h3>穴狙い</h3>
+    ${hasLongshots ? `<div class="ana-subtitle">単勝の穴候補</div><div class="combo-list">${racerRows}</div>` : ""}
+    ${hasCombos ? `<div class="ana-subtitle">3連単の穴目（本命が1着以外）</div><div class="combo-list">${comboRows}</div>` : ""}
+    <div class="note">期待値(予想勝率×オッズ)が高い順に表示しています。あくまで参考値です。</div>
+  `;
+}
+
 function renderResult(result) {
   if (!result) {
     el.resultBox.innerHTML = "";
     return;
   }
   const rows = result.racers
-    .map((r) => `<tr><td>${r.place_number_source}</td><td>${r.entry_number}</td><td>${r.name}</td></tr>`)
+    .map((r) => `<tr><td>${r.place_number_source}</td><td>${wakuBadge(r.entry_number)}</td><td>${r.name}</td></tr>`)
     .join("");
   const trifectaPayout = result.payouts?.trifecta?.[0];
   el.resultBox.innerHTML = `
@@ -259,6 +325,7 @@ async function loadRaceDetail() {
   el.racerTableWrap.innerHTML = `<div class="empty-state">読み込み中…</div>`;
   el.weatherBox.innerHTML = "";
   el.trifectaBox.innerHTML = "";
+  el.anaBox.innerHTML = "";
   el.resultBox.innerHTML = "";
   const seq = ++state.loadSeq;
   try {
@@ -276,6 +343,7 @@ async function loadRaceDetail() {
     renderWeather(detail.prediction.weather);
     renderRacerTable(detail.prediction);
     renderTrifecta(detail.prediction);
+    renderAna(detail.prediction);
     renderResult(detail.result);
 
     if (state.pollTimer) clearInterval(state.pollTimer);
