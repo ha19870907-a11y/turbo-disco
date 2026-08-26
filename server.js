@@ -5,6 +5,7 @@ const { getDay, CACHE_TTL_MS } = require("./src/turnmarkClient");
 const { predictRace } = require("./src/predictor");
 const { stadiumName } = require("./src/stadiums");
 const { todayJst, isValidDate } = require("./src/dateUtil");
+const { fetchRecentDays, buildRacerHistory, DEFAULT_LOOKBACK_DAYS } = require("./src/history");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -143,6 +144,42 @@ app.get("/api/race", async (req, res, next) => {
         : null,
       prediction,
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.get("/api/history", async (req, res, next) => {
+  try {
+    const date = parseDateParam(req);
+    const { stadium, race: raceNumber } = req.query;
+    const sample = req.query.sample === "1";
+    const lookbackDays = Math.min(Math.max(Number(req.query.lookbackDays) || DEFAULT_LOOKBACK_DAYS, 1), 30);
+    if (!stadium || !raceNumber) {
+      const err = new Error("stadium と race は必須です");
+      err.status = 400;
+      throw err;
+    }
+    if (sample) {
+      return res.json({ lookbackDays, daysFetched: 0, racers: [], note: "サンプルモードでは利用できません" });
+    }
+
+    const { data } = await getDay(date, {});
+    const race = data?.programs?.stadiums?.[stadium]?.races?.[raceNumber];
+    if (!race) {
+      const err = new Error("指定されたレースが見つかりません");
+      err.status = 404;
+      throw err;
+    }
+
+    const days = await fetchRecentDays(date, lookbackDays);
+    const racers = Object.values(race.racers).map((r) => ({
+      entryNumber: r.entry_number,
+      name: r.name,
+      ...buildRacerHistory(days, r.number),
+    }));
+
+    res.json({ lookbackDays, daysFetched: days.length, racers });
   } catch (err) {
     next(err);
   }

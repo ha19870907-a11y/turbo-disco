@@ -192,15 +192,36 @@ td.name-cell .rmeta { font-size: 0.72rem; color: var(--muted); }
 .ev-good { color: var(--good); font-weight: 700; }
 .ev-bad { color: var(--muted); }
 
-.trifecta-box, .ana-box, .result-box {
+.trifecta-box, .ana-box, .history-box, .result-box {
   margin-top: 18px;
   background: var(--panel-2);
   border-radius: var(--radius);
   padding: 14px;
 }
-.trifecta-box h3, .ana-box h3, .result-box h3 { margin-top: 0; font-size: 0.95rem; color: var(--accent-2); }
+.trifecta-box h3, .ana-box h3, .history-box h3, .result-box h3 { margin-top: 0; font-size: 0.95rem; color: var(--accent-2); }
 .ana-subtitle { font-size: 0.78rem; color: var(--muted); margin: 10px 0 6px; }
 .ana-subtitle:first-of-type { margin-top: 0; }
+
+.history-box .ghost-btn { margin-top: 8px; }
+.history-row .combo { min-width: 140px; }
+.place-badges { display: flex; gap: 3px; flex-wrap: wrap; }
+.place-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.place-badge.place-1 { background: var(--good); color: #0b1a10; border-color: var(--good); }
+.place-badge.place-2 { background: var(--accent); color: #2a1a05; border-color: var(--accent); }
+.place-badge.place-3 { background: var(--accent-2); color: #04211e; border-color: var(--accent-2); }
+.note-inline { font-size: 0.72rem; color: var(--muted); }
 
 .combo-list { display: flex; flex-direction: column; gap: 6px; }
 .combo-row {
@@ -251,7 +272,8 @@ td.name-cell .rmeta { font-size: 0.72rem; color: var(--muted); }
   #racer-table-wrap table { min-width: 620px; }
   .prob-bar-wrap { width: 60px; }
 
-  .trifecta-box, .ana-box, .result-box { padding: 10px; margin-top: 14px; }
+  .trifecta-box, .ana-box, .history-box, .result-box { padding: 10px; margin-top: 14px; }
+  .history-row .combo { min-width: 100%; }
   .waku-badge { width: 20px; height: 20px; font-size: 0.7rem; }
   .combo-row { font-size: 0.78rem; padding: 6px 10px; }
 

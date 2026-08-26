@@ -22,6 +22,7 @@
     raceMeta: document.getElementById("race-meta"),
     weatherBox: document.getElementById("weather-box"),
     racerTableWrap: document.getElementById("racer-table-wrap"),
+    historyBox: document.getElementById("history-box"),
     trifectaBox: document.getElementById("trifecta-box"),
     anaBox: document.getElementById("ana-box"),
     resultBox: document.getElementById("result-box"),
@@ -236,6 +237,79 @@
     `;
   }
 
+  const PLACE_BADGE_CLASS = { 1: "place-1", 2: "place-2", 3: "place-3" };
+
+  function renderHistoryPlaceholder() {
+    if (state.sample) {
+      el.historyBox.innerHTML = `
+        <h3>過去実績・得意コース</h3>
+        <div class="note">サンプルデータ表示中は利用できません（サンプルは1日分のみのため）。</div>
+      `;
+      return;
+    }
+    el.historyBox.innerHTML = `
+      <h3>過去実績・得意コース</h3>
+      <div class="note">
+        直近数日分のレース結果を取得して、選手ごとの直近成績と得意コースを集計します。
+        初回は少し時間がかかることがあります。
+      </div>
+      <button id="history-load-btn" class="ghost-btn" type="button">過去実績を取得する</button>
+    `;
+    document.getElementById("history-load-btn")?.addEventListener("click", loadHistory);
+  }
+
+  async function loadHistory() {
+    const btn = document.getElementById("history-load-btn");
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "取得中…";
+    }
+    const seq = state.loadSeq;
+    try {
+      const data = await api("/api/history", { stadium: state.stadium, race: state.race });
+      if (seq !== state.loadSeq) return;
+      if (!data.racers || data.racers.length === 0) {
+        el.historyBox.innerHTML = `<h3>過去実績・得意コース</h3><div class="note">${data.note || "過去データを取得できませんでした。"}</div>`;
+        return;
+      }
+      renderHistoryResults(data);
+    } catch (err) {
+      if (seq !== state.loadSeq) return;
+      el.historyBox.innerHTML = `<h3>過去実績・得意コース</h3><div class="note">取得に失敗しました: ${err.message}</div>`;
+    }
+  }
+
+  function renderHistoryResults(data) {
+    const rows = data.racers
+      .map((r) => {
+        const recentBadges = r.recentResults
+          .map((e) => {
+            const cls = PLACE_BADGE_CLASS[e.placeNumber] || "place-other";
+            return `<span class="place-badge ${cls}" title="${e.date} ${e.stadiumName}${e.raceNumber}R ${e.courseNumber ?? "-"}コース">${e.placeNumber}</span>`;
+          })
+          .join("");
+        const bestCourseText = r.bestCourse
+          ? (() => {
+              const s = r.courseStats[r.bestCourse];
+              return `${wakuBadge(r.bestCourse)}コース得意 (勝率${((s.wins / s.races) * 100).toFixed(0)}% ${s.races}走)`;
+            })()
+          : "データ不足";
+        return `<div class="combo-row history-row">
+          <span class="combo">${wakuBadge(r.entryNumber)} ${r.name}</span>
+          <span>${bestCourseText}</span>
+          <span class="place-badges">${recentBadges || "直近成績なし"}</span>
+          <span class="note-inline">直近${data.lookbackDays}日中 ${r.totalRaces}走</span>
+        </div>`;
+      })
+      .join("");
+
+    el.historyBox.innerHTML = `
+      <h3>過去実績・得意コース（直近${data.lookbackDays}日）</h3>
+      <div class="combo-list">${rows}</div>
+      <div class="note">得意コースは同一コースで2走以上ある場合のみ判定しています。母数が少ないため参考程度にご覧ください。</div>
+    `;
+  }
+
   function renderTrifecta(prediction, hasOdds) {
     if (!prediction.trifectaBox || prediction.trifectaBox.length === 0) {
       el.trifectaBox.innerHTML = "";
@@ -326,6 +400,7 @@
     showPanel("detail");
     el.racerTableWrap.innerHTML = `<div class="empty-state">読み込み中…</div>`;
     el.weatherBox.innerHTML = "";
+    el.historyBox.innerHTML = "";
     el.trifectaBox.innerHTML = "";
     el.anaBox.innerHTML = "";
     el.resultBox.innerHTML = "";
@@ -341,6 +416,7 @@
       `;
       renderWeather(data.prediction.weather);
       renderRacerTable(data.prediction);
+      renderHistoryPlaceholder();
       renderTrifecta(data.prediction, data.prediction.hasOdds);
       renderAna(data.prediction);
       renderResult(data.result);

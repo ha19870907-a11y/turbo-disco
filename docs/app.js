@@ -1,4 +1,5 @@
 import { todayJst, isValidDate, getDay, buildStadiumList, buildRaceList, buildRaceDetail } from "./client.js";
+import { fetchRecentDays, buildRacerHistory, DEFAULT_LOOKBACK_DAYS } from "./history.js";
 
 const state = {
   date: null,
@@ -23,6 +24,7 @@ const el = {
   raceMeta: document.getElementById("race-meta"),
   weatherBox: document.getElementById("weather-box"),
   racerTableWrap: document.getElementById("racer-table-wrap"),
+  historyBox: document.getElementById("history-box"),
   trifectaBox: document.getElementById("trifecta-box"),
   anaBox: document.getElementById("ana-box"),
   resultBox: document.getElementById("result-box"),
@@ -234,6 +236,82 @@ function renderRacerTable(prediction) {
   `;
 }
 
+const PLACE_BADGE_CLASS = { 1: "place-1", 2: "place-2", 3: "place-3" };
+
+function renderHistoryPlaceholder(racers) {
+  if (state.sample) {
+    el.historyBox.innerHTML = `
+      <h3>過去実績・得意コース</h3>
+      <div class="note">サンプルデータ表示中は利用できません（サンプルは1日分のみのため）。</div>
+    `;
+    return;
+  }
+  el.historyBox.innerHTML = `
+    <h3>過去実績・得意コース</h3>
+    <div class="note">
+      直近${DEFAULT_LOOKBACK_DAYS}日分のレース結果を取得して、選手ごとの直近成績と得意コースを集計します。
+      日別データ(数MB)をまとめて取得するため、初回は少し時間がかかります。
+    </div>
+    <button id="history-load-btn" class="ghost-btn" type="button">過去実績を取得する</button>
+  `;
+  document.getElementById("history-load-btn")?.addEventListener("click", () => loadHistory(racers));
+}
+
+async function loadHistory(racers) {
+  const btn = document.getElementById("history-load-btn");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "取得中… (0/" + DEFAULT_LOOKBACK_DAYS + "日)";
+  }
+  const seq = state.loadSeq; // 現在表示中のレースを離れたら結果を破棄する
+  try {
+    const days = await fetchRecentDays(state.date, DEFAULT_LOOKBACK_DAYS, (done, total) => {
+      if (btn) btn.textContent = `取得中… (${done}/${total}日)`;
+    });
+    if (seq !== state.loadSeq) return;
+    if (days.length === 0) {
+      el.historyBox.innerHTML = `<h3>過去実績・得意コース</h3><div class="note">過去データを取得できませんでした。</div>`;
+      return;
+    }
+    renderHistoryResults(racers, days);
+  } catch (err) {
+    if (seq !== state.loadSeq) return;
+    el.historyBox.innerHTML = `<h3>過去実績・得意コース</h3><div class="note">取得に失敗しました: ${err.message}</div>`;
+  }
+}
+
+function renderHistoryResults(racers, days) {
+  const rows = racers
+    .map((r) => {
+      const h = buildRacerHistory(days, r.registrationNumber);
+      const recentBadges = h.recentResults
+        .map((e) => {
+          const cls = PLACE_BADGE_CLASS[e.placeNumber] || "place-other";
+          return `<span class="place-badge ${cls}" title="${e.date} ${e.stadiumName}${e.raceNumber}R ${e.courseNumber ?? "-"}コース">${e.placeNumber}</span>`;
+        })
+        .join("");
+      const bestCourseText = h.bestCourse
+        ? (() => {
+            const s = h.courseStats[h.bestCourse];
+            return `${wakuBadge(h.bestCourse)}コース得意 (勝率${((s.wins / s.races) * 100).toFixed(0)}% ${s.races}走)`;
+          })()
+        : "データ不足";
+      return `<div class="combo-row history-row">
+        <span class="combo">${wakuBadge(r.entryNumber)} ${r.name}</span>
+        <span>${bestCourseText}</span>
+        <span class="place-badges">${recentBadges || "直近成績なし"}</span>
+        <span class="note-inline">直近${DEFAULT_LOOKBACK_DAYS}日中 ${h.totalRaces}走</span>
+      </div>`;
+    })
+    .join("");
+
+  el.historyBox.innerHTML = `
+    <h3>過去実績・得意コース（直近${DEFAULT_LOOKBACK_DAYS}日）</h3>
+    <div class="combo-list">${rows}</div>
+    <div class="note">得意コースは同一コースで2走以上ある場合のみ判定しています。母数が少ないため参考程度にご覧ください。</div>
+  `;
+}
+
 function renderTrifecta(prediction) {
   if (!prediction.trifectaBox || prediction.trifectaBox.length === 0) {
     el.trifectaBox.innerHTML = "";
@@ -324,6 +402,7 @@ async function loadRaceDetail() {
   showPanel("detail");
   el.racerTableWrap.innerHTML = `<div class="empty-state">読み込み中…</div>`;
   el.weatherBox.innerHTML = "";
+  el.historyBox.innerHTML = "";
   el.trifectaBox.innerHTML = "";
   el.anaBox.innerHTML = "";
   el.resultBox.innerHTML = "";
@@ -342,6 +421,7 @@ async function loadRaceDetail() {
     `;
     renderWeather(detail.prediction.weather);
     renderRacerTable(detail.prediction);
+    renderHistoryPlaceholder(detail.prediction.racers);
     renderTrifecta(detail.prediction);
     renderAna(detail.prediction);
     renderResult(detail.result);
