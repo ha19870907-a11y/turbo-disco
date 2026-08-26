@@ -3,6 +3,12 @@
 出走表・直前情報・オッズをリアルタイムに近い形（約3分間隔）で取得し、独自のスコアリングで
 勝率・推奨買い目を算出するボートレース予想ツールです。
 
+このリポジトリには同じ予想ロジックを使った2つの実装があります。
+
+- **`docs/`**: サーバー不要の静的Webアプリ（PWA）。GitHub Pages でそのまま公開でき、
+  スマホでホーム画面に追加すればアプリのように起動できます。**まずはこちらの利用を推奨します。**
+- **`server.js` + `public/` + `src/`**: Node.js/Express 版。自分のPCやサーバーで動かす場合に。
+
 ## 特徴
 
 - データソースは [Turnmark Boatrace Open API](https://github.com/turnmark/api)（非公式・約3分間隔で更新）。
@@ -16,7 +22,22 @@
 - ネットワークに繋がらない環境でも動作確認できるよう、実データを基にしたサンプルデータ表示
   モードを搭載しています。
 
-## セットアップ
+## 公開する（GitHub Pages・推奨）
+
+`docs/` フォルダはサーバー不要の静的PWAで、ブラウザから直接データソースを取得します。
+GitHub Pages を有効にするだけで、誰でもURLからアプリとして使えるようになります。
+
+1. GitHubでこのリポジトリの **Settings → Pages** を開く
+2. **Build and deployment → Source** を「Deploy from a branch」に設定
+3. **Branch** で公開したいブランチ（例: `main`）と **フォルダを `/docs`** に設定して **Save**
+4. 数分後、`https://<ユーザー名>.github.io/<リポジトリ名>/` でアクセスできるようになります
+
+公開後、スマホのブラウザでそのURLを開き「ホーム画面に追加」すると、アイコンから
+アプリのように起動できます（PWA）。
+
+## ローカルで動かす（Node.js版）
+
+自分のPC・サーバーで動かしたい場合は Node.js 版を使えます。
 
 ```bash
 npm install
@@ -38,7 +59,8 @@ npm start
 
 ## 予想アルゴリズムについて
 
-`src/predictor.js` にスコアリングロジックがあります。主な考慮要素と重み付けは以下の通りです。
+`src/predictor.js`（Node版）/ `docs/predictor.js`（静的版・内容は同一）にスコアリングロジックが
+あります。主な考慮要素と重み付けは以下の通りです。
 
 | 要素 | 重み(目安) | 備考 |
 |---|---|---|
@@ -60,18 +82,25 @@ npm start
 ## 構成
 
 ```
-server.js              Express サーバー・APIエンドポイント
+docs/                   静的PWA版（GitHub Pages公開用、サーバー不要）
+  index.html/app.js/client.js  UI・データ取得（ブラウザから直接APIへfetch）
+  predictor.js/stadiums.js     予想ロジック（src/ と同一内容）
+  manifest.webmanifest/sw.js   PWA設定・サービスワーカー
+  fixtures/                    サンプルデータ表示モード用の実データ（2026-04-01）
+
+server.js              Express サーバー・APIエンドポイント（Node版）
 src/turnmarkClient.js  外部APIの取得・キャッシュ（TTL 60秒）・ミラーフォールバック
 src/predictor.js        予想スコアリングロジック
 src/stadiums.js         競艇場番号 → 場名マッピング
 src/dateUtil.js         日本時間の日付ユーティリティ
-public/                 フロントエンド（素のHTML/CSS/JS、ビルド不要）
-fixtures/               サンプルデータ表示モード用の実データ（2026-04-01）
+public/                 Node版フロントエンド（素のHTML/CSS/JS、ビルド不要）
+fixtures/               サンプルデータ表示モード用の実データ（2026-04-01, Node版用）
 ```
 
 ## 注意事項
 
 - データソースは非公式のオープンAPI（turnmark/api）です。公式サイトとは一切関係なく、
   正確性・完全性は保証されません。重要な情報は公式サイトで確認してください。
-- サーバーがAPI取得元（`turnmark.github.io` および そのミラーの
-  `raw.githubusercontent.com`）に到達できるネットワーク環境が必要です。
+- 静的PWA版はブラウザから直接 `turnmark.github.io`（および そのミラーの
+  `raw.githubusercontent.com`）にアクセスします。Node版はサーバーがそこに到達できる
+  ネットワーク環境が必要です。
