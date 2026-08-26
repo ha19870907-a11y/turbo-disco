@@ -39,6 +39,9 @@ const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // 200MB/本
 const MAX_VIDEOS_PER_GROUP = 15; // 動画はデコード負荷が高いため写真より低い上限にする
 const MAX_VIDEO_CLIP_SECONDS = 15; // 1クリップが動画内で使われる長さの上限
 const DEFAULT_VIDEO_CLIP_SECONDS = 5;
+const BEAT_ANALYSIS_MAX_SECONDS = 60; // テンポ検出に使う先頭部分の長さ（テンポは曲を通して一定と仮定）
+const BEAT_MIN_BPM = 80;
+const BEAT_MAX_BPM = 180;
 
 const state = {
   bgmFiles: [], // { id, file }
@@ -96,6 +99,8 @@ const els = {
   bgmDropzone: document.getElementById("bgm-dropzone"),
   bgmInput: document.getElementById("bgm-input"),
   bgmList: document.getElementById("bgm-list"),
+  beatSyncEnabled: document.getElementById("beat-sync-enabled"),
+  beatSyncInterval: document.getElementById("beat-sync-interval"),
   addBgmBtn: document.getElementById("add-bgm-btn"),
   bgmProgressBox: document.getElementById("bgm-progress-box"),
   bgmProgressFill: document.getElementById("bgm-progress-fill"),
@@ -604,7 +609,10 @@ function introLines(settings) {
 
 // 動画クリップはその本編の長さ（ユーザーが調整した使用秒数）で表示し、
 // 写真は共通の photoDuration 設定で表示する。
+// ただしビート同期が有効な場合は、写真・動画とも検出したBGMのテンポに
+// 合わせた長さ（beatSyncDuration）で統一する。
 function mediaDuration(item, settings) {
+  if (settings.beatSyncDuration) return settings.beatSyncDuration;
   return item.kind === "video" ? item.clipSeconds : settings.photoDuration;
 }
 
@@ -1123,6 +1131,84 @@ async function loadAudioDuration(file) {
   return { url, duration };
 }
 
+// BGMのテンポ（拍の間隔）をおおまかに検出する。低域（キック・ベース帯域）を
+// 強調したエネルギー包絡線から立ち上がり（オンセット）を検出し、オンセット間隔の
+// 中央値をテンポの目安として採用する簡易的な手法（完璧な検出ではない）。
+async function detectBeats(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  const decodeCtx = new AudioCtx();
+  let audioBuffer;
+  try {
+    audioBuffer = await decodeCtx.decodeAudioData(arrayBuffer);
+  } finally {
+    decodeCtx.close();
+  }
+
+  const sampleRate = audioBuffer.sampleRate;
+  const analyzeSeconds = Math.min(audioBuffer.duration, BEAT_ANALYSIS_MAX_SECONDS);
+  const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const offline = new OfflineCtx(1, Math.ceil(sampleRate * analyzeSeconds), sampleRate);
+  const source = offline.createBufferSource();
+  source.buffer = audioBuffer;
+  const lowpass = offline.createBiquadFilter();
+  lowpass.type = "lowpass";
+  lowpass.frequency.value = 150;
+  source.connect(lowpass);
+  lowpass.connect(offline.destination);
+  source.start(0);
+  const rendered = await offline.startRendering();
+  const data = rendered.getChannelData(0);
+
+  const hopSeconds = 0.02;
+  const hopSize = Math.max(1, Math.round(sampleRate * hopSeconds));
+  const frameCount = Math.floor(data.length / hopSize);
+  const energies = new Float32Array(frameCount);
+  for (let i = 0; i < frameCount; i++) {
+    let sum = 0;
+    const start = i * hopSize;
+    const end = start + hopSize;
+    for (let j = start; j < end; j++) {
+      const v = data[j];
+      sum += v * v;
+    }
+    energies[i] = sum / hopSize;
+  }
+
+  const windowFrames = Math.round(1 / hopSeconds);
+  const minGapFrames = Math.round(0.25 / hopSeconds);
+  const onsets = [];
+  let lastOnsetFrame = -Infinity;
+  for (let i = 0; i < frameCount; i++) {
+    const winStart = Math.max(0, i - windowFrames);
+    let sum = 0;
+    for (let k = winStart; k < i; k++) sum += energies[k];
+    const count = i - winStart;
+    const localAvg = count > 0 ? sum / count : 0;
+    if (energies[i] > localAvg * 1.4 && energies[i] > 1e-6 && i - lastOnsetFrame >= minGapFrames) {
+      onsets.push(i * hopSeconds);
+      lastOnsetFrame = i;
+    }
+  }
+
+  if (onsets.length < 4) {
+    return { beatInterval: 60 / 124, confident: false };
+  }
+
+  const intervals = [];
+  for (let i = 1; i < onsets.length; i++) intervals.push(onsets[i] - onsets[i - 1]);
+  intervals.sort((a, b) => a - b);
+  let beatInterval = intervals[Math.floor(intervals.length / 2)];
+
+  // 検出間隔がテンポの整数倍(半分・2倍など)になりがちなため、妥当なBPM帯に収める
+  const minInterval = 60 / BEAT_MAX_BPM;
+  const maxInterval = 60 / BEAT_MIN_BPM;
+  for (let guard = 0; beatInterval < minInterval && guard < 8; guard++) beatInterval *= 2;
+  for (let guard = 0; beatInterval > maxInterval && guard < 8; guard++) beatInterval /= 2;
+
+  return { beatInterval, confident: true };
+}
+
 // 選んだ曲を順番に、動画の長さを満たすまで繰り返し並べたスケジュールを作る。
 // 曲の切り替わり・ループのつなぎ目にはAUDIO_CROSSFADE_SEC分の重なりを持たせる。
 function buildAudioSchedule(infos, totalDuration) {
@@ -1245,10 +1331,18 @@ async function setupAudioPlaylist(audioFiles, totalDuration, audioDucks = []) {
   return { audioTracks: dest.stream.getAudioTracks(), onFrame, cleanup };
 }
 
-async function renderVideo({ audioFiles, onProgress } = {}) {
-  const settings = getSettings();
+async function renderVideo({ audioFiles, beatSyncCutDuration, onProgress } = {}) {
+  let settings = getSettings();
   if (countPhotos(settings) === 0) {
-    throw new Error("写真を1枚以上追加してください");
+    throw new Error("写真・動画を1つ以上追加してください");
+  }
+  if (beatSyncCutDuration) {
+    settings = {
+      ...settings,
+      beatSyncDuration: beatSyncCutDuration,
+      // 短い拍間隔にトランジションが食い込みすぎないよう、切り替え長も合わせて短縮する
+      transitionDuration: Math.min(settings.transitionDuration, beatSyncCutDuration * 0.4),
+    };
   }
   const timeline = computeTimeline(settings);
   const canvas = els.canvas;
@@ -1348,7 +1442,7 @@ function fixVideoDuration(videoEl) {
 
 els.createBtn.addEventListener("click", async () => {
   if (countPhotos(getSettings()) === 0) {
-    alert("写真を1枚以上追加してください");
+    alert("写真・動画を1つ以上追加してください");
     return;
   }
   els.createBtn.disabled = true;
@@ -1384,11 +1478,28 @@ els.addBgmBtn.addEventListener("click", async () => {
   els.addBgmBtn.disabled = true;
   els.bgmProgressBox.classList.remove("hidden");
   els.finalBox.classList.add("hidden");
+
+  let beatSyncCutDuration;
+  if (els.beatSyncEnabled.checked) {
+    setProgress(els.bgmProgressFill, els.bgmProgressLabel, 0, "BGMのテンポを解析中…");
+    try {
+      const beatInfo = await detectBeats(state.bgmFiles[0].file);
+      const beatsPerCut = Number(els.beatSyncInterval.value) || 2;
+      beatSyncCutDuration = beatInfo.beatInterval * beatsPerCut;
+      if (!beatInfo.confident) {
+        alert("BGMのテンポを自動検出できなかったため、124BPM相当を仮定して調整します（曲によってはズレる場合があります）");
+      }
+    } catch (err) {
+      alert(`BGMのテンポ解析に失敗したため、通常の設定で書き出します: ${err.message || err}`);
+    }
+  }
+
   setProgress(els.bgmProgressFill, els.bgmProgressLabel, 0, "BGMを合成中…");
 
   try {
     const blob = await renderVideo({
       audioFiles: state.bgmFiles.map((track) => track.file),
+      beatSyncCutDuration,
       onProgress: (ratio) =>
         setProgress(els.bgmProgressFill, els.bgmProgressLabel, ratio, `BGMを合成中… ${Math.round(ratio * 100)}%`),
     });

@@ -192,6 +192,26 @@
         <input id="bgm-input" type="file" accept="audio/*" multiple hidden />
       </div>
       <div id="bgm-list" class="bgm-list"></div>
+
+      <div class="beat-sync-box">
+        <label class="checkbox-label">
+          <input type="checkbox" id="beat-sync-enabled" />
+          BGMのビートに合わせて自動でカット（写真・動画の長さを自動調整）
+        </label>
+        <label class="beat-sync-interval-label">何拍ごとに切り替える
+          <select id="beat-sync-interval">
+            <option value="1">1拍ごと（かなり速い）</option>
+            <option value="2" selected>2拍ごと（おすすめ）</option>
+            <option value="4">4拍ごと（ややゆったり）</option>
+          </select>
+        </label>
+        <p class="hint">
+          リストの先頭のBGMのテンポを解析し、写真・動画の表示時間をそのテンポに自動で合わせます
+          （動画の「使用秒数」設定は上書きされます）。テンポ検出は完全ではないため、曲によっては
+          ズレが生じる場合があります。有効にすると無音プレビューとは長さが変わります。
+        </p>
+      </div>
+
       <button id="add-bgm-btn" class="primary-btn" type="button" disabled>BGM付きで書き出す</button>
       <div id="bgm-progress-box" class="progress-box hidden">
         <div class="progress-bar"><div id="bgm-progress-fill" class="progress-fill"></div></div>
