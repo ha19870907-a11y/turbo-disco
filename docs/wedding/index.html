@@ -27,7 +27,7 @@
         <p>ここに写真をドラッグ＆ドロップ<br />またはクリックして選択</p>
         <input id="file-input" type="file" accept="image/*" multiple hidden />
       </div>
-      <p class="hint">複数選択できます。並び順はサムネイルをドラッグして入れ替えられます。（目安: 100枚以下推奨）</p>
+      <p class="hint">複数選択できます。並び順はサムネイルをドラッグして入れ替えられます。（目安: 100枚以下推奨）<br />各写真の下の欄にひとことキャプションを入れると、その写真が表示されている間だけ文字が重なって表示されます。</p>
       <div id="photo-grid" class="photo-grid"></div>
     </section>
 
@@ -56,7 +56,16 @@
         <label>1枚あたりの表示時間（秒）
           <input id="photo-duration" type="number" min="1.5" max="10" step="0.5" value="4" />
         </label>
-        <label>切り替え（クロスフェード）の長さ（秒）
+        <label>切り替え効果
+          <select id="transition-type">
+            <option value="crossfade">クロスフェード</option>
+            <option value="slide">スライド</option>
+            <option value="zoom">ズーム</option>
+            <option value="wipe">ワイプ</option>
+            <option value="random">ランダム（写真ごとに変える）</option>
+          </select>
+        </label>
+        <label>切り替えの長さ（秒）
           <input id="transition-duration" type="number" min="0.3" max="2" step="0.1" value="0.8" />
         </label>
       </div>
@@ -78,8 +87,12 @@
 
     <section id="bgm-section" class="panel disabled">
       <h2>4. BGMを追加</h2>
-      <p class="hint">先に音声なしムービーを作成すると、この欄が使えるようになります。動画と同じ長さで書き出し直します（曲は自動でループ／末尾でフェードアウトします）。</p>
-      <input id="bgm-input" type="file" accept="audio/*" />
+      <p class="hint">先に音声なしムービーを作成すると、この欄が使えるようになります。動画と同じ長さで書き出し直します。複数曲を選ぶと選んだ順にクロスフェードしながら再生し、動画の長さに足りない分は自動で繰り返します（末尾はフェードアウトします）。</p>
+      <div id="bgm-dropzone" class="dropzone bgm-dropzone">
+        <p>ここに音楽ファイルをドラッグ＆ドロップ（複数可）<br />またはクリックして選択</p>
+        <input id="bgm-input" type="file" accept="audio/*" multiple hidden />
+      </div>
+      <div id="bgm-list" class="bgm-list"></div>
       <button id="add-bgm-btn" class="primary-btn" type="button" disabled>BGM付きで書き出す</button>
       <div id="bgm-progress-box" class="progress-box hidden">
         <div class="progress-bar"><div id="bgm-progress-fill" class="progress-fill"></div></div>

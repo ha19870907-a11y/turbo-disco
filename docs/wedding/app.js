@@ -16,17 +16,23 @@ const INTRO_DUR = 3.2;
 const OUTRO_DUR = 3.2;
 const FADE = 0.6;
 const ZOOM_AMOUNT = 0.16;
+const TRANSITION_TYPES = ["crossfade", "slide", "zoom", "wipe"];
+const AUDIO_CROSSFADE_SEC = 1.2;
 
 // 入力ファイルに対する上限（悪意あるファイルやサイズの大きすぎるファイルで
 // タブがフリーズ・クラッシュするのを防ぐための安全策）
 const MAX_PHOTOS = 300;
 const MAX_PHOTO_BYTES = 30 * 1024 * 1024; // 30MB/枚
-const MAX_AUDIO_BYTES = 150 * 1024 * 1024; // 150MB
+const MAX_AUDIO_BYTES = 150 * 1024 * 1024; // 150MB/曲
+const MAX_BGM_TRACKS = 20;
 const MAX_IMAGE_LONG_EDGE = 2400; // 書き出しに必要な解像度を大きく超える画像はここまで縮小して保持する
+const MAX_CAPTION_LENGTH = 40;
 
 const state = {
-  photos: [], // { id, url, img }
+  photos: [], // { id, url, img, caption }
   nextId: 1,
+  bgmFiles: [], // { id, file }
+  nextBgmId: 1,
 };
 
 const els = {
@@ -39,6 +45,7 @@ const els = {
   endMessage: document.getElementById("end-message"),
   themeSelect: document.getElementById("theme-select"),
   photoDuration: document.getElementById("photo-duration"),
+  transitionType: document.getElementById("transition-type"),
   transitionDuration: document.getElementById("transition-duration"),
   durationEstimate: document.getElementById("duration-estimate"),
   createBtn: document.getElementById("create-btn"),
@@ -49,7 +56,9 @@ const els = {
   previewVideo: document.getElementById("preview-video"),
   downloadSilent: document.getElementById("download-silent"),
   bgmSection: document.getElementById("bgm-section"),
+  bgmDropzone: document.getElementById("bgm-dropzone"),
   bgmInput: document.getElementById("bgm-input"),
+  bgmList: document.getElementById("bgm-list"),
   addBgmBtn: document.getElementById("add-bgm-btn"),
   bgmProgressBox: document.getElementById("bgm-progress-box"),
   bgmProgressFill: document.getElementById("bgm-progress-fill"),
@@ -68,6 +77,7 @@ function getSettings() {
     endMessage: els.endMessage.value.trim() || "Thank You",
     theme: THEMES[els.themeSelect.value] || THEMES.pink,
     photoDuration: Math.min(Math.max(Number(els.photoDuration.value) || 4, 1.5), 10),
+    transitionType: els.transitionType.value || "crossfade",
     transitionDuration: Math.min(Math.max(Number(els.transitionDuration.value) || 0.8, 0.3), 2),
   };
 }
@@ -133,7 +143,7 @@ async function addFiles(fileList) {
     try {
       const rawImg = await loadImage(url);
       const renderSource = capImageSize(rawImg);
-      state.photos.push({ id: state.nextId++, url, img: renderSource });
+      state.photos.push({ id: state.nextId++, url, img: renderSource, caption: "" });
     } catch (err) {
       skippedInvalid++;
       URL.revokeObjectURL(url);
@@ -157,14 +167,17 @@ function renderPhotoGrid() {
     item.draggable = true;
     item.dataset.id = String(photo.id);
 
+    const thumb = document.createElement("div");
+    thumb.className = "photo-thumb";
+
     const img = document.createElement("img");
     img.src = photo.url;
-    item.appendChild(img);
+    thumb.appendChild(img);
 
     const badge = document.createElement("span");
     badge.className = "order-badge";
     badge.textContent = String(index + 1);
-    item.appendChild(badge);
+    thumb.appendChild(badge);
 
     const removeBtn = document.createElement("button");
     removeBtn.className = "remove-btn";
@@ -176,7 +189,20 @@ function renderPhotoGrid() {
       renderPhotoGrid();
       updateDurationEstimate();
     });
-    item.appendChild(removeBtn);
+    thumb.appendChild(removeBtn);
+    item.appendChild(thumb);
+
+    const captionInput = document.createElement("input");
+    captionInput.type = "text";
+    captionInput.className = "photo-caption-input";
+    captionInput.placeholder = "文字を入れる（任意）";
+    captionInput.maxLength = MAX_CAPTION_LENGTH;
+    captionInput.value = photo.caption || "";
+    captionInput.draggable = false; // 親要素のdraggable=trueを継承させず、テキスト選択と競合させない
+    captionInput.addEventListener("input", () => {
+      photo.caption = captionInput.value;
+    });
+    item.appendChild(captionInput);
 
     item.addEventListener("dragstart", (e) => {
       e.dataTransfer.setData("text/plain", String(photo.id));
@@ -223,6 +249,119 @@ els.dropzone.addEventListener("drop", (e) => addFiles(e.dataTransfer.files));
 [els.photoDuration, els.transitionDuration].forEach((el) =>
   el.addEventListener("input", updateDurationEstimate)
 );
+
+// --- BGM（複数曲）の追加・並べ替え ---
+
+function renderBgmList() {
+  els.bgmList.innerHTML = "";
+  state.bgmFiles.forEach((track, index) => {
+    const row = document.createElement("div");
+    row.className = "bgm-row";
+    row.draggable = true;
+    row.dataset.id = String(track.id);
+
+    const badge = document.createElement("span");
+    badge.className = "bgm-order";
+    badge.textContent = String(index + 1);
+    row.appendChild(badge);
+
+    const name = document.createElement("span");
+    name.className = "bgm-name";
+    name.textContent = track.file.name;
+    row.appendChild(name);
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "bgm-remove";
+    removeBtn.type = "button";
+    removeBtn.textContent = "×";
+    removeBtn.addEventListener("click", () => {
+      state.bgmFiles = state.bgmFiles.filter((t) => t.id !== track.id);
+      renderBgmList();
+      updateAddBgmButtonState();
+    });
+    row.appendChild(removeBtn);
+
+    row.addEventListener("dragstart", (e) => {
+      e.dataTransfer.setData("text/plain", String(track.id));
+      e.dataTransfer.effectAllowed = "move";
+    });
+    row.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      row.classList.add("drag-over");
+    });
+    row.addEventListener("dragleave", () => row.classList.remove("drag-over"));
+    row.addEventListener("drop", (e) => {
+      e.preventDefault();
+      row.classList.remove("drag-over");
+      const draggedId = Number(e.dataTransfer.getData("text/plain"));
+      if (draggedId === track.id) return;
+      const fromIndex = state.bgmFiles.findIndex((t) => t.id === draggedId);
+      const toIndex = state.bgmFiles.findIndex((t) => t.id === track.id);
+      if (fromIndex < 0 || toIndex < 0) return;
+      const [moved] = state.bgmFiles.splice(fromIndex, 1);
+      state.bgmFiles.splice(toIndex, 0, moved);
+      renderBgmList();
+    });
+
+    els.bgmList.appendChild(row);
+  });
+}
+
+function updateAddBgmButtonState() {
+  els.addBgmBtn.disabled = state.bgmFiles.length === 0;
+}
+
+function addBgmFiles(fileList) {
+  const incoming = Array.from(fileList).filter((f) => f.type.startsWith("audio/"));
+  if (incoming.length === 0) {
+    if (fileList.length > 0) alert("音声ファイルを選択してください");
+    return;
+  }
+
+  const remainingSlots = MAX_BGM_TRACKS - state.bgmFiles.length;
+  if (remainingSlots <= 0) {
+    alert(`BGMは最大${MAX_BGM_TRACKS}曲まで追加できます`);
+    return;
+  }
+  const toAdd = incoming.slice(0, remainingSlots);
+  if (incoming.length > toAdd.length) {
+    alert(`BGMは最大${MAX_BGM_TRACKS}曲までのため、一部の曲は追加されませんでした`);
+  }
+
+  let skippedLarge = 0;
+  toAdd.forEach((file) => {
+    if (file.size > MAX_AUDIO_BYTES) {
+      skippedLarge++;
+      return;
+    }
+    state.bgmFiles.push({ id: state.nextBgmId++, file });
+  });
+  if (skippedLarge > 0) {
+    alert(`容量が大きすぎる音声${skippedLarge}件は追加しませんでした（上限: ${Math.round(MAX_AUDIO_BYTES / 1024 / 1024)}MB/曲）`);
+  }
+
+  renderBgmList();
+  updateAddBgmButtonState();
+}
+
+els.bgmDropzone.addEventListener("click", () => els.bgmInput.click());
+els.bgmInput.addEventListener("change", (e) => {
+  addBgmFiles(e.target.files);
+  els.bgmInput.value = "";
+});
+["dragenter", "dragover"].forEach((evt) =>
+  els.bgmDropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    els.bgmDropzone.classList.add("dragover");
+  })
+);
+["dragleave", "drop"].forEach((evt) =>
+  els.bgmDropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    els.bgmDropzone.classList.remove("dragover");
+  })
+);
+els.bgmDropzone.addEventListener("drop", (e) => addBgmFiles(e.dataTransfer.files));
 
 function computeTimeline(settings) {
   const segments = [];
@@ -326,7 +465,36 @@ function drawTitleCard(ctx, seg, localT, settings) {
   ctx.restore();
 }
 
-function drawPhoto(ctx, seg, localT) {
+function drawCaption(ctx, text, localT, duration, theme) {
+  const alpha = fadeAlpha(localT, duration, Math.min(FADE, duration / 2));
+  if (alpha <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  const barHeight = 92;
+  const y = CANVAS_H - barHeight;
+  const grad = ctx.createLinearGradient(0, y, 0, CANVAS_H);
+  grad.addColorStop(0, "rgba(0,0,0,0)");
+  grad.addColorStop(1, "rgba(0,0,0,0.62)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, y, CANVAS_W, barHeight);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = "500 32px serif";
+  ctx.fillText(text, CANVAS_W / 2, CANVAS_H - barHeight / 2 + 8, CANVAS_W - 80);
+
+  ctx.strokeStyle = theme.accent;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(CANVAS_W / 2 - 40, CANVAS_H - barHeight / 2 - 24);
+  ctx.lineTo(CANVAS_W / 2 + 40, CANVAS_H - barHeight / 2 - 24);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawPhoto(ctx, seg, localT, settings) {
   const { img } = seg.photo;
   const progress = Math.min(Math.max(localT / seg.duration, 0), 1);
   const zoomIn = seg.variant % 2 === 0;
@@ -369,6 +537,71 @@ function drawPhoto(ctx, seg, localT) {
     drawW,
     drawH
   );
+
+  if (seg.photo.caption) {
+    drawCaption(ctx, seg.photo.caption, localT, seg.duration, settings.theme);
+  }
+}
+
+// トランジション合成用のオフスクリーンバッファ（フレームごとに使い回す）
+const transitionBufferA = document.createElement("canvas");
+const transitionBufferB = document.createElement("canvas");
+transitionBufferA.width = CANVAS_W;
+transitionBufferA.height = CANVAS_H;
+transitionBufferB.width = CANVAS_W;
+transitionBufferB.height = CANVAS_H;
+const transitionCtxA = transitionBufferA.getContext("2d");
+const transitionCtxB = transitionBufferB.getContext("2d");
+
+// "ランダム"指定時、写真の切り替えごとに使う効果を決める。
+// インデックスから決定的に導出するので、BGM追加時の再生成でも同じ映像になる。
+function pickTransitionType(settings, index) {
+  if (settings.transitionType !== "random") return settings.transitionType;
+  const seed = (index * 9301 + 49297) % 233280;
+  const pos = Math.floor((seed / 233280) * TRANSITION_TYPES.length);
+  return TRANSITION_TYPES[pos];
+}
+
+function compositeTransition(ctx, canvasA, canvasB, progress, type) {
+  switch (type) {
+    case "slide": {
+      const dx = CANVAS_W * progress;
+      ctx.drawImage(canvasA, -dx, 0);
+      ctx.drawImage(canvasB, CANVAS_W - dx, 0);
+      break;
+    }
+    case "zoom": {
+      ctx.drawImage(canvasA, 0, 0);
+      const scale = 1.15 - 0.15 * progress;
+      const w = CANVAS_W * scale;
+      const h = CANVAS_H * scale;
+      ctx.save();
+      ctx.globalAlpha = progress;
+      ctx.drawImage(canvasB, (CANVAS_W - w) / 2, (CANVAS_H - h) / 2, w, h);
+      ctx.restore();
+      break;
+    }
+    case "wipe": {
+      ctx.drawImage(canvasA, 0, 0);
+      const wipeX = CANVAS_W * progress;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, wipeX, CANVAS_H);
+      ctx.clip();
+      ctx.drawImage(canvasB, 0, 0);
+      ctx.restore();
+      break;
+    }
+    case "crossfade":
+    default: {
+      ctx.drawImage(canvasA, 0, 0);
+      ctx.save();
+      ctx.globalAlpha = progress;
+      ctx.drawImage(canvasB, 0, 0);
+      ctx.restore();
+      break;
+    }
+  }
 }
 
 function drawFrame(ctx, timeline, t, settings) {
@@ -382,18 +615,21 @@ function drawFrame(ctx, timeline, t, settings) {
 
   const seg = segments[activeIndex];
   const localT = t - startTimes[activeIndex];
-  drawSegment(ctx, seg, localT, settings);
+  const hasNext = activeIndex < segments.length - 1;
+  const nextStart = hasNext ? startTimes[activeIndex + 1] : null;
+  const inTransition = hasNext && t >= nextStart;
 
-  if (activeIndex < segments.length - 1) {
-    const nextStart = startTimes[activeIndex + 1];
-    if (t >= nextStart) {
-      const alpha = Math.min(Math.max((t - nextStart) / settings.transitionDuration, 0), 1);
-      const nextSeg = segments[activeIndex + 1];
-      ctx.save();
-      ctx.globalAlpha = alpha;
-      drawSegment(ctx, nextSeg, t - nextStart, settings);
-      ctx.restore();
-    }
+  if (!inTransition) {
+    drawSegment(ctx, seg, localT, settings);
+  } else {
+    const nextSeg = segments[activeIndex + 1];
+    const progress = Math.min(Math.max((t - nextStart) / settings.transitionDuration, 0), 1);
+    transitionCtxA.clearRect(0, 0, CANVAS_W, CANVAS_H);
+    drawSegment(transitionCtxA, seg, localT, settings);
+    transitionCtxB.clearRect(0, 0, CANVAS_W, CANVAS_H);
+    drawSegment(transitionCtxB, nextSeg, t - nextStart, settings);
+    const type = pickTransitionType(settings, activeIndex);
+    compositeTransition(ctx, transitionBufferA, transitionBufferB, progress, type);
   }
 
   drawVignette(ctx, settings.theme.accent);
@@ -403,7 +639,7 @@ function drawSegment(ctx, seg, localT, settings) {
   if (seg.type === "title") {
     drawTitleCard(ctx, seg, localT, settings);
   } else {
-    drawPhoto(ctx, seg, localT);
+    drawPhoto(ctx, seg, localT, settings);
   }
 }
 
@@ -421,7 +657,125 @@ function pickMimeType() {
   return "";
 }
 
-async function renderVideo({ audioFile, onProgress } = {}) {
+// 音声ファイル1つの長さだけを調べる（実際の再生には使わない専用の<audio>）
+async function loadAudioDuration(file) {
+  const url = URL.createObjectURL(file);
+  const probeEl = document.createElement("audio");
+  probeEl.preload = "metadata";
+  probeEl.src = url;
+  const duration = await new Promise((resolve) => {
+    probeEl.addEventListener(
+      "loadedmetadata",
+      () => resolve(isFinite(probeEl.duration) && probeEl.duration > 0 ? probeEl.duration : 180),
+      { once: true }
+    );
+    probeEl.addEventListener("error", () => resolve(180), { once: true });
+  });
+  return { url, duration };
+}
+
+// 選んだ曲を順番に、動画の長さを満たすまで繰り返し並べたスケジュールを作る。
+// 曲の切り替わり・ループのつなぎ目にはAUDIO_CROSSFADE_SEC分の重なりを持たせる。
+function buildAudioSchedule(infos, totalDuration) {
+  const schedule = [];
+  let t = 0;
+  let i = 0;
+  while (t < totalDuration && schedule.length < 500) {
+    const info = infos[i % infos.length];
+    const crossfade = Math.min(AUDIO_CROSSFADE_SEC, info.duration / 2);
+    schedule.push({ url: info.url, duration: info.duration, crossfade, start: t });
+    if (info.duration <= 0.05) break;
+    t += info.duration - crossfade;
+    i++;
+  }
+  return schedule;
+}
+
+// 複数曲のBGMを、曲間クロスフェード付きで動画の長さいっぱいに流すための再生管理。
+// 2つの<audio>要素を交互に使い、切り替わりのタイミングで音量をクロスフェードする。
+async function setupAudioPlaylist(audioFiles, totalDuration) {
+  const infos = [];
+  for (const file of audioFiles) {
+    infos.push(await loadAudioDuration(file));
+  }
+  const schedule = buildAudioSchedule(infos, totalDuration);
+
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  const audioCtx = new AudioCtx();
+  const audioElA = document.createElement("audio");
+  const audioElB = document.createElement("audio");
+  const sourceA = audioCtx.createMediaElementSource(audioElA);
+  const sourceB = audioCtx.createMediaElementSource(audioElB);
+  const gainA = audioCtx.createGain();
+  const gainB = audioCtx.createGain();
+  const masterGain = audioCtx.createGain();
+  const dest = audioCtx.createMediaStreamDestination();
+  gainA.gain.value = 0;
+  gainB.gain.value = 0;
+  sourceA.connect(gainA);
+  sourceB.connect(gainB);
+  gainA.connect(masterGain);
+  gainB.connect(masterGain);
+  masterGain.connect(dest);
+
+  const fadeStart = Math.max(totalDuration - 1.5, 0.1);
+  masterGain.gain.setValueAtTime(1, audioCtx.currentTime);
+  masterGain.gain.setValueAtTime(1, audioCtx.currentTime + fadeStart);
+  masterGain.gain.linearRampToValueAtTime(0.0001, audioCtx.currentTime + totalDuration);
+
+  let activeIsA = true;
+  let scheduleIndex = -1;
+
+  async function playScheduleItem(idx) {
+    if (idx === scheduleIndex) return;
+    scheduleIndex = idx;
+    const item = schedule[idx];
+    const incomingEl = activeIsA ? audioElB : audioElA;
+    const incomingGain = activeIsA ? gainB : gainA;
+    const outgoingGain = activeIsA ? gainA : gainB;
+    const now = audioCtx.currentTime;
+
+    incomingEl.src = item.url;
+    incomingEl.currentTime = 0;
+    incomingGain.gain.cancelScheduledValues(now);
+    incomingGain.gain.setValueAtTime(0, now);
+    try {
+      await incomingEl.play();
+    } catch (err) {
+      // 自動再生がブロックされても録画自体は続行する
+    }
+    incomingGain.gain.linearRampToValueAtTime(1, now + item.crossfade);
+
+    outgoingGain.gain.cancelScheduledValues(now);
+    outgoingGain.gain.setValueAtTime(outgoingGain.gain.value, now);
+    outgoingGain.gain.linearRampToValueAtTime(0, now + item.crossfade);
+
+    activeIsA = !activeIsA;
+  }
+
+  if (schedule.length > 0) {
+    await playScheduleItem(0);
+  }
+
+  function onFrame(t) {
+    let idx = scheduleIndex;
+    while (idx + 1 < schedule.length && t >= schedule[idx + 1].start) {
+      idx++;
+    }
+    if (idx !== scheduleIndex) playScheduleItem(idx);
+  }
+
+  function cleanup() {
+    audioElA.pause();
+    audioElB.pause();
+    infos.forEach((info) => URL.revokeObjectURL(info.url));
+    audioCtx.close();
+  }
+
+  return { audioTracks: dest.stream.getAudioTracks(), onFrame, cleanup };
+}
+
+async function renderVideo({ audioFiles, onProgress } = {}) {
   const settings = getSettings();
   if (state.photos.length === 0) {
     throw new Error("写真を1枚以上追加してください");
@@ -437,42 +791,13 @@ async function renderVideo({ audioFile, onProgress } = {}) {
   const videoStream = canvas.captureStream(30);
   let tracks = videoStream.getVideoTracks();
   let audioCleanup = null;
+  let onAudioFrame = null;
 
-  if (audioFile) {
-    const audioEl = document.createElement("audio");
-    audioEl.src = URL.createObjectURL(audioFile);
-    audioEl.loop = true;
-    await new Promise((resolve) => {
-      audioEl.addEventListener("canplaythrough", resolve, { once: true });
-      audioEl.addEventListener("error", resolve, { once: true });
-      audioEl.load();
-    });
-
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    const audioCtx = new AudioCtx();
-    const source = audioCtx.createMediaElementSource(audioEl);
-    const gainNode = audioCtx.createGain();
-    const dest = audioCtx.createMediaStreamDestination();
-    source.connect(gainNode);
-    gainNode.connect(dest);
-
-    const fadeStart = Math.max(timeline.total - 1.5, 0.1);
-    gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
-    gainNode.gain.setValueAtTime(1, audioCtx.currentTime + fadeStart);
-    gainNode.gain.linearRampToValueAtTime(0.0001, audioCtx.currentTime + timeline.total);
-
-    tracks = tracks.concat(dest.stream.getAudioTracks());
-    audioEl.currentTime = 0;
-    try {
-      await audioEl.play();
-    } catch (err) {
-      // 自動再生がブロックされても録画自体は続行する
-    }
-    audioCleanup = () => {
-      audioEl.pause();
-      URL.revokeObjectURL(audioEl.src);
-      audioCtx.close();
-    };
+  if (audioFiles && audioFiles.length > 0) {
+    const playlist = await setupAudioPlaylist(audioFiles, timeline.total);
+    tracks = tracks.concat(playlist.audioTracks);
+    onAudioFrame = playlist.onFrame;
+    audioCleanup = playlist.cleanup;
   }
 
   const combinedStream = new MediaStream(tracks);
@@ -494,6 +819,7 @@ async function renderVideo({ audioFile, onProgress } = {}) {
     function frame() {
       const t = (performance.now() - startPerf) / 1000;
       drawFrame(ctx, timeline, t, settings);
+      if (onAudioFrame) onAudioFrame(t);
       if (onProgress) onProgress(Math.min(t / timeline.total, 1));
       if (t < timeline.total) {
         requestAnimationFrame(frame);
@@ -560,7 +886,7 @@ els.createBtn.addEventListener("click", async () => {
     els.previewBox.classList.remove("hidden");
     await fixVideoDuration(els.previewVideo);
     els.bgmSection.classList.remove("disabled");
-    els.addBgmBtn.disabled = false;
+    updateAddBgmButtonState();
     setProgress(els.progressFill, els.progressLabel, 1, "完成しました");
   } catch (err) {
     alert(`生成に失敗しました: ${err.message || err}`);
@@ -571,17 +897,8 @@ els.createBtn.addEventListener("click", async () => {
 });
 
 els.addBgmBtn.addEventListener("click", async () => {
-  const file = els.bgmInput.files && els.bgmInput.files[0];
-  if (!file) {
-    alert("BGMファイルを選択してください");
-    return;
-  }
-  if (!file.type.startsWith("audio/")) {
-    alert("音声ファイルを選択してください");
-    return;
-  }
-  if (file.size > MAX_AUDIO_BYTES) {
-    alert(`音声ファイルの容量が大きすぎます（上限: ${Math.round(MAX_AUDIO_BYTES / 1024 / 1024)}MB）`);
+  if (state.bgmFiles.length === 0) {
+    alert("BGMファイルを1曲以上追加してください");
     return;
   }
   els.addBgmBtn.disabled = true;
@@ -591,7 +908,7 @@ els.addBgmBtn.addEventListener("click", async () => {
 
   try {
     const blob = await renderVideo({
-      audioFile: file,
+      audioFiles: state.bgmFiles.map((track) => track.file),
       onProgress: (ratio) =>
         setProgress(els.bgmProgressFill, els.bgmProgressLabel, ratio, `BGMを合成中… ${Math.round(ratio * 100)}%`),
     });
@@ -605,7 +922,7 @@ els.addBgmBtn.addEventListener("click", async () => {
     alert(`BGM付き書き出しに失敗しました: ${err.message || err}`);
     els.bgmProgressBox.classList.add("hidden");
   } finally {
-    els.addBgmBtn.disabled = false;
+    updateAddBgmButtonState();
   }
 });
 

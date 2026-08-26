@@ -93,24 +93,40 @@ main {
 }
 
 .photo-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: grab;
+}
+
+.photo-thumb {
   position: relative;
   border-radius: 8px;
   overflow: hidden;
   aspect-ratio: 1 / 1;
   background: #eee;
-  cursor: grab;
   border: 2px solid transparent;
 }
 
-.photo-item.drag-over {
+.photo-item.drag-over .photo-thumb {
   border-color: var(--accent-dark);
 }
 
-.photo-item img {
+.photo-thumb img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.photo-caption-input {
+  font: inherit;
+  font-size: 0.72rem;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: 100%;
+  color: var(--text);
 }
 
 .photo-item .order-badge {
@@ -230,6 +246,63 @@ main {
   border-radius: 10px;
   background: #000;
   display: block;
+}
+
+.bgm-dropzone {
+  padding: 18px;
+  margin-top: 10px;
+}
+
+.bgm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 14px 0;
+}
+
+.bgm-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  cursor: grab;
+}
+
+.bgm-row.drag-over {
+  border-color: var(--accent-dark);
+}
+
+.bgm-order {
+  flex-shrink: 0;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.bgm-name {
+  flex: 1;
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bgm-remove {
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  line-height: 1;
 }
 
 .hidden {
