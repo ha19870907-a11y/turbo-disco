@@ -139,11 +139,19 @@ main { max-width: 960px; margin: 0 auto; padding: 20px; }
 .weather-box .item .label { color: var(--muted); font-size: 0.72rem; display: block; }
 
 table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-th, td { padding: 8px 6px; text-align: center; border-bottom: 1px solid var(--border); }
+th, td { padding: 8px 6px; text-align: center; border-bottom: 1px solid var(--border); white-space: nowrap; }
 th { color: var(--muted); font-weight: 600; font-size: 0.75rem; }
 td.name-cell { text-align: left; }
 td.name-cell .rname { font-weight: 600; }
 td.name-cell .rmeta { font-size: 0.72rem; color: var(--muted); }
+
+/* 選手表・結果表は横に長いため、ページ全体ではなく表単体を横スクロールさせる。
+   nowrap と組み合わせないと日本語の名前が1文字ずつ縦に折り返されてしまう。 */
+#racer-table-wrap, .result-box {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+#racer-table-wrap table { min-width: 680px; }
 
 .mark { font-size: 1.1rem; font-weight: 700; }
 .mark-1 { color: #ff5b5b; }
@@ -167,8 +175,10 @@ td.name-cell .rmeta { font-size: 0.72rem; color: var(--muted); }
 .combo-list { display: flex; flex-direction: column; gap: 6px; }
 .combo-row {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
+  gap: 4px 10px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -191,6 +201,28 @@ td.name-cell .rmeta { font-size: 0.72rem; color: var(--muted); }
 .empty-state { color: var(--muted); font-size: 0.9rem; padding: 20px 0; text-align: center; }
 
 @media (max-width: 600px) {
+  .app-header { padding: 10px 14px; gap: 8px; }
+  .app-header h1 { font-size: 1.05rem; }
+  input[type="date"] { padding: 5px 8px; font-size: 0.85rem; }
+  .ghost-btn { padding: 5px 10px; font-size: 0.8rem; }
+  .status-badge { font-size: 0.72rem; padding: 3px 8px; }
+
+  main { padding: 12px; }
+  .panel { padding: 12px; margin-bottom: 14px; }
+  .panel h2 { font-size: 0.95rem; }
+
+  .stadium-grid, .race-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+  .card { padding: 10px; }
+
+  .weather-box { gap: 10px 16px; padding: 8px 10px; font-size: 0.78rem; }
+
   table { font-size: 0.75rem; }
-  th, td { padding: 6px 3px; }
+  th, td { padding: 6px 5px; }
+  #racer-table-wrap table { min-width: 620px; }
+  .prob-bar-wrap { width: 60px; }
+
+  .trifecta-box, .result-box { padding: 10px; margin-top: 14px; }
+  .combo-row { font-size: 0.78rem; padding: 6px 10px; }
+
+  .app-footer { padding: 16px 12px 28px; font-size: 0.7rem; }
 }
