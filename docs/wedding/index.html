@@ -17,11 +17,26 @@
 <body>
   <header class="app-header">
     <h1>💐 結婚式ムービー作成ツール</h1>
-    <p class="lead">写真を並べるだけで、Ken Burns風の動きとタイトルカード付きムービーを作成します。BGMは動画ができた後から追加できます。</p>
+    <p class="lead">写真を並べるだけでムービーを作成します。BGMは動画ができた後から追加できます。</p>
   </header>
 
   <main>
     <section class="panel">
+      <h2>0. テンプレートを選ぶ</h2>
+      <div class="template-toggle">
+        <label class="template-option">
+          <input type="radio" name="template" value="standard" checked />
+          <span><strong>スタンダード</strong><br />優しいKen Burns風のハイライトムービー</span>
+        </label>
+        <label class="template-option">
+          <input type="radio" name="template" value="opening" />
+          <span><strong>オープニング演出</strong><br />黒背景×ネオン、カウントダウンから入場までの疾走感ムービー</span>
+        </label>
+      </div>
+    </section>
+
+    <!-- スタンダード: 写真 -->
+    <section class="panel" id="standard-photos-section">
       <h2>1. 写真を追加</h2>
       <div id="dropzone" class="dropzone">
         <p>ここに写真をドラッグ＆ドロップ<br />またはクリックして選択</p>
@@ -31,7 +46,8 @@
       <div id="photo-grid" class="photo-grid"></div>
     </section>
 
-    <section class="panel">
+    <!-- スタンダード: タイトル設定 -->
+    <section class="panel" id="standard-settings-section">
       <h2>2. タイトル・演出設定</h2>
       <div class="form-grid">
         <label>新郎・新婦の名前
@@ -62,6 +78,7 @@
             <option value="slide">スライド</option>
             <option value="zoom">ズーム</option>
             <option value="wipe">ワイプ</option>
+            <option value="flash">フラッシュ</option>
             <option value="random">ランダム（写真ごとに変える）</option>
           </select>
         </label>
@@ -69,11 +86,92 @@
           <input id="transition-duration" type="number" min="0.3" max="2" step="0.1" value="0.8" />
         </label>
       </div>
-      <p id="duration-estimate" class="hint"></p>
+    </section>
+
+    <!-- オープニング演出: 設定 -->
+    <section class="panel hidden" id="opening-section">
+      <h2>1. オープニング演出の設定</h2>
+      <div class="form-grid">
+        <label>新郎の名前（英字推奨）
+          <input id="op-groom-name" type="text" placeholder="TARO" />
+        </label>
+        <label>新郎パートのひとこと1（生まれ年など）
+          <input id="op-groom-sub1" type="text" value="BORN IN 199X" />
+        </label>
+        <label>新郎パートのひとこと2
+          <input id="op-groom-sub2" type="text" value="ALWAYS WITH BEST FRIENDS" />
+        </label>
+        <label>新婦の名前（英字推奨）
+          <input id="op-bride-name" type="text" placeholder="HANAKO" />
+        </label>
+        <label>新婦パートのひとこと1（生まれ年など）
+          <input id="op-bride-sub1" type="text" value="BORN IN 199X" />
+        </label>
+        <label>新婦パートのひとこと2
+          <input id="op-bride-sub2" type="text" value="FULL OF SMILES" />
+        </label>
+        <label>ネオンカラー
+          <select id="op-neon-color">
+            <option value="pink">ネオンピンク</option>
+            <option value="blue">ネオンブルー</option>
+            <option value="green">ネオングリーン</option>
+            <option value="yellow">ネオンイエロー</option>
+          </select>
+        </label>
+        <label>1枚あたりの表示時間（秒）
+          <input id="op-photo-duration" type="number" min="0.4" max="3" step="0.1" value="1" />
+        </label>
+        <label>切り替え効果
+          <select id="op-transition-type">
+            <option value="flash">フラッシュ（おすすめ）</option>
+            <option value="crossfade">クロスフェード</option>
+            <option value="slide">スライド</option>
+            <option value="zoom">ズーム</option>
+            <option value="wipe">ワイプ</option>
+            <option value="random">ランダム（写真ごとに変える）</option>
+          </select>
+        </label>
+        <label>切り替えの長さ（秒）
+          <input id="op-transition-duration" type="number" min="0.15" max="1" step="0.05" value="0.3" />
+        </label>
+      </div>
+      <p class="hint">
+        構成は「カウントダウン → 新郎パート → 新婦パート → 2人の思い出パート → クライマックス（お二人の名前発表）」の
+        順に自動で組み立てられます。実際の長さは各パートに追加する写真の枚数によって変わります
+        （目安: 新郎・新婦パートは各15〜20枚、思い出パートは10〜15枚で合計約1分30秒〜2分）。<br />
+        BGMは後の手順で追加できます。BPM120〜130前後のアップテンポな洋楽ロック/EDM系がおすすめです。
+      </p>
+    </section>
+
+    <!-- オープニング演出: 写真（パートごと） -->
+    <section class="panel hidden" id="opening-photos-section">
+      <h2>2. 写真を追加（パートごと）</h2>
+
+      <h3>新郎パート</h3>
+      <div id="groom-dropzone" class="dropzone">
+        <p>新郎の写真をドラッグ＆ドロップ<br />またはクリックして選択</p>
+        <input id="groom-file-input" type="file" accept="image/*" multiple hidden />
+      </div>
+      <div id="groom-grid" class="photo-grid"></div>
+
+      <h3>新婦パート</h3>
+      <div id="bride-dropzone" class="dropzone">
+        <p>新婦の写真をドラッグ＆ドロップ<br />またはクリックして選択</p>
+        <input id="bride-file-input" type="file" accept="image/*" multiple hidden />
+      </div>
+      <div id="bride-grid" class="photo-grid"></div>
+
+      <h3>2人の思い出パート</h3>
+      <div id="together-dropzone" class="dropzone">
+        <p>2人が一緒に写っている写真をドラッグ＆ドロップ<br />またはクリックして選択</p>
+        <input id="together-file-input" type="file" accept="image/*" multiple hidden />
+      </div>
+      <div id="together-grid" class="photo-grid"></div>
     </section>
 
     <section class="panel">
       <h2>3. ムービーを作成</h2>
+      <p id="duration-estimate" class="hint"></p>
       <button id="create-btn" class="primary-btn" type="button">ムービーを作成（音声なし）</button>
       <div id="progress-box" class="progress-box hidden">
         <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>

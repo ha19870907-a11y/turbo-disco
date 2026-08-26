@@ -66,6 +66,44 @@ main {
   padding-left: 10px;
 }
 
+.template-toggle {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.template-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.template-option:has(input:checked) {
+  border-color: var(--accent);
+  background: #fbeef2;
+}
+
+.template-option input {
+  margin-top: 3px;
+}
+
+#opening-photos-section h3 {
+  font-size: 0.95rem;
+  margin: 20px 0 8px;
+  color: var(--text);
+}
+
+#opening-photos-section h3:first-of-type {
+  margin-top: 0;
+}
+
 .dropzone {
   border: 2px dashed var(--accent);
   border-radius: 12px;
