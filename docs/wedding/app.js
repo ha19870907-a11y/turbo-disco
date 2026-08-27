@@ -73,6 +73,8 @@ const els = {
   photoDuration: document.getElementById("photo-duration"),
   transitionType: document.getElementById("transition-type"),
   transitionDuration: document.getElementById("transition-duration"),
+  captionStyle: document.getElementById("caption-style"),
+  captionFade: document.getElementById("caption-fade"),
 
   opGroomName: document.getElementById("op-groom-name"),
   opGroomSub1: document.getElementById("op-groom-sub1"),
@@ -84,6 +86,8 @@ const els = {
   opPhotoDuration: document.getElementById("op-photo-duration"),
   opTransitionType: document.getElementById("op-transition-type"),
   opTransitionDuration: document.getElementById("op-transition-duration"),
+  opCaptionStyle: document.getElementById("op-caption-style"),
+  opCaptionFade: document.getElementById("op-caption-fade"),
 
   groomDropzone: document.getElementById("groom-dropzone"),
   groomFileInput: document.getElementById("groom-file-input"),
@@ -141,6 +145,8 @@ function getSettings() {
       photoDuration: Math.min(Math.max(Number(els.opPhotoDuration.value) || 1, 0.4), 3),
       transitionType: els.opTransitionType.value || "flash",
       transitionDuration: Math.min(Math.max(Number(els.opTransitionDuration.value) || 0.3, 0.15), 1),
+      captionStyle: els.opCaptionStyle.value || "simple",
+      captionFade: els.opCaptionFade.value || "fade",
       groomName: (els.opGroomName.value || "GROOM").trim().toUpperCase(),
       groomSub1: els.opGroomSub1.value.trim(),
       groomSub2: els.opGroomSub2.value.trim(),
@@ -162,6 +168,8 @@ function getSettings() {
     photoDuration: Math.min(Math.max(Number(els.photoDuration.value) || 4, 1.5), 10),
     transitionType: els.transitionType.value || "crossfade",
     transitionDuration: Math.min(Math.max(Number(els.transitionDuration.value) || 0.8, 0.3), 2),
+    captionStyle: els.captionStyle.value || "simple",
+    captionFade: els.captionFade.value || "fade",
     photos: standardGroup.photos,
   };
 }
@@ -296,11 +304,11 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
 
       if (photo.kind === "video") {
         const clipLabel = document.createElement("label");
-        clipLabel.className = "video-clip-label";
+        clipLabel.className = "item-duration-label";
         clipLabel.textContent = "使用秒数";
         const clipInput = document.createElement("input");
         clipInput.type = "number";
-        clipInput.className = "video-clip-input";
+        clipInput.className = "item-duration-input";
         clipInput.min = "0.5";
         clipInput.max = String(Math.min(photo.naturalDuration, MAX_VIDEO_CLIP_SECONDS));
         clipInput.step = "0.5";
@@ -314,6 +322,32 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
         });
         clipLabel.appendChild(clipInput);
         item.appendChild(clipLabel);
+      } else {
+        // 動画を当てこむ際など、写真ごとに表示秒数を個別調整したい場合の上書き設定。
+        // 空欄のときは共通設定（1枚あたりの表示時間）に従う。
+        const durLabel = document.createElement("label");
+        durLabel.className = "item-duration-label";
+        durLabel.textContent = "表示秒数";
+        const durInput = document.createElement("input");
+        durInput.type = "number";
+        durInput.className = "item-duration-input";
+        durInput.min = "0.2";
+        durInput.max = "20";
+        durInput.step = "0.1";
+        durInput.placeholder = "共通";
+        durInput.value = photo.duration != null ? photo.duration : "";
+        durInput.draggable = false;
+        durInput.title = "空欄の場合は共通設定（1枚あたりの表示時間）が使われます";
+        durInput.addEventListener("input", () => {
+          if (durInput.value.trim() === "") {
+            photo.duration = null;
+          } else {
+            photo.duration = Math.min(Math.max(Number(durInput.value) || 0.2, 0.2), 20);
+          }
+          onChange();
+        });
+        durLabel.appendChild(durInput);
+        item.appendChild(durLabel);
       }
 
       const captionInput = document.createElement("input");
@@ -403,7 +437,7 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
       try {
         const rawImg = await loadImage(url);
         const renderSource = capImageSize(rawImg);
-        group.photos.push({ id: group.nextId++, kind: "image", url, img: renderSource, file, caption: "" });
+        group.photos.push({ id: group.nextId++, kind: "image", url, img: renderSource, file, caption: "", duration: null });
       } catch (err) {
         skippedInvalid++;
         URL.revokeObjectURL(url);
@@ -473,7 +507,15 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
         try {
           const rawImg = await loadImage(url);
           const renderSource = capImageSize(rawImg);
-          group.photos.push({ id: group.nextId++, kind: "image", url, img: renderSource, file, caption: saved.caption || "" });
+          group.photos.push({
+            id: group.nextId++,
+            kind: "image",
+            url,
+            img: renderSource,
+            file,
+            caption: saved.caption || "",
+            duration: saved.duration != null ? saved.duration : null,
+          });
         } catch (err) {
           URL.revokeObjectURL(url);
         }
@@ -687,7 +729,8 @@ function introLines(settings) {
 // 合わせた長さ（beatSyncDuration）で統一する。
 function mediaDuration(item, settings) {
   if (settings.beatSyncDuration) return settings.beatSyncDuration;
-  return item.kind === "video" ? item.clipSeconds : settings.photoDuration;
+  if (item.kind === "video") return item.clipSeconds;
+  return item.duration != null ? item.duration : settings.photoDuration;
 }
 
 function computeStandardTimeline(settings) {
@@ -844,32 +887,96 @@ function drawTitleCard(ctx, seg, localT, settings) {
   ctx.restore();
 }
 
-function drawCaption(ctx, text, localT, duration, theme) {
-  const alpha = fadeAlpha(localT, duration, Math.min(FADE, duration / 2));
+function roundRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// キャプションの見せ方（フェード/スライド＋フェード/常に表示）に応じて
+// 透明度とスライド量（下からせり上がる量）を計算する。
+function captionMotion(localT, duration, fadeMode) {
+  const fadeLen = Math.min(FADE, duration / 2);
+  if (fadeMode === "none") {
+    return { alpha: 1, offsetY: 0 };
+  }
+  if (fadeMode === "slide") {
+    const inProgress = fadeLen > 0 ? Math.min(Math.max(localT / fadeLen, 0), 1) : 1;
+    const outProgress = fadeLen > 0 ? Math.min(Math.max((duration - localT) / fadeLen, 0), 1) : 1;
+    const edge = Math.min(inProgress, outProgress, 1);
+    return { alpha: edge, offsetY: (1 - edge) * 26 };
+  }
+  return { alpha: fadeAlpha(localT, duration, fadeLen), offsetY: 0 };
+}
+
+function drawCaption(ctx, text, localT, duration, theme, style, fadeMode) {
+  const { alpha, offsetY } = captionMotion(localT, duration, fadeMode || "fade");
   if (alpha <= 0) return;
   ctx.save();
   ctx.globalAlpha = alpha;
+  ctx.translate(0, offsetY);
 
-  const barHeight = 92;
-  const y = CANVAS_H - barHeight;
-  const grad = ctx.createLinearGradient(0, y, 0, CANVAS_H);
-  grad.addColorStop(0, "rgba(0,0,0,0)");
-  grad.addColorStop(1, "rgba(0,0,0,0.62)");
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, y, CANVAS_W, barHeight);
+  if (style === "elegant") {
+    // 背景バーなし。明朝体イタリック＋文字影＋下に細いアクセント線というシンプルな見せ方。
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "italic 400 34px serif";
+    ctx.shadowColor = "rgba(0,0,0,0.7)";
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(text, CANVAS_W / 2, CANVAS_H - 76, CANVAS_W - 100);
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = theme.accent;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(CANVAS_W / 2 - 50, CANVAS_H - 46);
+    ctx.lineTo(CANVAS_W / 2 + 50, CANVAS_H - 46);
+    ctx.stroke();
+  } else if (style === "pop") {
+    // テーマカラーの丸みを帯びたピル型バッジに太字白文字。
+    ctx.font = "700 30px sans-serif";
+    const maxTextWidth = CANVAS_W - 120;
+    const textWidth = Math.min(ctx.measureText(text).width, maxTextWidth);
+    const paddingX = 28;
+    const pillW = Math.min(textWidth + paddingX * 2, CANVAS_W - 60);
+    const pillH = 58;
+    const pillX = CANVAS_W / 2 - pillW / 2;
+    const pillY = CANVAS_H - 118;
+    ctx.fillStyle = theme.accent;
+    roundRectPath(ctx, pillX, pillY, pillW, pillH, pillH / 2);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, CANVAS_W / 2, pillY + pillH / 2 + 2, pillW - paddingX * 2);
+  } else {
+    // "simple"（既定）: 下から暗くなるグラデーションバー＋白文字＋アクセント下線。
+    const barHeight = 92;
+    const y = CANVAS_H - barHeight;
+    const grad = ctx.createLinearGradient(0, y, 0, CANVAS_H);
+    grad.addColorStop(0, "rgba(0,0,0,0)");
+    grad.addColorStop(1, "rgba(0,0,0,0.62)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, y, CANVAS_W, barHeight);
 
-  ctx.fillStyle = "#ffffff";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.font = "500 32px serif";
-  ctx.fillText(text, CANVAS_W / 2, CANVAS_H - barHeight / 2 + 8, CANVAS_W - 80);
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "500 32px serif";
+    ctx.fillText(text, CANVAS_W / 2, CANVAS_H - barHeight / 2 + 8, CANVAS_W - 80);
 
-  ctx.strokeStyle = theme.accent;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(CANVAS_W / 2 - 40, CANVAS_H - barHeight / 2 - 24);
-  ctx.lineTo(CANVAS_W / 2 + 40, CANVAS_H - barHeight / 2 - 24);
-  ctx.stroke();
+    ctx.strokeStyle = theme.accent;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(CANVAS_W / 2 - 40, CANVAS_H - barHeight / 2 - 24);
+    ctx.lineTo(CANVAS_W / 2 + 40, CANVAS_H - barHeight / 2 - 24);
+    ctx.stroke();
+  }
+
   ctx.restore();
 }
 
@@ -932,7 +1039,7 @@ function drawPhoto(ctx, seg, localT, settings) {
   );
 
   if (seg.photo.caption) {
-    drawCaption(ctx, seg.photo.caption, localT, seg.duration, settings.theme);
+    drawCaption(ctx, seg.photo.caption, localT, seg.duration, settings.theme, settings.captionStyle, settings.captionFade);
   }
 }
 
@@ -1591,6 +1698,7 @@ function collectGroupDraftItems(group) {
       fileType: p.file.type,
       caption: p.caption || "",
       clipSeconds: p.kind === "video" ? p.clipSeconds : undefined,
+      duration: p.kind === "image" ? p.duration : undefined,
     }));
 }
 
@@ -1617,6 +1725,10 @@ function collectDraftData() {
       opPhotoDuration: els.opPhotoDuration.value,
       opTransitionType: els.opTransitionType.value,
       opTransitionDuration: els.opTransitionDuration.value,
+      captionStyle: els.captionStyle.value,
+      captionFade: els.captionFade.value,
+      opCaptionStyle: els.opCaptionStyle.value,
+      opCaptionFade: els.opCaptionFade.value,
       beatSyncEnabled: els.beatSyncEnabled.checked,
       beatSyncInterval: els.beatSyncInterval.value,
     },
@@ -1654,6 +1766,10 @@ async function restoreDraftData(data) {
   els.opPhotoDuration.value = f.opPhotoDuration || 1;
   els.opTransitionType.value = f.opTransitionType || "flash";
   els.opTransitionDuration.value = f.opTransitionDuration || 0.3;
+  els.captionStyle.value = f.captionStyle || "simple";
+  els.captionFade.value = f.captionFade || "fade";
+  els.opCaptionStyle.value = f.opCaptionStyle || "simple";
+  els.opCaptionFade.value = f.opCaptionFade || "fade";
   els.beatSyncEnabled.checked = !!f.beatSyncEnabled;
   els.beatSyncInterval.value = f.beatSyncInterval || 2;
 
