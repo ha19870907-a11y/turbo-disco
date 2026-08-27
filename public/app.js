@@ -128,7 +128,15 @@
       if (seq !== state.loadSeq) return;
       setStatusBadge(data.source, data.error);
       if (data.stadiums.length === 0) {
-        el.stadiumGrid.innerHTML = `<div class="empty-state">この日の開催データがありません（データ提供元でまだ生成されていない可能性があります。自動で再確認します）</div>`;
+        el.stadiumGrid.innerHTML = `
+          <div class="empty-state">
+            この日の開催データがまだありません。実際にレースが開催中でも、データ提供元
+            （非公式）側の生成が追いついていない場合があります。60秒ごとに自動で再確認しますが、
+            今すぐ確認したい場合は下のボタンを押してください。
+          </div>
+          <div style="text-align:center"><button id="stadium-retry-btn" class="ghost-btn" type="button">今すぐ再確認する</button></div>
+        `;
+        document.getElementById("stadium-retry-btn")?.addEventListener("click", loadStadiums);
         scheduleStadiumRetry();
         return;
       }
@@ -150,7 +158,12 @@
     } catch (err) {
       if (seq !== state.loadSeq) return;
       setStatusBadge(null, err.message);
-      el.stadiumGrid.innerHTML = `<div class="empty-state">${err.message}${state.date === todayJstCache && !state.sample ? "（自動で再確認します）" : ""}</div>`;
+      const isToday = state.date === todayJstCache && !state.sample;
+      el.stadiumGrid.innerHTML = `
+        <div class="empty-state">${err.message}${isToday ? "（60秒ごとに自動で再確認します）" : ""}</div>
+        ${isToday ? `<div style="text-align:center"><button id="stadium-retry-btn" class="ghost-btn" type="button">今すぐ再確認する</button></div>` : ""}
+      `;
+      document.getElementById("stadium-retry-btn")?.addEventListener("click", loadStadiums);
       scheduleStadiumRetry();
     }
   }
