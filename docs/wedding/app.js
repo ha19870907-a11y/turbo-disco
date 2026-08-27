@@ -95,6 +95,7 @@ const els = {
   previewBox: document.getElementById("preview-box"),
   previewVideo: document.getElementById("preview-video"),
   downloadSilent: document.getElementById("download-silent"),
+  opentabSilent: document.getElementById("opentab-silent"),
   shareSilentBtn: document.getElementById("share-silent-btn"),
   shareSilentHint: document.getElementById("share-silent-hint"),
   bgmSection: document.getElementById("bgm-section"),
@@ -110,6 +111,7 @@ const els = {
   finalBox: document.getElementById("final-box"),
   finalVideo: document.getElementById("final-video"),
   downloadFinal: document.getElementById("download-final"),
+  opentabFinal: document.getElementById("opentab-final"),
   shareFinalBtn: document.getElementById("share-final-btn"),
   shareFinalHint: document.getElementById("share-final-hint"),
   canvas: document.getElementById("render-canvas"),
@@ -1125,11 +1127,22 @@ function pickMimeType() {
     "video/webm;codecs=vp9,opus",
     "video/webm;codecs=vp8,opus",
     "video/webm",
+    // SafariはWebMのMediaRecorderに対応していないため、対応していればMP4系にフォールバックする
+    "video/mp4;codecs=avc1,mp4a.40.2",
+    "video/mp4",
   ];
   for (const type of candidates) {
     if (window.MediaRecorder && MediaRecorder.isTypeSupported(type)) return type;
   }
   return "";
+}
+
+function extensionForMimeType(mimeType) {
+  return mimeType && mimeType.includes("mp4") ? "mp4" : "webm";
+}
+
+function baseMimeType(mimeType) {
+  return (mimeType || "video/webm").split(";")[0].trim();
 }
 
 // 音声ファイル1つの長さだけを調べる（実際の再生には使わない専用の<audio>）
@@ -1462,13 +1475,21 @@ function fixVideoDuration(videoEl) {
 // 直接渡せるようにする。サーバーには一切アップロードしない。対応していない
 // ブラウザ（多くのデスクトップブラウザ含む）では共有ボタン自体を表示しない。
 function updateShareButton(blob, filename, btnEl, hintEl) {
-  const file = new File([blob], filename, { type: blob.type || "video/webm" });
-  const supported = !!(navigator.canShare && navigator.canShare({ files: [file] }));
+  // 一部のブラウザは "video/webm;codecs=vp9,opus" のようにcodecs付きのtypeだと
+  // canShareがfalseを返すことがあるため、共有判定・共有自体は素のMIMEタイプで行う。
+  const file = new File([blob], filename, { type: baseMimeType(blob.type) });
+  const supported = !!(navigator.canShare && navigator.share && navigator.canShare({ files: [file] }));
+
   if (!supported) {
     btnEl.classList.add("hidden");
-    hintEl.classList.add("hidden");
+    hintEl.textContent =
+      "この端末・ブラウザでは直接共有できません。「ダウンロード」または「新しいタブで開く」から動画を保存し、" +
+      "LINEアプリの「+」やアルバムから送信してください。LINEなどアプリ内のブラウザで開いている場合は、" +
+      "Safari／Chromeで開き直すと使えるようになることがあります。";
+    hintEl.classList.remove("hidden");
     return;
   }
+
   btnEl.classList.remove("hidden");
   hintEl.classList.add("hidden");
   btnEl.onclick = async () => {
@@ -1476,7 +1497,7 @@ function updateShareButton(blob, filename, btnEl, hintEl) {
       await navigator.share({ files: [file], title: "結婚式ムービー", text: "結婚式ムービー" });
     } catch (err) {
       if (err && err.name === "AbortError") return; // 共有シートをキャンセルしただけなので何もしない
-      hintEl.textContent = `共有に失敗しました（${err.message || err}）。ダウンロードしたファイルをLINEアプリから送信してください。`;
+      hintEl.textContent = `共有に失敗しました（${err.message || err}）。「ダウンロード」または「新しいタブで開く」から動画を保存し、LINEアプリから送信してください。`;
       hintEl.classList.remove("hidden");
     }
   };
@@ -1497,10 +1518,13 @@ els.createBtn.addEventListener("click", async () => {
       onProgress: (ratio) => setProgress(els.progressFill, els.progressLabel, ratio, `生成中… ${Math.round(ratio * 100)}%`),
     });
     const url = URL.createObjectURL(blob);
+    const filename = `wedding-movie-silent.${extensionForMimeType(blob.type)}`;
     els.previewVideo.src = url;
     els.downloadSilent.href = url;
+    els.downloadSilent.download = filename;
+    els.opentabSilent.href = url;
     els.previewBox.classList.remove("hidden");
-    updateShareButton(blob, "wedding-movie-silent.webm", els.shareSilentBtn, els.shareSilentHint);
+    updateShareButton(blob, filename, els.shareSilentBtn, els.shareSilentHint);
     await fixVideoDuration(els.previewVideo);
     els.bgmSection.classList.remove("disabled");
     updateAddBgmButtonState();
@@ -1547,10 +1571,13 @@ els.addBgmBtn.addEventListener("click", async () => {
         setProgress(els.bgmProgressFill, els.bgmProgressLabel, ratio, `BGMを合成中… ${Math.round(ratio * 100)}%`),
     });
     const url = URL.createObjectURL(blob);
+    const filename = `wedding-movie.${extensionForMimeType(blob.type)}`;
     els.finalVideo.src = url;
     els.downloadFinal.href = url;
+    els.downloadFinal.download = filename;
+    els.opentabFinal.href = url;
     els.finalBox.classList.remove("hidden");
-    updateShareButton(blob, "wedding-movie.webm", els.shareFinalBtn, els.shareFinalHint);
+    updateShareButton(blob, filename, els.shareFinalBtn, els.shareFinalHint);
     await fixVideoDuration(els.finalVideo);
     setProgress(els.bgmProgressFill, els.bgmProgressLabel, 1, "完成しました");
   } catch (err) {
