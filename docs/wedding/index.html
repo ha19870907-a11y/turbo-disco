@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>結婚式ムービー作成ツール</title>
+  <meta name="description" content="写真を並べるだけでプロっぽい結婚式オープニング/エンドロールムービーを作成できるツール。BGMは後から追加できます。" />
+
+  <!-- このページは外部通信を一切行わない前提のため、CSPで明示的にブロックする。
+       将来のコード変更で誤って外部送信や外部スクリプト読み込みが混入しても、
+       ブラウザ側で遮断されるようにする多層防御。 -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob:; media-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none';" />
+  <meta http-equiv="Referrer-Policy" content="no-referrer" />
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>💐 結婚式ムービー作成ツール</h1>
+    <p class="lead">写真を並べるだけでムービーを作成します。BGMは動画ができた後から追加できます。</p>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>0. テンプレートを選ぶ</h2>
+      <div class="template-toggle">
+        <label class="template-option">
+          <input type="radio" name="template" value="standard" checked />
+          <span><strong>スタンダード</strong><br />優しいKen Burns風のハイライトムービー</span>
+        </label>
+        <label class="template-option">
+          <input type="radio" name="template" value="opening" />
+          <span><strong>オープニング演出</strong><br />黒背景×ネオン、カウントダウンから入場までの疾走感ムービー</span>
+        </label>
+      </div>
+    </section>
+
+    <section class="panel" id="draft-section">
+      <h2>📝 下書きの保存・復元</h2>
+      <p class="hint">
+        写真・動画・入力した文章は、ブラウザを閉じたりページを再読み込みすると消えてしまいます。
+        作業を中断する前にここで一時保存しておくと、次回このページを開いたときに続きから再開できます
+        （この端末のブラウザ内だけに保存され、外部には送信されません）。
+      </p>
+      <button id="save-draft-btn" class="ghost-btn" type="button">💾 今の内容を一時保存する</button>
+      <button id="delete-draft-btn" class="ghost-btn hidden" type="button">🗑 保存した下書きを削除</button>
+      <p id="draft-status" class="hint"></p>
+      <div id="draft-restore-box" class="hidden">
+        <p class="hint">前回保存した下書きがあります（<span id="draft-saved-at"></span>）。</p>
+        <button id="restore-draft-btn" class="primary-btn" type="button">📂 下書きを復元する</button>
+      </div>
+    </section>
+
+    <!-- スタンダード: 写真 -->
+    <section class="panel" id="standard-photos-section">
+      <h2>1. 写真・動画を追加</h2>
+      <div id="dropzone" class="dropzone">
+        <p>ここに写真・動画をドラッグ＆ドロップ<br />またはクリックして選択</p>
+        <input id="file-input" type="file" accept="image/*,video/*" multiple hidden />
+      </div>
+      <p class="hint">複数選択できます。並び順はサムネイルをドラッグして入れ替えられます。（目安: 写真100枚以下推奨、動画1本200MBまで）<br />動画は「使用秒数」欄でムービー内で使う長さ（最大15秒）を調整できます。動画自体の音声は収録されません（BGMのみ収録）。<br />各サムネイルの下の欄にひとことキャプションを入れると、表示されている間だけ文字が重なって表示されます。</p>
+      <div id="photo-grid" class="photo-grid"></div>
+    </section>
+
+    <!-- スタンダード: タイトル設定 -->
+    <section class="panel" id="standard-settings-section">
+      <h2>2. タイトル・演出設定</h2>
+      <div class="form-grid">
+        <label>新郎・新婦の名前
+          <input id="title1" type="text" placeholder="例: 太郎" />
+        </label>
+        <label>&nbsp;
+          <input id="title2" type="text" placeholder="例: 花子" />
+        </label>
+        <label>日付・メッセージ（冒頭）
+          <input id="date-text" type="text" placeholder="例: 2026.10.4" />
+        </label>
+        <label>エンディングメッセージ
+          <input id="end-message" type="text" placeholder="例: Thank You" />
+        </label>
+        <label>テーマカラー
+          <select id="theme-select">
+            <option value="pink">ピンク×ゴールド</option>
+            <option value="navy">ネイビー×ゴールド</option>
+            <option value="green">グリーン×アイボリー</option>
+          </select>
+        </label>
+        <label>1枚あたりの表示時間（秒・写真のみ）
+          <input id="photo-duration" type="number" min="1.5" max="10" step="0.5" value="4" />
+        </label>
+        <label>切り替え効果
+          <select id="transition-type">
+            <option value="crossfade">クロスフェード</option>
+            <option value="slide">スライド</option>
+            <option value="zoom">ズーム</option>
+            <option value="wipe">ワイプ</option>
+            <option value="flash">フラッシュ</option>
+            <option value="random">ランダム（写真ごとに変える）</option>
+          </select>
+        </label>
+        <label>切り替えの長さ（秒）
+          <input id="transition-duration" type="number" min="0.3" max="2" step="0.1" value="0.8" />
+        </label>
+      </div>
+    </section>
+
+    <!-- オープニング演出: 設定 -->
+    <section class="panel hidden" id="opening-section">
+      <h2>1. オープニング演出の設定</h2>
+      <div class="form-grid">
+        <label>新郎の名前（英字推奨）
+          <input id="op-groom-name" type="text" placeholder="TARO" />
+        </label>
+        <label>新郎パートのひとこと1（生まれ年など）
+          <input id="op-groom-sub1" type="text" value="BORN IN 199X" />
+        </label>
+        <label>新郎パートのひとこと2
+          <input id="op-groom-sub2" type="text" value="ALWAYS WITH BEST FRIENDS" />
+        </label>
+        <label>新婦の名前（英字推奨）
+          <input id="op-bride-name" type="text" placeholder="HANAKO" />
+        </label>
+        <label>新婦パートのひとこと1（生まれ年など）
+          <input id="op-bride-sub1" type="text" value="BORN IN 199X" />
+        </label>
+        <label>新婦パートのひとこと2
+          <input id="op-bride-sub2" type="text" value="FULL OF SMILES" />
+        </label>
+        <label>ネオンカラー
+          <select id="op-neon-color">
+            <option value="pink">ネオンピンク</option>
+            <option value="blue">ネオンブルー</option>
+            <option value="green">ネオングリーン</option>
+            <option value="yellow">ネオンイエロー</option>
+          </select>
+        </label>
+        <label>1枚あたりの表示時間（秒・写真のみ）
+          <input id="op-photo-duration" type="number" min="0.4" max="3" step="0.1" value="1" />
+        </label>
+        <label>切り替え効果
+          <select id="op-transition-type">
+            <option value="flash">フラッシュ（おすすめ）</option>
+            <option value="crossfade">クロスフェード</option>
+            <option value="slide">スライド</option>
+            <option value="zoom">ズーム</option>
+            <option value="wipe">ワイプ</option>
+            <option value="random">ランダム（写真ごとに変える）</option>
+          </select>
+        </label>
+        <label>切り替えの長さ（秒）
+          <input id="op-transition-duration" type="number" min="0.15" max="1" step="0.05" value="0.3" />
+        </label>
+      </div>
+      <p class="hint">
+        構成は「カウントダウン → 新郎パート → 新婦パート → 2人の思い出パート → クライマックス（お二人の名前発表）」の
+        順に自動で組み立てられます。実際の長さは各パートに追加する写真の枚数によって変わります
+        （目安: 新郎・新婦パートは各15〜20枚、思い出パートは10〜15枚で合計約1分30秒〜2分）。<br />
+        BGMは後の手順で追加できます。BPM120〜130前後のアップテンポな洋楽ロック/EDM系がおすすめです。
+      </p>
+    </section>
+
+    <!-- オープニング演出: 写真（パートごと） -->
+    <section class="panel hidden" id="opening-photos-section">
+      <h2>2. 写真・動画を追加（パートごと）</h2>
+      <p class="hint">各パートに写真・動画をまとめて追加できます。動画は「使用秒数」欄でムービー内で使う長さ（最大15秒）を調整できます。動画自体の音声は収録されません（BGMのみ収録）。</p>
+
+      <h3>新郎パート</h3>
+      <div id="groom-dropzone" class="dropzone">
+        <p>新郎の写真・動画をドラッグ＆ドロップ<br />またはクリックして選択</p>
+        <input id="groom-file-input" type="file" accept="image/*,video/*" multiple hidden />
+      </div>
+      <div id="groom-grid" class="photo-grid"></div>
+
+      <h3>新婦パート</h3>
+      <div id="bride-dropzone" class="dropzone">
+        <p>新婦の写真・動画をドラッグ＆ドロップ<br />またはクリックして選択</p>
+        <input id="bride-file-input" type="file" accept="image/*,video/*" multiple hidden />
+      </div>
+      <div id="bride-grid" class="photo-grid"></div>
+
+      <h3>2人の思い出パート</h3>
+      <div id="together-dropzone" class="dropzone">
+        <p>2人が一緒に写っている写真・動画をドラッグ＆ドロップ<br />またはクリックして選択</p>
+        <input id="together-file-input" type="file" accept="image/*,video/*" multiple hidden />
+      </div>
+      <div id="together-grid" class="photo-grid"></div>
+    </section>
+
+    <section class="panel">
+      <h2>3. ムービーを作成</h2>
+      <p id="duration-estimate" class="hint"></p>
+      <button id="create-btn" class="primary-btn" type="button">ムービーを作成（音声なし）</button>
+      <div id="progress-box" class="progress-box hidden">
+        <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+        <span id="progress-label"></span>
+      </div>
+      <div id="preview-box" class="preview-box hidden">
+        <video id="preview-video" controls playsinline></video>
+        <p id="format-silent-info" class="hint format-info"></p>
+        <a id="download-silent" class="ghost-btn" download="wedding-movie-silent.webm">ダウンロード（音声なし）</a>
+        <a id="opentab-silent" class="ghost-btn" target="_blank" rel="noopener">🎬 新しいタブで開く</a>
+        <button id="share-silent-btn" class="ghost-btn hidden" type="button">📤 LINEなどで共有</button>
+        <p id="share-silent-hint" class="hint share-hint hidden"></p>
+        <p class="hint opentab-warning">
+          ⚠️「新しいタブで開く」で表示された動画は、ブラウザ自体の共有ボタン（画面のツールバーにある共有アイコン）では
+          正しく送れません。iPhoneの場合は動画を<strong>長押しして「ビデオを保存」</strong>を選んでカメラロールに
+          保存してから、LINEアプリの「+」から動画を選んで送ってください。
+        </p>
+      </div>
+    </section>
+
+    <section id="bgm-section" class="panel disabled">
+      <h2>4. BGMを追加</h2>
+      <p class="hint">先に音声なしムービーを作成すると、この欄が使えるようになります。動画と同じ長さで書き出し直します。複数曲を選ぶと選んだ順にクロスフェードしながら再生し、動画の長さに足りない分は自動で繰り返します（末尾はフェードアウトします）。</p>
+      <p class="hint">
+        スマホで音楽ファイルを選ぶ画面がうまく開かない場合は、LINEなど他のアプリ内で開いたリンクではなく、
+        Safari／Chromeで直接このページを開いているかご確認ください（アプリ内ブラウザではファイル選択が
+        正しく動作しないことがあります）。
+      </p>
+      <div id="bgm-dropzone" class="dropzone bgm-dropzone">
+        <p>ここに音楽ファイルをドラッグ＆ドロップ（複数可）<br />またはクリックして選択</p>
+        <input id="bgm-input" type="file" multiple hidden />
+      </div>
+      <div id="bgm-list" class="bgm-list"></div>
+
+      <div class="beat-sync-box">
+        <label class="checkbox-label">
+          <input type="checkbox" id="beat-sync-enabled" />
+          BGMのビートに合わせて自動でカット（写真・動画の長さを自動調整）
+        </label>
+        <label class="beat-sync-interval-label">何拍ごとに切り替える
+          <select id="beat-sync-interval">
+            <option value="1">1拍ごと（かなり速い）</option>
+            <option value="2" selected>2拍ごと（おすすめ）</option>
+            <option value="4">4拍ごと（ややゆったり）</option>
+          </select>
+        </label>
+        <p class="hint">
+          リストの先頭のBGMのテンポを解析し、写真・動画の表示時間をそのテンポに自動で合わせます
+          （動画の「使用秒数」設定は上書きされます）。テンポ検出は完全ではないため、曲によっては
+          ズレが生じる場合があります。有効にすると無音プレビューとは長さが変わります。
+        </p>
+      </div>
+
+      <button id="add-bgm-btn" class="primary-btn" type="button" disabled>BGM付きで書き出す</button>
+      <div id="bgm-progress-box" class="progress-box hidden">
+        <div class="progress-bar"><div id="bgm-progress-fill" class="progress-fill"></div></div>
+        <span id="bgm-progress-label"></span>
+      </div>
+      <div id="final-box" class="preview-box hidden">
+        <video id="final-video" controls playsinline></video>
+        <p id="format-final-info" class="hint format-info"></p>
+        <a id="download-final" class="ghost-btn" download="wedding-movie.webm">ダウンロード（BGM付き）</a>
+        <a id="opentab-final" class="ghost-btn" target="_blank" rel="noopener">🎬 新しいタブで開く</a>
+        <button id="share-final-btn" class="ghost-btn hidden" type="button">📤 LINEなどで共有</button>
+        <p id="share-final-hint" class="hint share-hint hidden"></p>
+        <p class="hint opentab-warning">
+          ⚠️「新しいタブで開く」で表示された動画は、ブラウザ自体の共有ボタン（画面のツールバーにある共有アイコン）では
+          正しく送れません。iPhoneの場合は動画を<strong>長押しして「ビデオを保存」</strong>を選んでカメラロールに
+          保存してから、LINEアプリの「+」から動画を選んで送ってください。
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <canvas id="render-canvas" width="1280" height="720" class="hidden-canvas"></canvas>
+
+  <footer class="app-footer">
+    <p>
+      すべての処理はブラウザ内で完結し、写真や音楽が外部に送信されることはありません。<br />
+      書き出しには Chrome または Edge の最新版を推奨します（対応形式: WebM）。動画の長さと同程度の生成時間がかかります。
+    </p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
