@@ -285,6 +285,12 @@ main {
   max-width: 480px;
 }
 
+.opentab-warning {
+  margin: 8px 0 0;
+  max-width: 480px;
+  color: var(--accent-dark);
+}
+
 .progress-box {
   margin-top: 14px;
   display: flex;
