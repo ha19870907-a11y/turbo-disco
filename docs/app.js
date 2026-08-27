@@ -7,8 +7,11 @@ const state = {
   stadium: null,
   race: null,
   pollTimer: null,
+  stadiumPollTimer: null,
   loadSeq: 0,
 };
+
+const STADIUM_RETRY_MS = 60000; // その日のデータがまだ無い場合、これくらいの間隔で自動的に再試行する
 
 const el = {
   dateInput: document.getElementById("date-input"),
@@ -100,6 +103,17 @@ function showPanel(name) {
     clearInterval(state.pollTimer);
     state.pollTimer = null;
   }
+  if (name !== "stadiums" && state.stadiumPollTimer) {
+    clearInterval(state.stadiumPollTimer);
+    state.stadiumPollTimer = null;
+  }
+}
+
+function scheduleStadiumRetry() {
+  // 当日分のデータがまだ提供元で生成されていないだけのケースがあるため、
+  // 「今日」を表示中でエラー/空だった場合は自動的に再試行する。
+  if (state.stadiumPollTimer || state.sample || state.date !== todayJst()) return;
+  state.stadiumPollTimer = setInterval(loadStadiums, STADIUM_RETRY_MS);
 }
 
 async function loadStadiums() {
@@ -112,8 +126,13 @@ async function loadStadiums() {
     setStatusBadge(source, error);
     const stadiums = buildStadiumList(data);
     if (stadiums.length === 0) {
-      el.stadiumGrid.innerHTML = `<div class="empty-state">この日の開催データがありません</div>`;
+      el.stadiumGrid.innerHTML = `<div class="empty-state">この日の開催データがありません（データ提供元でまだ生成されていない可能性があります。自動で再確認します）</div>`;
+      scheduleStadiumRetry();
       return;
+    }
+    if (state.stadiumPollTimer) {
+      clearInterval(state.stadiumPollTimer);
+      state.stadiumPollTimer = null;
     }
     el.stadiumGrid.innerHTML = "";
     for (const s of stadiums) {
@@ -129,7 +148,8 @@ async function loadStadiums() {
   } catch (err) {
     if (seq !== state.loadSeq) return;
     setStatusBadge(null, err.message);
-    el.stadiumGrid.innerHTML = `<div class="empty-state">${err.message}</div>`;
+    el.stadiumGrid.innerHTML = `<div class="empty-state">${err.message}${state.date === todayJst() && !state.sample ? "（自動で再確認します）" : ""}</div>`;
+    scheduleStadiumRetry();
   }
 }
 

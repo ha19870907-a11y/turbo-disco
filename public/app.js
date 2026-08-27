@@ -5,8 +5,11 @@
     stadium: null,
     race: null,
     pollTimer: null,
+    stadiumPollTimer: null,
     loadSeq: 0,
   };
+  const STADIUM_RETRY_MS = 60000; // その日のデータがまだ無い場合、これくらいの間隔で自動的に再試行する
+  let todayJstCache = null;
 
   const el = {
     dateInput: document.getElementById("date-input"),
@@ -103,6 +106,17 @@
       clearInterval(state.pollTimer);
       state.pollTimer = null;
     }
+    if (name !== "stadiums" && state.stadiumPollTimer) {
+      clearInterval(state.stadiumPollTimer);
+      state.stadiumPollTimer = null;
+    }
+  }
+
+  function scheduleStadiumRetry() {
+    // 当日分のデータがまだ提供元で生成されていないだけのケースがあるため、
+    // 「今日」を表示中でエラー/空だった場合は自動的に再試行する。
+    if (state.stadiumPollTimer || state.sample || state.date !== todayJstCache) return;
+    state.stadiumPollTimer = setInterval(loadStadiums, STADIUM_RETRY_MS);
   }
 
   async function loadStadiums() {
@@ -114,8 +128,13 @@
       if (seq !== state.loadSeq) return;
       setStatusBadge(data.source, data.error);
       if (data.stadiums.length === 0) {
-        el.stadiumGrid.innerHTML = `<div class="empty-state">この日の開催データがありません</div>`;
+        el.stadiumGrid.innerHTML = `<div class="empty-state">この日の開催データがありません（データ提供元でまだ生成されていない可能性があります。自動で再確認します）</div>`;
+        scheduleStadiumRetry();
         return;
+      }
+      if (state.stadiumPollTimer) {
+        clearInterval(state.stadiumPollTimer);
+        state.stadiumPollTimer = null;
       }
       el.stadiumGrid.innerHTML = "";
       for (const s of data.stadiums) {
@@ -131,7 +150,8 @@
     } catch (err) {
       if (seq !== state.loadSeq) return;
       setStatusBadge(null, err.message);
-      el.stadiumGrid.innerHTML = `<div class="empty-state">${err.message}</div>`;
+      el.stadiumGrid.innerHTML = `<div class="empty-state">${err.message}${state.date === todayJstCache && !state.sample ? "（自動で再確認します）" : ""}</div>`;
+      scheduleStadiumRetry();
     }
   }
 
@@ -467,10 +487,12 @@
     try {
       const meta = await fetch("/api/meta").then((r) => r.json());
       state.date = meta.todayJst;
+      todayJstCache = meta.todayJst;
       el.dateInput.value = toDateInputValue(state.date);
     } catch {
       const fallback = new Date().toISOString().slice(0, 10).replace(/-/g, "");
       state.date = fallback;
+      todayJstCache = fallback;
       el.dateInput.value = toDateInputValue(fallback);
     }
     loadStadiums();
