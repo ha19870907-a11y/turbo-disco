@@ -49,6 +49,14 @@ const state = {
 };
 
 const els = {
+  saveDraftBtn: document.getElementById("save-draft-btn"),
+  deleteDraftBtn: document.getElementById("delete-draft-btn"),
+  draftStatus: document.getElementById("draft-status"),
+  draftRestoreBox: document.getElementById("draft-restore-box"),
+  draftSavedAt: document.getElementById("draft-saved-at"),
+  restoreDraftBtn: document.getElementById("restore-draft-btn"),
+  draftSection: document.getElementById("draft-section"),
+
   standardPhotosSection: document.getElementById("standard-photos-section"),
   standardSettingsSection: document.getElementById("standard-settings-section"),
   openingSection: document.getElementById("opening-section"),
@@ -94,6 +102,7 @@ const els = {
   progressLabel: document.getElementById("progress-label"),
   previewBox: document.getElementById("preview-box"),
   previewVideo: document.getElementById("preview-video"),
+  formatSilentInfo: document.getElementById("format-silent-info"),
   downloadSilent: document.getElementById("download-silent"),
   opentabSilent: document.getElementById("opentab-silent"),
   shareSilentBtn: document.getElementById("share-silent-btn"),
@@ -110,6 +119,7 @@ const els = {
   bgmProgressLabel: document.getElementById("bgm-progress-label"),
   finalBox: document.getElementById("final-box"),
   finalVideo: document.getElementById("final-video"),
+  formatFinalInfo: document.getElementById("format-final-info"),
   downloadFinal: document.getElementById("download-final"),
   opentabFinal: document.getElementById("opentab-final"),
   shareFinalBtn: document.getElementById("share-final-btn"),
@@ -377,7 +387,7 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
         }
         try {
           const videoItem = await loadVideoItem(file);
-          group.photos.push({ id: group.nextId++, kind: "video", caption: "", ...videoItem });
+          group.photos.push({ id: group.nextId++, kind: "video", caption: "", file, ...videoItem });
           videoCount++;
         } catch (err) {
           skippedInvalid++;
@@ -393,7 +403,7 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
       try {
         const rawImg = await loadImage(url);
         const renderSource = capImageSize(rawImg);
-        group.photos.push({ id: group.nextId++, kind: "image", url, img: renderSource, caption: "" });
+        group.photos.push({ id: group.nextId++, kind: "image", url, img: renderSource, file, caption: "" });
       } catch (err) {
         skippedInvalid++;
         URL.revokeObjectURL(url);
@@ -431,6 +441,50 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
   );
   dropzoneEl.addEventListener("drop", (e) => addFiles(e.dataTransfer.files));
 
+  // 下書き復元用: 保存されていたファイル(Blob)の配列から、現在の内容を
+  // すべて置き換える形で写真・動画を復元する。
+  async function restoreItems(savedItems) {
+    group.photos.forEach((p) => {
+      if (p.kind === "video") p.videoEl.pause();
+      URL.revokeObjectURL(p.url);
+    });
+    group.photos = [];
+    group.nextId = 1;
+
+    for (const saved of savedItems) {
+      const file = new File([saved.blob], saved.fileName, { type: saved.fileType });
+      if (saved.kind === "video") {
+        try {
+          const videoItem = await loadVideoItem(file);
+          const maxAllowed = Math.min(videoItem.naturalDuration, MAX_VIDEO_CLIP_SECONDS);
+          group.photos.push({
+            id: group.nextId++,
+            kind: "video",
+            caption: saved.caption || "",
+            file,
+            ...videoItem,
+            clipSeconds: Math.min(saved.clipSeconds || videoItem.clipSeconds, maxAllowed),
+          });
+        } catch (err) {
+          // 復元できないデータはスキップする
+        }
+      } else {
+        const url = URL.createObjectURL(file);
+        try {
+          const rawImg = await loadImage(url);
+          const renderSource = capImageSize(rawImg);
+          group.photos.push({ id: group.nextId++, kind: "image", url, img: renderSource, file, caption: saved.caption || "" });
+        } catch (err) {
+          URL.revokeObjectURL(url);
+        }
+      }
+    }
+    render();
+    onChange();
+  }
+
+  group.render = render;
+  group.restoreItems = restoreItems;
   return group;
 }
 
@@ -1471,6 +1525,152 @@ function fixVideoDuration(videoEl) {
   });
 }
 
+// --- 下書き（写真・動画・入力内容）の一時保存 ---
+// 生成した動画そのものではなく、選んだ写真・動画・入力した文章・設定を
+// この端末のIndexedDBにだけ保存する（サーバーには送信しない）。写真・動画は
+// Blobのまま保存できるため、次回開いたときに元のファイルとして復元できる。
+
+const DRAFT_DB_NAME = "wedding-movie-draft-db";
+const DRAFT_STORE_NAME = "drafts";
+const DRAFT_KEY = "current";
+
+function openDraftDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DRAFT_DB_NAME, 1);
+    req.onupgradeneeded = () => {
+      req.result.createObjectStore(DRAFT_STORE_NAME);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function saveDraftToDB(data) {
+  const db = await openDraftDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DRAFT_STORE_NAME, "readwrite");
+    tx.objectStore(DRAFT_STORE_NAME).put(data, DRAFT_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function loadDraftFromDB() {
+  const db = await openDraftDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DRAFT_STORE_NAME, "readonly");
+    const req = tx.objectStore(DRAFT_STORE_NAME).get(DRAFT_KEY);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function deleteDraftFromDB() {
+  const db = await openDraftDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DRAFT_STORE_NAME, "readwrite");
+    tx.objectStore(DRAFT_STORE_NAME).delete(DRAFT_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+function collectGroupDraftItems(group) {
+  return group.photos
+    .filter((p) => p.file) // 元ファイルの参照がないものは復元できないため対象外
+    .map((p) => ({
+      kind: p.kind,
+      blob: p.file,
+      fileName: p.file.name,
+      fileType: p.file.type,
+      caption: p.caption || "",
+      clipSeconds: p.kind === "video" ? p.clipSeconds : undefined,
+    }));
+}
+
+function collectDraftData() {
+  return {
+    savedAt: Date.now(),
+    template: getTemplate(),
+    fields: {
+      title1: els.title1.value,
+      title2: els.title2.value,
+      dateText: els.dateText.value,
+      endMessage: els.endMessage.value,
+      theme: els.themeSelect.value,
+      photoDuration: els.photoDuration.value,
+      transitionType: els.transitionType.value,
+      transitionDuration: els.transitionDuration.value,
+      opGroomName: els.opGroomName.value,
+      opGroomSub1: els.opGroomSub1.value,
+      opGroomSub2: els.opGroomSub2.value,
+      opBrideName: els.opBrideName.value,
+      opBrideSub1: els.opBrideSub1.value,
+      opBrideSub2: els.opBrideSub2.value,
+      opNeonColor: els.opNeonColor.value,
+      opPhotoDuration: els.opPhotoDuration.value,
+      opTransitionType: els.opTransitionType.value,
+      opTransitionDuration: els.opTransitionDuration.value,
+      beatSyncEnabled: els.beatSyncEnabled.checked,
+      beatSyncInterval: els.beatSyncInterval.value,
+    },
+    groups: {
+      standard: collectGroupDraftItems(standardGroup),
+      groom: collectGroupDraftItems(groomGroup),
+      bride: collectGroupDraftItems(brideGroup),
+      together: collectGroupDraftItems(togetherGroup),
+    },
+    bgmFiles: state.bgmFiles.map((t) => ({
+      blob: t.file,
+      fileName: t.file.name,
+      fileType: t.file.type,
+    })),
+  };
+}
+
+async function restoreDraftData(data) {
+  const f = data.fields || {};
+  els.title1.value = f.title1 || "";
+  els.title2.value = f.title2 || "";
+  els.dateText.value = f.dateText || "";
+  els.endMessage.value = f.endMessage || "";
+  els.themeSelect.value = f.theme || "pink";
+  els.photoDuration.value = f.photoDuration || 4;
+  els.transitionType.value = f.transitionType || "crossfade";
+  els.transitionDuration.value = f.transitionDuration || 0.8;
+  els.opGroomName.value = f.opGroomName || "";
+  els.opGroomSub1.value = f.opGroomSub1 || "";
+  els.opGroomSub2.value = f.opGroomSub2 || "";
+  els.opBrideName.value = f.opBrideName || "";
+  els.opBrideSub1.value = f.opBrideSub1 || "";
+  els.opBrideSub2.value = f.opBrideSub2 || "";
+  els.opNeonColor.value = f.opNeonColor || "pink";
+  els.opPhotoDuration.value = f.opPhotoDuration || 1;
+  els.opTransitionType.value = f.opTransitionType || "flash";
+  els.opTransitionDuration.value = f.opTransitionDuration || 0.3;
+  els.beatSyncEnabled.checked = !!f.beatSyncEnabled;
+  els.beatSyncInterval.value = f.beatSyncInterval || 2;
+
+  const templateValue = data.template === "opening" ? "opening" : "standard";
+  const templateRadio = document.querySelector(`input[name="template"][value="${templateValue}"]`);
+  if (templateRadio) templateRadio.checked = true;
+  updateTemplateVisibility();
+
+  await standardGroup.restoreItems((data.groups && data.groups.standard) || []);
+  await groomGroup.restoreItems((data.groups && data.groups.groom) || []);
+  await brideGroup.restoreItems((data.groups && data.groups.bride) || []);
+  await togetherGroup.restoreItems((data.groups && data.groups.together) || []);
+
+  state.bgmFiles = (data.bgmFiles || []).map((b) => ({
+    id: state.nextBgmId++,
+    file: new File([b.blob], b.fileName, { type: b.fileType }),
+  }));
+  renderBgmList();
+  updateAddBgmButtonState();
+
+  updateDurationEstimate();
+}
+
 // スマホのブラウザ標準の共有シート(Web Share API)経由でLINEなどに動画ファイルを
 // 直接渡せるようにする。サーバーには一切アップロードしない。対応していない
 // ブラウザ（多くのデスクトップブラウザ含む）では共有ボタン自体を表示しない。
@@ -1520,6 +1720,7 @@ els.createBtn.addEventListener("click", async () => {
     const url = URL.createObjectURL(blob);
     const filename = `wedding-movie-silent.${extensionForMimeType(blob.type)}`;
     els.previewVideo.src = url;
+    els.formatSilentInfo.textContent = `書き出し形式: ${blob.type || "不明"}`;
     els.downloadSilent.href = url;
     els.downloadSilent.download = filename;
     els.opentabSilent.href = url;
@@ -1573,6 +1774,7 @@ els.addBgmBtn.addEventListener("click", async () => {
     const url = URL.createObjectURL(blob);
     const filename = `wedding-movie.${extensionForMimeType(blob.type)}`;
     els.finalVideo.src = url;
+    els.formatFinalInfo.textContent = `書き出し形式: ${blob.type || "不明"}`;
     els.downloadFinal.href = url;
     els.downloadFinal.download = filename;
     els.opentabFinal.href = url;
@@ -1587,5 +1789,70 @@ els.addBgmBtn.addEventListener("click", async () => {
     updateAddBgmButtonState();
   }
 });
+
+// --- 下書きUIの配線 ---
+
+if (!window.indexedDB) {
+  els.draftSection.classList.add("hidden");
+} else {
+  els.saveDraftBtn.addEventListener("click", async () => {
+    els.saveDraftBtn.disabled = true;
+    els.draftStatus.textContent = "保存中…";
+    try {
+      const data = collectDraftData();
+      await saveDraftToDB(data);
+      els.draftStatus.textContent = `保存しました（${new Date(data.savedAt).toLocaleString("ja-JP")}）`;
+      els.deleteDraftBtn.classList.remove("hidden");
+    } catch (err) {
+      els.draftStatus.textContent = `保存に失敗しました: ${err.message || err}`;
+    } finally {
+      els.saveDraftBtn.disabled = false;
+    }
+  });
+
+  els.deleteDraftBtn.addEventListener("click", async () => {
+    if (!confirm("保存した下書きを削除しますか？")) return;
+    try {
+      await deleteDraftFromDB();
+      els.draftStatus.textContent = "下書きを削除しました";
+      els.deleteDraftBtn.classList.add("hidden");
+      els.draftRestoreBox.classList.add("hidden");
+    } catch (err) {
+      els.draftStatus.textContent = `削除に失敗しました: ${err.message || err}`;
+    }
+  });
+
+  els.restoreDraftBtn.addEventListener("click", async () => {
+    if (!confirm("現在の内容を上書きして、保存した下書きを復元しますか？")) return;
+    els.restoreDraftBtn.disabled = true;
+    els.draftStatus.textContent = "復元中…";
+    try {
+      const data = await loadDraftFromDB();
+      if (!data) {
+        els.draftStatus.textContent = "下書きが見つかりませんでした";
+        return;
+      }
+      await restoreDraftData(data);
+      els.draftStatus.textContent = "下書きを復元しました";
+    } catch (err) {
+      els.draftStatus.textContent = `復元に失敗しました: ${err.message || err}`;
+    } finally {
+      els.restoreDraftBtn.disabled = false;
+    }
+  });
+
+  (async () => {
+    try {
+      const data = await loadDraftFromDB();
+      if (data) {
+        els.draftRestoreBox.classList.remove("hidden");
+        els.draftSavedAt.textContent = new Date(data.savedAt).toLocaleString("ja-JP");
+        els.deleteDraftBtn.classList.remove("hidden");
+      }
+    } catch (err) {
+      // IndexedDBが使えない/壊れている環境では下書き機能を静かに諦める
+    }
+  })();
+}
 
 updateDurationEstimate();

@@ -35,6 +35,22 @@
       </div>
     </section>
 
+    <section class="panel" id="draft-section">
+      <h2>📝 下書きの保存・復元</h2>
+      <p class="hint">
+        写真・動画・入力した文章は、ブラウザを閉じたりページを再読み込みすると消えてしまいます。
+        作業を中断する前にここで一時保存しておくと、次回このページを開いたときに続きから再開できます
+        （この端末のブラウザ内だけに保存され、外部には送信されません）。
+      </p>
+      <button id="save-draft-btn" class="ghost-btn" type="button">💾 今の内容を一時保存する</button>
+      <button id="delete-draft-btn" class="ghost-btn hidden" type="button">🗑 保存した下書きを削除</button>
+      <p id="draft-status" class="hint"></p>
+      <div id="draft-restore-box" class="hidden">
+        <p class="hint">前回保存した下書きがあります（<span id="draft-saved-at"></span>）。</p>
+        <button id="restore-draft-btn" class="primary-btn" type="button">📂 下書きを復元する</button>
+      </div>
+    </section>
+
     <!-- スタンダード: 写真 -->
     <section class="panel" id="standard-photos-section">
       <h2>1. 写真・動画を追加</h2>
@@ -180,6 +196,7 @@
       </div>
       <div id="preview-box" class="preview-box hidden">
         <video id="preview-video" controls playsinline></video>
+        <p id="format-silent-info" class="hint format-info"></p>
         <a id="download-silent" class="ghost-btn" download="wedding-movie-silent.webm">ダウンロード（音声なし）</a>
         <a id="opentab-silent" class="ghost-btn" target="_blank" rel="noopener">🎬 新しいタブで開く</a>
         <button id="share-silent-btn" class="ghost-btn hidden" type="button">📤 LINEなどで共有</button>
@@ -232,6 +249,7 @@
       </div>
       <div id="final-box" class="preview-box hidden">
         <video id="final-video" controls playsinline></video>
+        <p id="format-final-info" class="hint format-info"></p>
         <a id="download-final" class="ghost-btn" download="wedding-movie.webm">ダウンロード（BGM付き）</a>
         <a id="opentab-final" class="ghost-btn" target="_blank" rel="noopener">🎬 新しいタブで開く</a>
         <button id="share-final-btn" class="ghost-btn hidden" type="button">📤 LINEなどで共有</button>

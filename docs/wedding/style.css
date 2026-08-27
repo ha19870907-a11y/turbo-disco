@@ -327,6 +327,11 @@ main {
   display: block;
 }
 
+.format-info {
+  margin: 6px 0 0;
+  font-size: 0.72rem;
+}
+
 .bgm-dropzone {
   padding: 18px;
   margin-top: 10px;
@@ -390,6 +395,23 @@ main {
   border: 1px solid var(--border);
   border-radius: 10px;
   background: #fbf8f6;
+}
+
+#draft-section #draft-status {
+  margin-top: 10px;
+}
+
+#draft-restore-box {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: #fbeef2;
+}
+
+#draft-restore-box .hint {
+  margin: 0 0 10px;
+  color: var(--text);
 }
 
 .checkbox-label {
