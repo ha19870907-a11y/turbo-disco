@@ -2,12 +2,15 @@ const fs = require("fs");
 const path = require("path");
 const { splitDate } = require("./dateUtil");
 
-// Turnmark Boatrace Open API: 出走表/直前情報/オッズ/結果を約3分間隔で更新して公開している
-// 非公式データソース。GitHub Pages と、その配信元である raw.githubusercontent.com の
-// 2系統をミラーとして順に試す（どちらかが到達不能な環境でも動くようにするため）。
-const PRIMARY_BASE = "https://turnmark.github.io/api/v1";
-const MIRROR_BASE =
-  "https://raw.githubusercontent.com/turnmark/api/gh-pages/docs/v1";
+// Turnmark(単勝/3連単オッズ込み)を優先し、その日のファイルが無い場合のみ
+// 同系統・同スキーマのboatraceopenapi/api(オッズ非対応)にフォールバックする。
+// 実際に運用中、Turnmark側だけ当日分の生成が数時間遅れる事象が確認されたため導入。
+const SOURCES = [
+  { base: "https://turnmark.github.io/api/v1", label: "本サーバー", hasOdds: true },
+  { base: "https://raw.githubusercontent.com/turnmark/api/gh-pages/docs/v1", label: "ミラー", hasOdds: true },
+  { base: "https://boatraceopenapi.github.io/api/v1", label: "代替データ", hasOdds: false },
+  { base: "https://raw.githubusercontent.com/boatraceopenapi/api/gh-pages/docs/v1", label: "代替データミラー", hasOdds: false },
+];
 
 const CACHE_TTL_MS = 60 * 1000; // 元データの更新間隔(約3分)より短い周期でポーリングして反映を早める
 const FETCH_TIMEOUT_MS = 10 * 1000;
@@ -33,11 +36,12 @@ async function fetchWithTimeout(url) {
 
 async function fetchLive(date) {
   const errors = [];
-  for (const base of [PRIMARY_BASE, MIRROR_BASE]) {
+  for (const src of SOURCES) {
     try {
-      return await fetchWithTimeout(urlFor(base, date));
+      const data = await fetchWithTimeout(urlFor(src.base, date));
+      return { data, usedFallback: !src.hasOdds };
     } catch (err) {
-      errors.push(`${base}: ${err.message}`);
+      errors.push(`${src.label}: ${err.message}`);
     }
   }
   throw new Error(`データ取得に失敗しました: ${errors.join(" / ")}`);
@@ -67,8 +71,8 @@ async function getDay(date, opts = {}) {
   }
 
   try {
-    const data = await fetchLive(date);
-    const entry = { data, fetchedAt: Date.now() };
+    const { data, usedFallback } = await fetchLive(date);
+    const entry = { data, fetchedAt: Date.now(), usedFallback };
     cache.set(date, entry);
     return { ...entry, source: "live" };
   } catch (err) {

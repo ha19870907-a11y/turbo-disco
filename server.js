@@ -12,10 +12,29 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.static(path.join(__dirname, "public")));
 
+// 代替データソース(boatraceopenapi/api)は、まだ確定していないレースでも
+// result/preview オブジェクト自体は(全フィールドnullの状態で)存在することがある。
+// 実際に値が入っているかまで確認しないと「確定」等と誤判定してしまう。
+function hasRealResult(race) {
+  return !!(
+    race.result &&
+    race.result.racers &&
+    Object.values(race.result.racers).some((r) => typeof r.place_number === "number")
+  );
+}
+
+function hasRealPreview(race) {
+  return !!(
+    race.preview &&
+    race.preview.racers &&
+    Object.values(race.preview.racers).some((r) => r.course_number !== null && r.course_number !== undefined)
+  );
+}
+
 function raceStatus(race) {
-  if (race.result) return "finished";
+  if (hasRealResult(race)) return "finished";
   if (race.odds && race.odds.win) return "odds";
-  if (race.preview) return "preview";
+  if (hasRealPreview(race)) return "preview";
   return "scheduled";
 }
 
@@ -37,7 +56,7 @@ app.get("/api/stadiums", async (req, res, next) => {
   try {
     const date = parseDateParam(req);
     const sample = req.query.sample === "1";
-    const { data, source, fetchedAt, error } = await getDay(date, { forceSample: sample });
+    const { data, source, fetchedAt, error, usedFallback } = await getDay(date, { forceSample: sample });
     const stadiums = data?.programs?.stadiums || {};
 
     const list = Object.keys(stadiums)
@@ -54,7 +73,7 @@ app.get("/api/stadiums", async (req, res, next) => {
       })
       .sort((a, b) => a.stadiumNumber - b.stadiumNumber);
 
-    res.json({ date, source, fetchedAt, error: error || null, stadiums: list });
+    res.json({ date, source, fetchedAt, error: error || null, usedFallback, stadiums: list });
   } catch (err) {
     next(err);
   }
@@ -70,10 +89,10 @@ app.get("/api/races", async (req, res, next) => {
       err.status = 400;
       throw err;
     }
-    const { data, source, fetchedAt, error } = await getDay(date, { forceSample: sample });
+    const { data, source, fetchedAt, error, usedFallback } = await getDay(date, { forceSample: sample });
     const stadiumData = data?.programs?.stadiums?.[stadium];
     if (!stadiumData) {
-      return res.json({ date, source, fetchedAt, stadiumNumber: Number(stadium), races: [] });
+      return res.json({ date, source, fetchedAt, usedFallback, stadiumNumber: Number(stadium), races: [] });
     }
     const races = Object.keys(stadiumData.races)
       .sort((a, b) => Number(a) - Number(b))
@@ -92,6 +111,7 @@ app.get("/api/races", async (req, res, next) => {
       source,
       fetchedAt,
       error: error || null,
+      usedFallback,
       stadiumNumber: Number(stadium),
       stadiumName: stadiumName(stadium),
       races,
@@ -111,7 +131,7 @@ app.get("/api/race", async (req, res, next) => {
       err.status = 400;
       throw err;
     }
-    const { data, source, fetchedAt, error } = await getDay(date, { forceSample: sample });
+    const { data, source, fetchedAt, error, usedFallback } = await getDay(date, { forceSample: sample });
     const race = data?.programs?.stadiums?.[stadium]?.races?.[raceNumber];
     if (!race) {
       const err = new Error("指定されたレースが見つかりません");
@@ -126,6 +146,7 @@ app.get("/api/race", async (req, res, next) => {
       source,
       fetchedAt,
       error: error || null,
+      usedFallback,
       stadiumNumber: Number(stadium),
       stadiumName: stadiumName(stadium),
       raceNumber: Number(raceNumber),
@@ -133,7 +154,7 @@ app.get("/api/race", async (req, res, next) => {
       subtitle: race.subtitle,
       closedAt: race.closed_at,
       status: raceStatus(race),
-      result: race.result
+      result: hasRealResult(race)
         ? {
             techniqueText: race.result.technique_number_source,
             racers: Object.values(race.result.racers).sort(

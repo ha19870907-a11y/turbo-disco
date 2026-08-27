@@ -45,13 +45,24 @@ function isRoughWeather(preview) {
   return windRough || waveRough;
 }
 
+// 代替データソース(boatraceopenapi/api)は、直前情報がまだスクレイピングされていない
+// レースでも preview オブジェクト自体は(全フィールドnullの状態で)存在することがある。
+// racers 配下が「オブジェクトとしてある」だけでなく実際に値が入っているかまで確認する。
+function hasRealPreview(preview) {
+  return !!(
+    preview &&
+    preview.racers &&
+    Object.values(preview.racers).some((r) => r.course_number !== null && r.course_number !== undefined)
+  );
+}
+
 /**
  * @param {object} race turnmark API の races.{n} オブジェクト
  * @returns {object} 予想結果
  */
 export function predictRace(race) {
   const entries = Object.keys(race.racers).sort((a, b) => Number(a) - Number(b));
-  const preview = race.preview || null;
+  const preview = hasRealPreview(race.preview) ? race.preview : null;
   const odds = race.odds || null;
   const hasPreview = !!(preview && preview.racers);
   const rough = isRoughWeather(preview);

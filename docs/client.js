@@ -4,8 +4,15 @@
 import { predictRace } from "./predictor.js";
 import { stadiumName } from "./stadiums.js";
 
-const PRIMARY_BASE = "https://turnmark.github.io/api/v1";
-const MIRROR_BASE = "https://raw.githubusercontent.com/turnmark/api/gh-pages/docs/v1";
+// Turnmark(単勝/3連単オッズ込み)を優先し、その日のファイルが無い場合のみ
+// 同系統・同スキーマのboatraceopenapi/api(オッズ非対応)にフォールバックする。
+// 実際に運用中、Turnmark側だけ当日分の生成が数時間遅れる事象が確認されたため導入。
+const SOURCES = [
+  { base: "https://turnmark.github.io/api/v1", label: "本サーバー", hasOdds: true },
+  { base: "https://raw.githubusercontent.com/turnmark/api/gh-pages/docs/v1", label: "ミラー", hasOdds: true },
+  { base: "https://boatraceopenapi.github.io/api/v1", label: "代替データ", hasOdds: false },
+  { base: "https://raw.githubusercontent.com/boatraceopenapi/api/gh-pages/docs/v1", label: "代替データミラー", hasOdds: false },
+];
 const CACHE_TTL_MS = 60 * 1000; // 元データの更新間隔(約3分)より短い周期でポーリングして反映を早める
 const FETCH_TIMEOUT_MS = 10 * 1000;
 
@@ -43,11 +50,12 @@ async function fetchWithTimeout(url) {
 
 async function fetchLive(date) {
   const errors = [];
-  for (const base of [PRIMARY_BASE, MIRROR_BASE]) {
+  for (const src of SOURCES) {
     try {
-      return await fetchWithTimeout(urlFor(base, date));
+      const data = await fetchWithTimeout(urlFor(src.base, date));
+      return { data, usedFallback: !src.hasOdds };
     } catch (err) {
-      errors.push(`${base.includes("githubusercontent") ? "ミラー" : "本サーバー"}: ${err.message}`);
+      errors.push(`${src.label}: ${err.message}`);
     }
   }
   throw new Error(`データ取得に失敗しました (${errors.join(" / ")})`);
@@ -80,8 +88,8 @@ export async function getDay(date, opts = {}) {
   }
 
   try {
-    const data = await fetchLive(date);
-    const entry = { data, fetchedAt: Date.now() };
+    const { data, usedFallback } = await fetchLive(date);
+    const entry = { data, fetchedAt: Date.now(), usedFallback };
     memoryCache.set(date, entry);
     return { ...entry, source: "live" };
   } catch (err) {
@@ -92,10 +100,29 @@ export async function getDay(date, opts = {}) {
   }
 }
 
+// 代替データソース(boatraceopenapi/api)は、まだ確定していないレースでも
+// result オブジェクト自体は(全フィールドnullの状態で)存在することがある。
+// 実際に着順が入っているかまで確認しないと「確定」と誤判定してしまう。
+function hasRealResult(race) {
+  return !!(
+    race.result &&
+    race.result.racers &&
+    Object.values(race.result.racers).some((r) => typeof r.place_number === "number")
+  );
+}
+
+function hasRealPreview(race) {
+  return !!(
+    race.preview &&
+    race.preview.racers &&
+    Object.values(race.preview.racers).some((r) => r.course_number !== null && r.course_number !== undefined)
+  );
+}
+
 function raceStatus(race) {
-  if (race.result) return "finished";
+  if (hasRealResult(race)) return "finished";
   if (race.odds && race.odds.win) return "odds";
-  if (race.preview) return "preview";
+  if (hasRealPreview(race)) return "preview";
   return "scheduled";
 }
 
@@ -148,7 +175,7 @@ export function buildRaceDetail(dayData, stadium, raceNumber) {
     subtitle: race.subtitle,
     closedAt: race.closed_at,
     status: raceStatus(race),
-    result: race.result
+    result: hasRealResult(race)
       ? {
           techniqueText: race.result.technique_number_source,
           racers: Object.values(race.result.racers).sort((a, b) => a.place_number - b.place_number),

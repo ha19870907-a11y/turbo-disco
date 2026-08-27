@@ -4,8 +4,15 @@
 // 過去の確定済みの日のデータは内容が変わらないため、プロセス存続中は無期限にキャッシュする。
 const { stadiumName } = require("./stadiums");
 
-const PRIMARY_BASE = "https://turnmark.github.io/api/v1";
-const MIRROR_BASE = "https://raw.githubusercontent.com/turnmark/api/gh-pages/docs/v1";
+// Turnmarkを優先し、その日のファイルが無い場合のみ同系統・同スキーマの
+// boatraceopenapi/api(オッズ非対応)にフォールバックする。過去実績の集計では
+// 着順(place_number)だけを使うため、オッズが無くても支障はない。
+const SOURCES = [
+  "https://turnmark.github.io/api/v1",
+  "https://raw.githubusercontent.com/turnmark/api/gh-pages/docs/v1",
+  "https://boatraceopenapi.github.io/api/v1",
+  "https://raw.githubusercontent.com/boatraceopenapi/api/gh-pages/docs/v1",
+];
 const FETCH_TIMEOUT_MS = 12000;
 const FETCH_CONCURRENCY = 3;
 const DEFAULT_LOOKBACK_DAYS = 10;
@@ -29,11 +36,11 @@ async function fetchWithTimeout(url) {
 }
 
 async function fetchDayRaw(date) {
-  for (const base of [PRIMARY_BASE, MIRROR_BASE]) {
+  for (const base of SOURCES) {
     try {
       return await fetchWithTimeout(urlFor(base, date));
     } catch {
-      // 次のミラーを試す。両方失敗したらその日は諦める(欠損として扱う)。
+      // 次の候補を試す。すべて失敗したらその日は諦める(欠損として扱う)。
     }
   }
   return null;
