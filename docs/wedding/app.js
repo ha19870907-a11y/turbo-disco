@@ -1178,12 +1178,18 @@ function drawSegment(ctx, seg, localT, settings) {
 
 function pickMimeType() {
   const candidates = [
+    // iOS(Safari含む)は、ブラウザのMediaRecorder自体はWebM(VP9/Opus)の
+    // isTypeSupportedにtrueを返すことがあるが、そのWebMファイルは「写真に保存」や
+    // 他アプリへの共有（LINEなど）に使われるOS側のメディア基盤では扱えず、
+    // 長押し保存や共有が壊れる（リンクだけが送られて動画が開けない等）原因になる。
+    // MP4(H.264/AAC)はどのプラットフォームでも安全に扱えるため、対応していれば必ず優先する。
+    "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+    "video/mp4;codecs=avc1,mp4a.40.2",
+    "video/mp4;codecs=h264,aac",
+    "video/mp4",
     "video/webm;codecs=vp9,opus",
     "video/webm;codecs=vp8,opus",
     "video/webm",
-    // SafariはWebMのMediaRecorderに対応していないため、対応していればMP4系にフォールバックする
-    "video/mp4;codecs=avc1,mp4a.40.2",
-    "video/mp4",
   ];
   for (const type of candidates) {
     if (window.MediaRecorder && MediaRecorder.isTypeSupported(type)) return type;
