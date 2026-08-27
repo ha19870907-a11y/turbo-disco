@@ -513,4 +513,11 @@ if ("serviceWorker" in navigator) {
       // オフライン対応は付加価値のため、登録失敗時も本体機能は継続する
     });
   });
+  // 新しいservice workerが有効になったら自動でリロードし、更新の反映漏れを防ぐ
+  let reloadedForUpdate = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (reloadedForUpdate) return;
+    reloadedForUpdate = true;
+    window.location.reload();
+  });
 }

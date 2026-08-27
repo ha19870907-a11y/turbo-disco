@@ -1,7 +1,8 @@
 // PWAのアプリシェルをキャッシュし、オフライン時も最低限起動できるようにするサービスワーカー。
-// レース関連の外部データは network-first とし、通信できない時のみ直近のキャッシュを表示する
-// （予想の性質上、鮮度が最優先のため常に最新取得を優先する）。
-const CACHE_VERSION = "v1";
+// アプリ本体(HTML/JS/CSS)は開発中に頻繁に更新されるため network-first とし、
+// オフライン時のみキャッシュにフォールバックする(鮮度を優先し、更新が反映されない事故を防ぐ)。
+// レース関連の外部データも同様に network-first。
+const CACHE_VERSION = "v2";
 const APP_SHELL_CACHE = `kyotei-app-shell-${CACHE_VERSION}`;
 const DATA_CACHE = `kyotei-data-${CACHE_VERSION}`;
 
@@ -13,6 +14,8 @@ const APP_SHELL_FILES = [
   "./client.js",
   "./predictor.js",
   "./stadiums.js",
+  "./history.js",
+  "./dayCache.js",
   "./manifest.webmanifest",
   "./fixtures/sample-20260401.json",
   "./icons/icon-192.png",
@@ -62,9 +65,16 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (url.origin === self.location.origin) {
-    // app shell: cache-first
+    // app shell: network-first。コード更新を即座に反映するため、オンライン時は常に
+    // ネットワークを優先し、オフライン時のみキャッシュへフォールバックする。
     event.respondWith(
-      caches.match(event.request).then((cached) => cached || fetch(event.request))
+      fetch(event.request)
+        .then((res) => {
+          const clone = res.clone();
+          caches.open(APP_SHELL_CACHE).then((cache) => cache.put(event.request, clone));
+          return res;
+        })
+        .catch(() => caches.match(event.request))
     );
   }
 });
