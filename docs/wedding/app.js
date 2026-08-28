@@ -74,6 +74,7 @@ const els = {
   transitionType: document.getElementById("transition-type"),
   transitionDuration: document.getElementById("transition-duration"),
   captionStyle: document.getElementById("caption-style"),
+  captionFontSize: document.getElementById("caption-font-size"),
   captionFade: document.getElementById("caption-fade"),
 
   opGroomName: document.getElementById("op-groom-name"),
@@ -87,6 +88,7 @@ const els = {
   opTransitionType: document.getElementById("op-transition-type"),
   opTransitionDuration: document.getElementById("op-transition-duration"),
   opCaptionStyle: document.getElementById("op-caption-style"),
+  opCaptionFontSize: document.getElementById("op-caption-font-size"),
   opCaptionFade: document.getElementById("op-caption-fade"),
 
   groomDropzone: document.getElementById("groom-dropzone"),
@@ -146,6 +148,7 @@ function getSettings() {
       transitionType: els.opTransitionType.value || "flash",
       transitionDuration: Math.min(Math.max(Number(els.opTransitionDuration.value) || 0.3, 0.15), 1),
       captionStyle: els.opCaptionStyle.value || "simple",
+      captionFontSize: Math.min(Math.max(Number(els.opCaptionFontSize.value) || 32, 16), 64),
       captionFade: els.opCaptionFade.value || "fade",
       groomName: (els.opGroomName.value || "GROOM").trim().toUpperCase(),
       groomSub1: els.opGroomSub1.value.trim(),
@@ -169,6 +172,7 @@ function getSettings() {
     transitionType: els.transitionType.value || "crossfade",
     transitionDuration: Math.min(Math.max(Number(els.transitionDuration.value) || 0.8, 0.3), 2),
     captionStyle: els.captionStyle.value || "simple",
+    captionFontSize: Math.min(Math.max(Number(els.captionFontSize.value) || 32, 16), 64),
     captionFade: els.captionFade.value || "fade",
     photos: standardGroup.photos,
   };
@@ -897,7 +901,7 @@ function roundRectPath(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-// キャプションの見せ方（フェード/スライド＋フェード/常に表示）に応じて
+// キャプションの見せ方（フェード/スライド＋フェード/キラキラ出現/常に表示）に応じて
 // 透明度とスライド量（下からせり上がる量）を計算する。
 function captionMotion(localT, duration, fadeMode) {
   const fadeLen = Math.min(FADE, duration / 2);
@@ -910,25 +914,96 @@ function captionMotion(localT, duration, fadeMode) {
     const edge = Math.min(inProgress, outProgress, 1);
     return { alpha: edge, offsetY: (1 - edge) * 26 };
   }
+  if (fadeMode === "sparkle") {
+    const inProgress = fadeLen > 0 ? Math.min(Math.max(localT / fadeLen, 0), 1) : 1;
+    const outProgress = fadeLen > 0 ? Math.min(Math.max((duration - localT) / fadeLen, 0), 1) : 1;
+    const edge = Math.min(inProgress, outProgress, 1);
+    const ease = 1 - Math.pow(1 - inProgress, 3);
+    // フェードだけでなく、下から浮かび上がるように少し大きめのスライド量を使う。
+    return { alpha: edge, offsetY: (1 - ease) * 34 };
+  }
   return { alpha: fadeAlpha(localT, duration, fadeLen), offsetY: 0 };
 }
 
-function drawCaption(ctx, text, localT, duration, theme, style, fadeMode) {
+// 疑似乱数（0〜1）。パーティクルごとに同じシード値なら毎フレーム同じ値になる。
+function sparkleRandom(seed) {
+  const x = Math.sin(seed) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+// 十字＋中心の光点でできた、きらめく星形パーティクルを描画する。
+function drawSparkleStar(ctx, x, y, size, alpha) {
+  if (alpha <= 0.02) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y);
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = Math.max(1, size * 0.18);
+  ctx.beginPath();
+  ctx.moveTo(-size, 0);
+  ctx.lineTo(size, 0);
+  ctx.moveTo(0, -size);
+  ctx.lineTo(0, size);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, 0, size * 0.32, 0, Math.PI * 2);
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
+  ctx.restore();
+}
+
+// 文字の左右から星のパーティクルが飛んできて文字の周りできらめく演出。
+function drawSparkleOverlay(ctx, cx, cy, halfWidth, localT, duration) {
+  const fadeLen = Math.min(FADE, duration / 2);
+  const inProgress = fadeLen > 0 ? Math.min(Math.max(localT / fadeLen, 0), 1) : 1;
+  const count = 10;
+  const spread = Math.max(halfWidth, 60);
+  for (let i = 0; i < count; i++) {
+    const fromLeft = i % 2 === 0;
+    const seed = i * 12.9898 + 3.51;
+    const arriveAt = 0.15 + sparkleRandom(seed) * 0.6;
+    const arrive = arriveAt > 0 ? Math.min(inProgress / arriveAt, 1) : 1;
+    if (arrive <= 0) continue;
+    const startX = fromLeft
+      ? cx - spread - 200 - sparkleRandom(seed + 1) * 80
+      : cx + spread + 200 + sparkleRandom(seed + 1) * 80;
+    const targetX = cx + (sparkleRandom(seed + 2) - 0.5) * spread * 2;
+    const targetY = cy + (sparkleRandom(seed + 3) - 0.5) * 44;
+    const startY = targetY + (sparkleRandom(seed + 4) - 0.5) * 30;
+    const ease = 1 - Math.pow(1 - arrive, 3);
+    const px = startX + (targetX - startX) * ease;
+    const py = startY + (targetY - startY) * ease;
+    const twinkle = 0.35 + 0.65 * Math.abs(Math.sin(localT * (3 + sparkleRandom(seed + 5) * 3) + seed));
+    const alpha = arrive * twinkle;
+    const size = 5 + sparkleRandom(seed + 6) * 4;
+    drawSparkleStar(ctx, px, py, size, alpha);
+  }
+}
+
+function drawCaption(ctx, text, localT, duration, theme, style, fadeMode, fontSize) {
   const { alpha, offsetY } = captionMotion(localT, duration, fadeMode || "fade");
   if (alpha <= 0) return;
+  const size = fontSize || 32;
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.translate(0, offsetY);
 
+  let capCenterX = CANVAS_W / 2;
+  let capCenterY = CANVAS_H / 2;
+  let capHalfWidth = 100;
+
   if (style === "elegant") {
     // 背景バーなし。明朝体イタリック＋文字影＋下に細いアクセント線というシンプルな見せ方。
+    const fSize = size + 2;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.font = "italic 400 34px serif";
+    ctx.font = `italic 400 ${fSize}px serif`;
+    capCenterY = CANVAS_H - 76;
+    capHalfWidth = Math.min(ctx.measureText(text).width, CANVAS_W - 100) / 2;
     ctx.shadowColor = "rgba(0,0,0,0.7)";
     ctx.shadowBlur = 10;
     ctx.fillStyle = "#ffffff";
-    ctx.fillText(text, CANVAS_W / 2, CANVAS_H - 76, CANVAS_W - 100);
+    ctx.fillText(text, capCenterX, capCenterY, CANVAS_W - 100);
     ctx.shadowBlur = 0;
     ctx.strokeStyle = theme.accent;
     ctx.lineWidth = 1.5;
@@ -938,14 +1013,18 @@ function drawCaption(ctx, text, localT, duration, theme, style, fadeMode) {
     ctx.stroke();
   } else if (style === "pop") {
     // テーマカラーの丸みを帯びたピル型バッジに太字白文字。
-    ctx.font = "700 30px sans-serif";
+    const fSize = Math.max(size - 2, 12);
+    ctx.font = `700 ${fSize}px sans-serif`;
     const maxTextWidth = CANVAS_W - 120;
     const textWidth = Math.min(ctx.measureText(text).width, maxTextWidth);
     const paddingX = 28;
     const pillW = Math.min(textWidth + paddingX * 2, CANVAS_W - 60);
-    const pillH = 58;
+    const pillH = Math.round(fSize * 1.93);
     const pillX = CANVAS_W / 2 - pillW / 2;
     const pillY = CANVAS_H - 118;
+    capCenterX = CANVAS_W / 2;
+    capCenterY = pillY + pillH / 2;
+    capHalfWidth = pillW / 2;
     ctx.fillStyle = theme.accent;
     roundRectPath(ctx, pillX, pillY, pillW, pillH, pillH / 2);
     ctx.fill();
@@ -955,7 +1034,8 @@ function drawCaption(ctx, text, localT, duration, theme, style, fadeMode) {
     ctx.fillText(text, CANVAS_W / 2, pillY + pillH / 2 + 2, pillW - paddingX * 2);
   } else {
     // "simple"（既定）: 下から暗くなるグラデーションバー＋白文字＋アクセント下線。
-    const barHeight = 92;
+    const fSize = size;
+    const barHeight = Math.round(fSize * 2.875);
     const y = CANVAS_H - barHeight;
     const grad = ctx.createLinearGradient(0, y, 0, CANVAS_H);
     grad.addColorStop(0, "rgba(0,0,0,0)");
@@ -966,8 +1046,11 @@ function drawCaption(ctx, text, localT, duration, theme, style, fadeMode) {
     ctx.fillStyle = "#ffffff";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.font = "500 32px serif";
-    ctx.fillText(text, CANVAS_W / 2, CANVAS_H - barHeight / 2 + 8, CANVAS_W - 80);
+    ctx.font = `500 ${fSize}px serif`;
+    capCenterX = CANVAS_W / 2;
+    capCenterY = CANVAS_H - barHeight / 2 + 8;
+    capHalfWidth = Math.min(ctx.measureText(text).width, CANVAS_W - 80) / 2;
+    ctx.fillText(text, capCenterX, capCenterY, CANVAS_W - 80);
 
     ctx.strokeStyle = theme.accent;
     ctx.lineWidth = 2;
@@ -975,6 +1058,10 @@ function drawCaption(ctx, text, localT, duration, theme, style, fadeMode) {
     ctx.moveTo(CANVAS_W / 2 - 40, CANVAS_H - barHeight / 2 - 24);
     ctx.lineTo(CANVAS_W / 2 + 40, CANVAS_H - barHeight / 2 - 24);
     ctx.stroke();
+  }
+
+  if (fadeMode === "sparkle") {
+    drawSparkleOverlay(ctx, capCenterX, capCenterY, capHalfWidth, localT, duration);
   }
 
   ctx.restore();
@@ -1039,7 +1126,16 @@ function drawPhoto(ctx, seg, localT, settings) {
   );
 
   if (seg.photo.caption) {
-    drawCaption(ctx, seg.photo.caption, localT, seg.duration, settings.theme, settings.captionStyle, settings.captionFade);
+    drawCaption(
+      ctx,
+      seg.photo.caption,
+      localT,
+      seg.duration,
+      settings.theme,
+      settings.captionStyle,
+      settings.captionFade,
+      settings.captionFontSize
+    );
   }
 }
 
@@ -1726,8 +1822,10 @@ function collectDraftData() {
       opTransitionType: els.opTransitionType.value,
       opTransitionDuration: els.opTransitionDuration.value,
       captionStyle: els.captionStyle.value,
+      captionFontSize: els.captionFontSize.value,
       captionFade: els.captionFade.value,
       opCaptionStyle: els.opCaptionStyle.value,
+      opCaptionFontSize: els.opCaptionFontSize.value,
       opCaptionFade: els.opCaptionFade.value,
       beatSyncEnabled: els.beatSyncEnabled.checked,
       beatSyncInterval: els.beatSyncInterval.value,
@@ -1767,8 +1865,10 @@ async function restoreDraftData(data) {
   els.opTransitionType.value = f.opTransitionType || "flash";
   els.opTransitionDuration.value = f.opTransitionDuration || 0.3;
   els.captionStyle.value = f.captionStyle || "simple";
+  els.captionFontSize.value = f.captionFontSize || 32;
   els.captionFade.value = f.captionFade || "fade";
   els.opCaptionStyle.value = f.opCaptionStyle || "simple";
+  els.opCaptionFontSize.value = f.opCaptionFontSize || 32;
   els.opCaptionFade.value = f.opCaptionFade || "fade";
   els.beatSyncEnabled.checked = !!f.beatSyncEnabled;
   els.beatSyncInterval.value = f.beatSyncInterval || 2;
