@@ -88,6 +88,9 @@
         <label>1枚あたりの表示時間（秒・写真のみ）
           <input id="photo-duration" type="number" min="1.5" max="10" step="0.5" value="4" />
         </label>
+        <label>写真の表示サイズ（%・余白付きで小さく表示）
+          <input id="photo-display-scale" type="number" min="30" max="100" step="5" value="100" />
+        </label>
         <label>切り替え効果
           <select id="transition-type">
             <option value="crossfade">クロスフェード</option>
@@ -154,6 +157,9 @@
         </label>
         <label>1枚あたりの表示時間（秒・写真のみ）
           <input id="op-photo-duration" type="number" min="0.4" max="3" step="0.1" value="1" />
+        </label>
+        <label>写真の表示サイズ（%・余白付きで小さく表示）
+          <input id="op-photo-display-scale" type="number" min="30" max="100" step="5" value="100" />
         </label>
         <label>切り替え効果
           <select id="op-transition-type">

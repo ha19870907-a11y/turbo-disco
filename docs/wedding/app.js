@@ -71,6 +71,7 @@ const els = {
   endMessage: document.getElementById("end-message"),
   themeSelect: document.getElementById("theme-select"),
   photoDuration: document.getElementById("photo-duration"),
+  photoDisplayScale: document.getElementById("photo-display-scale"),
   transitionType: document.getElementById("transition-type"),
   transitionDuration: document.getElementById("transition-duration"),
   captionStyle: document.getElementById("caption-style"),
@@ -85,6 +86,7 @@ const els = {
   opBrideSub2: document.getElementById("op-bride-sub2"),
   opNeonColor: document.getElementById("op-neon-color"),
   opPhotoDuration: document.getElementById("op-photo-duration"),
+  opPhotoDisplayScale: document.getElementById("op-photo-display-scale"),
   opTransitionType: document.getElementById("op-transition-type"),
   opTransitionDuration: document.getElementById("op-transition-duration"),
   opCaptionStyle: document.getElementById("op-caption-style"),
@@ -145,6 +147,7 @@ function getSettings() {
       template,
       theme: NEON_THEMES[els.opNeonColor.value] || NEON_THEMES.pink,
       photoDuration: Math.min(Math.max(Number(els.opPhotoDuration.value) || 1, 0.4), 3),
+      photoDisplayScale: Math.min(Math.max(Number(els.opPhotoDisplayScale.value) || 100, 30), 100),
       transitionType: els.opTransitionType.value || "flash",
       transitionDuration: Math.min(Math.max(Number(els.opTransitionDuration.value) || 0.3, 0.15), 1),
       captionStyle: els.opCaptionStyle.value || "simple",
@@ -169,6 +172,7 @@ function getSettings() {
     endMessage: els.endMessage.value.trim() || "Thank You",
     theme: THEMES[els.themeSelect.value] || THEMES.pink,
     photoDuration: Math.min(Math.max(Number(els.photoDuration.value) || 4, 1.5), 10),
+    photoDisplayScale: Math.min(Math.max(Number(els.photoDisplayScale.value) || 100, 30), 100),
     transitionType: els.transitionType.value || "crossfade",
     transitionDuration: Math.min(Math.max(Number(els.transitionDuration.value) || 0.8, 0.3), 2),
     captionStyle: els.captionStyle.value || "simple",
@@ -308,11 +312,11 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
 
       if (photo.kind === "video") {
         const clipLabel = document.createElement("label");
-        clipLabel.className = "item-duration-label";
+        clipLabel.className = "photo-field-label";
         clipLabel.textContent = "使用秒数";
         const clipInput = document.createElement("input");
         clipInput.type = "number";
-        clipInput.className = "item-duration-input";
+        clipInput.className = "photo-field-input";
         clipInput.min = "0.5";
         clipInput.max = String(Math.min(photo.naturalDuration, MAX_VIDEO_CLIP_SECONDS));
         clipInput.step = "0.5";
@@ -330,11 +334,11 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
         // 動画を当てこむ際など、写真ごとに表示秒数を個別調整したい場合の上書き設定。
         // 空欄のときは共通設定（1枚あたりの表示時間）に従う。
         const durLabel = document.createElement("label");
-        durLabel.className = "item-duration-label";
+        durLabel.className = "photo-field-label";
         durLabel.textContent = "表示秒数";
         const durInput = document.createElement("input");
         durInput.type = "number";
-        durInput.className = "item-duration-input";
+        durInput.className = "photo-field-input";
         durInput.min = "0.2";
         durInput.max = "20";
         durInput.step = "0.1";
@@ -365,6 +369,95 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
         photo.caption = captionInput.value;
       });
       item.appendChild(captionInput);
+
+      // 詳細設定（この写真だけの文字サイズ・エフェクト・表示サイズの上書き）。
+      // 空欄／「共通」のときは共通設定に従う。
+      const advanced = document.createElement("details");
+      advanced.className = "photo-advanced";
+      advanced.draggable = false;
+      const summary = document.createElement("summary");
+      summary.textContent = "詳細設定";
+      advanced.appendChild(summary);
+      const advancedFields = document.createElement("div");
+      advancedFields.className = "photo-advanced-fields";
+
+      const fontSizeLabel = document.createElement("label");
+      fontSizeLabel.className = "photo-field-label";
+      fontSizeLabel.textContent = "文字サイズ(px)";
+      const fontSizeInput = document.createElement("input");
+      fontSizeInput.type = "number";
+      fontSizeInput.className = "photo-field-input";
+      fontSizeInput.min = "16";
+      fontSizeInput.max = "64";
+      fontSizeInput.step = "2";
+      fontSizeInput.placeholder = "共通";
+      fontSizeInput.value = photo.captionFontSize != null ? photo.captionFontSize : "";
+      fontSizeInput.draggable = false;
+      fontSizeInput.title = "空欄の場合は共通設定（キャプションの文字サイズ）が使われます";
+      fontSizeInput.addEventListener("input", () => {
+        if (fontSizeInput.value.trim() === "") {
+          photo.captionFontSize = null;
+        } else {
+          photo.captionFontSize = Math.min(Math.max(Number(fontSizeInput.value) || 16, 16), 64);
+        }
+        onChange();
+      });
+      fontSizeLabel.appendChild(fontSizeInput);
+      advancedFields.appendChild(fontSizeLabel);
+
+      const fadeLabel = document.createElement("label");
+      fadeLabel.className = "photo-field-label";
+      fadeLabel.textContent = "文字のエフェクト";
+      const fadeSelect = document.createElement("select");
+      fadeSelect.className = "photo-field-input";
+      fadeSelect.draggable = false;
+      fadeSelect.title = "「共通」の場合は共通設定（キャプションの出し方）が使われます";
+      [
+        ["", "共通"],
+        ["fade", "フェード"],
+        ["slide", "スライド＋フェード"],
+        ["sparkle", "キラキラ出現"],
+        ["none", "常に表示"],
+      ].forEach(([value, label]) => {
+        const opt = document.createElement("option");
+        opt.value = value;
+        opt.textContent = label;
+        fadeSelect.appendChild(opt);
+      });
+      fadeSelect.value = photo.captionFade || "";
+      fadeSelect.addEventListener("change", () => {
+        photo.captionFade = fadeSelect.value || null;
+        onChange();
+      });
+      fadeLabel.appendChild(fadeSelect);
+      advancedFields.appendChild(fadeLabel);
+
+      const sizeLabel = document.createElement("label");
+      sizeLabel.className = "photo-field-label";
+      sizeLabel.textContent = "写真の表示サイズ(%)";
+      const sizeInput = document.createElement("input");
+      sizeInput.type = "number";
+      sizeInput.className = "photo-field-input";
+      sizeInput.min = "30";
+      sizeInput.max = "100";
+      sizeInput.step = "5";
+      sizeInput.placeholder = "共通";
+      sizeInput.value = photo.displayScale != null ? photo.displayScale : "";
+      sizeInput.draggable = false;
+      sizeInput.title = "空欄の場合は共通設定（写真の表示サイズ）が使われます";
+      sizeInput.addEventListener("input", () => {
+        if (sizeInput.value.trim() === "") {
+          photo.displayScale = null;
+        } else {
+          photo.displayScale = Math.min(Math.max(Number(sizeInput.value) || 30, 30), 100);
+        }
+        onChange();
+      });
+      sizeLabel.appendChild(sizeInput);
+      advancedFields.appendChild(sizeLabel);
+
+      advanced.appendChild(advancedFields);
+      item.appendChild(advanced);
 
       item.addEventListener("dragstart", (e) => {
         e.dataTransfer.setData("text/plain", String(photo.id));
@@ -425,7 +518,16 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
         }
         try {
           const videoItem = await loadVideoItem(file);
-          group.photos.push({ id: group.nextId++, kind: "video", caption: "", file, ...videoItem });
+          group.photos.push({
+            id: group.nextId++,
+            kind: "video",
+            caption: "",
+            file,
+            captionFontSize: null,
+            captionFade: null,
+            displayScale: null,
+            ...videoItem,
+          });
           videoCount++;
         } catch (err) {
           skippedInvalid++;
@@ -441,7 +543,18 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
       try {
         const rawImg = await loadImage(url);
         const renderSource = capImageSize(rawImg);
-        group.photos.push({ id: group.nextId++, kind: "image", url, img: renderSource, file, caption: "", duration: null });
+        group.photos.push({
+          id: group.nextId++,
+          kind: "image",
+          url,
+          img: renderSource,
+          file,
+          caption: "",
+          duration: null,
+          captionFontSize: null,
+          captionFade: null,
+          displayScale: null,
+        });
       } catch (err) {
         skippedInvalid++;
         URL.revokeObjectURL(url);
@@ -500,6 +613,9 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
             kind: "video",
             caption: saved.caption || "",
             file,
+            captionFontSize: saved.captionFontSize != null ? saved.captionFontSize : null,
+            captionFade: saved.captionFade || null,
+            displayScale: saved.displayScale != null ? saved.displayScale : null,
             ...videoItem,
             clipSeconds: Math.min(saved.clipSeconds || videoItem.clipSeconds, maxAllowed),
           });
@@ -519,6 +635,9 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
             file,
             caption: saved.caption || "",
             duration: saved.duration != null ? saved.duration : null,
+            captionFontSize: saved.captionFontSize != null ? saved.captionFontSize : null,
+            captionFade: saved.captionFade || null,
+            displayScale: saved.displayScale != null ? saved.displayScale : null,
           });
         } catch (err) {
           URL.revokeObjectURL(url);
@@ -1090,19 +1209,29 @@ function drawPhoto(ctx, seg, localT, settings) {
   const { width: imgW, height: imgH } = intrinsicSize(img);
   const imgRatio = imgW / imgH;
   const canvasRatio = CANVAS_W / CANVAS_H;
+
+  // 写真ごとの表示サイズ上書き（未指定なら共通設定に従う）。
+  // 100%未満のときは、余白（テーマカラーの背景）付きで写真を小さく表示する。
+  const effScale = seg.photo.displayScale != null ? seg.photo.displayScale : settings.photoDisplayScale;
+  const scaleFrac = Math.min(Math.max(effScale || 100, 30), 100) / 100;
+  const frameW = CANVAS_W * scaleFrac;
+  const frameH = CANVAS_H * scaleFrac;
+  const frameX = (CANVAS_W - frameW) / 2;
+  const frameY = (CANVAS_H - frameH) / 2;
+
   let baseW, baseH;
   if (imgRatio > canvasRatio) {
-    baseH = CANVAS_H;
+    baseH = frameH;
     baseW = baseH * imgRatio;
   } else {
-    baseW = CANVAS_W;
+    baseW = frameW;
     baseH = baseW / imgRatio;
   }
   const drawW = baseW * scale;
   const drawH = baseH * scale;
 
-  const maxOffsetX = (drawW - CANVAS_W) / 2;
-  const maxOffsetY = (drawH - CANVAS_H) / 2;
+  const maxOffsetX = (drawW - frameW) / 2;
+  const maxOffsetY = (drawH - frameH) / 2;
 
   const directions = [
     [-1, -1],
@@ -1115,17 +1244,38 @@ function drawPhoto(ctx, seg, localT, settings) {
   const offsetX = dx * maxOffsetX * panProgress;
   const offsetY = dy * maxOffsetY * panProgress;
 
-  ctx.fillStyle = "#000";
+  const bgGrad = ctx.createLinearGradient(0, 0, CANVAS_W, CANVAS_H);
+  bgGrad.addColorStop(0, settings.theme.bg1);
+  bgGrad.addColorStop(1, settings.theme.bg2);
+  ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(frameX, frameY, frameW, frameH);
+  ctx.clip();
   ctx.drawImage(
     img,
-    CANVAS_W / 2 - drawW / 2 + offsetX,
-    CANVAS_H / 2 - drawH / 2 + offsetY,
+    frameX + frameW / 2 - drawW / 2 + offsetX,
+    frameY + frameH / 2 - drawH / 2 + offsetY,
     drawW,
     drawH
   );
+  ctx.restore();
+
+  if (scaleFrac < 0.999) {
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,255,255,0.85)";
+    ctx.lineWidth = 4;
+    ctx.shadowColor = "rgba(0,0,0,0.35)";
+    ctx.shadowBlur = 18;
+    ctx.strokeRect(frameX, frameY, frameW, frameH);
+    ctx.restore();
+  }
 
   if (seg.photo.caption) {
+    const effFontSize = seg.photo.captionFontSize != null ? seg.photo.captionFontSize : settings.captionFontSize;
+    const effFade = seg.photo.captionFade || settings.captionFade;
     drawCaption(
       ctx,
       seg.photo.caption,
@@ -1133,8 +1283,8 @@ function drawPhoto(ctx, seg, localT, settings) {
       seg.duration,
       settings.theme,
       settings.captionStyle,
-      settings.captionFade,
-      settings.captionFontSize
+      effFade,
+      effFontSize
     );
   }
 }
@@ -1795,6 +1945,9 @@ function collectGroupDraftItems(group) {
       caption: p.caption || "",
       clipSeconds: p.kind === "video" ? p.clipSeconds : undefined,
       duration: p.kind === "image" ? p.duration : undefined,
+      captionFontSize: p.captionFontSize,
+      captionFade: p.captionFade,
+      displayScale: p.displayScale,
     }));
 }
 
@@ -1809,6 +1962,7 @@ function collectDraftData() {
       endMessage: els.endMessage.value,
       theme: els.themeSelect.value,
       photoDuration: els.photoDuration.value,
+      photoDisplayScale: els.photoDisplayScale.value,
       transitionType: els.transitionType.value,
       transitionDuration: els.transitionDuration.value,
       opGroomName: els.opGroomName.value,
@@ -1819,6 +1973,7 @@ function collectDraftData() {
       opBrideSub2: els.opBrideSub2.value,
       opNeonColor: els.opNeonColor.value,
       opPhotoDuration: els.opPhotoDuration.value,
+      opPhotoDisplayScale: els.opPhotoDisplayScale.value,
       opTransitionType: els.opTransitionType.value,
       opTransitionDuration: els.opTransitionDuration.value,
       captionStyle: els.captionStyle.value,
@@ -1852,6 +2007,7 @@ async function restoreDraftData(data) {
   els.endMessage.value = f.endMessage || "";
   els.themeSelect.value = f.theme || "pink";
   els.photoDuration.value = f.photoDuration || 4;
+  els.photoDisplayScale.value = f.photoDisplayScale || 100;
   els.transitionType.value = f.transitionType || "crossfade";
   els.transitionDuration.value = f.transitionDuration || 0.8;
   els.opGroomName.value = f.opGroomName || "";
@@ -1862,6 +2018,7 @@ async function restoreDraftData(data) {
   els.opBrideSub2.value = f.opBrideSub2 || "";
   els.opNeonColor.value = f.opNeonColor || "pink";
   els.opPhotoDuration.value = f.opPhotoDuration || 1;
+  els.opPhotoDisplayScale.value = f.opPhotoDisplayScale || 100;
   els.opTransitionType.value = f.opTransitionType || "flash";
   els.opTransitionDuration.value = f.opTransitionDuration || 0.3;
   els.captionStyle.value = f.captionStyle || "simple";
