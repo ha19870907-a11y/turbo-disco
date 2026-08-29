@@ -25,6 +25,14 @@ npm run post:thread -- "投稿したいテキスト"
   直接書き込まないでください。
 - 定期実行したい場合は、このスクリプトを cron や GitHub Actions の `schedule` トリガーなどから
   呼び出す形で自動化できます。
+- GitHubリポジトリの Actions タブから `Post to Threads` ワークフローを手動実行（Run workflow）すると、
+  パソコンがなくてもスマホのブラウザだけからテキストを指定して投稿できます。
+
+### 子育て・補助金情報の毎日自動投稿
+
+`scripts/thread-topics.json` に用意した子育て・補助金関連の投稿文（10種類）を、
+`.github/workflows/daily-thread.yml` が毎日 朝8:00(JST) に1つずつ順番に自動投稿します。
+投稿文を追加・編集したい場合は `thread-topics.json` を直接編集してください（500文字以内）。
 
 ## 結婚式ムービー作成ツール
 
