@@ -1,9 +1,30 @@
 # turbo-disco
 
-このリポジトリには独立した2つのツールがあります。
+このリポジトリには独立した3つのツールがあります。
 
 - **[結婚式ムービー作成ツール](#結婚式ムービー作成ツール)**（`docs/wedding/`）
 - **[競艇予想ツール](#競艇予想ツール)**（`docs/` / `server.js` + `public/` + `src/`）
+- **[Threads自動投稿ツール](#threads自動投稿ツール)**（`scripts/post-thread.js`）
+
+## Threads自動投稿ツール
+
+Meta社のSNS「Threads」に、指定したテキストを自動投稿するスクリプトです（`scripts/post-thread.js`）。
+Threads APIの長期アクセストークンとユーザーIDを環境変数に設定して使います。
+
+```bash
+export THREADS_USER_ID=xxxxxxxxxx
+export THREADS_ACCESS_TOKEN=xxxxxxxxxx
+
+npm run post:thread -- "投稿したいテキスト"
+```
+
+- 内部的には Threads API のコンテナ作成（`POST /{user-id}/threads`）→公開（`POST /{user-id}/threads_publish`）
+  の2ステップを自動で実行します。
+- 投稿は500文字までです（Threads APIの制限）。
+- アクセストークンは第三者に見られない環境変数・シークレットストアで管理し、リポジトリやチャットに
+  直接書き込まないでください。
+- 定期実行したい場合は、このスクリプトを cron や GitHub Actions の `schedule` トリガーなどから
+  呼び出す形で自動化できます。
 
 ## 結婚式ムービー作成ツール
 
