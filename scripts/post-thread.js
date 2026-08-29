@@ -9,8 +9,9 @@ const API_BASE = 'https://graph.threads.net/v1.0';
 const MAX_TEXT_LENGTH = 500;
 
 async function postToThreads(text, { userId, accessToken } = {}) {
-  userId = userId || process.env.THREADS_USER_ID;
-  accessToken = accessToken || process.env.THREADS_ACCESS_TOKEN;
+  userId = (userId || process.env.THREADS_USER_ID || '').trim();
+  accessToken = (accessToken || process.env.THREADS_ACCESS_TOKEN || '').trim();
+  console.log(`THREADS_USER_ID: ${userId.length}文字 / THREADS_ACCESS_TOKEN: ${accessToken.length}文字`);
 
   if (!userId || !accessToken) {
     throw new Error('THREADS_USER_ID と THREADS_ACCESS_TOKEN の環境変数を設定してください。');
