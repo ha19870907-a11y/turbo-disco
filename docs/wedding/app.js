@@ -43,9 +43,16 @@ const BEAT_ANALYSIS_MAX_SECONDS = 60; // テンポ検出に使う先頭部分の
 const BEAT_MIN_BPM = 80;
 const BEAT_MAX_BPM = 180;
 
+const MAX_GUEST_MESSAGES = 100;
+const MAX_GUEST_NAME_LENGTH = 30;
+const MAX_GUEST_MESSAGE_LENGTH = 200;
+const ENDROLL_SPEED_MAP = { slow: 40, normal: 60, fast: 90 };
+
 const state = {
   bgmFiles: [], // { id, file }
   nextBgmId: 1,
+  guestMessages: [], // { id, name, message }（エンドロール用）
+  nextGuestMessageId: 1,
 };
 
 const els = {
@@ -61,6 +68,8 @@ const els = {
   standardSettingsSection: document.getElementById("standard-settings-section"),
   openingSection: document.getElementById("opening-section"),
   openingPhotosSection: document.getElementById("opening-photos-section"),
+  endrollSection: document.getElementById("endroll-section"),
+  endrollMessagesSection: document.getElementById("endroll-messages-section"),
 
   dropzone: document.getElementById("dropzone"),
   fileInput: document.getElementById("file-input"),
@@ -92,6 +101,16 @@ const els = {
   opCaptionStyle: document.getElementById("op-caption-style"),
   opCaptionFontSize: document.getElementById("op-caption-font-size"),
   opCaptionFade: document.getElementById("op-caption-fade"),
+
+  endrollTitle1: document.getElementById("endroll-title1"),
+  endrollTitle2: document.getElementById("endroll-title2"),
+  endrollDateText: document.getElementById("endroll-date-text"),
+  endrollTheme: document.getElementById("endroll-theme"),
+  endrollHeaderLine1: document.getElementById("endroll-header-line1"),
+  endrollHeaderLine2: document.getElementById("endroll-header-line2"),
+  endrollSpeed: document.getElementById("endroll-speed"),
+  guestMessageList: document.getElementById("guest-message-list"),
+  addGuestMessageBtn: document.getElementById("add-guest-message-btn"),
 
   groomDropzone: document.getElementById("groom-dropzone"),
   groomFileInput: document.getElementById("groom-file-input"),
@@ -162,6 +181,21 @@ function getSettings() {
       groomPhotos: groomGroup.photos,
       bridePhotos: brideGroup.photos,
       togetherPhotos: togetherGroup.photos,
+    };
+  }
+  if (template === "endroll") {
+    return {
+      template,
+      title1: els.endrollTitle1.value.trim(),
+      title2: els.endrollTitle2.value.trim(),
+      dateText: els.endrollDateText.value.trim(),
+      theme: THEMES[els.endrollTheme.value] || THEMES.pink,
+      transitionType: "crossfade",
+      transitionDuration: 1,
+      endrollHeaderLine1: els.endrollHeaderLine1.value.trim() || "Thank You",
+      endrollHeaderLine2: els.endrollHeaderLine2.value.trim(),
+      endrollSpeed: ENDROLL_SPEED_MAP[els.endrollSpeed.value] || ENDROLL_SPEED_MAP.normal,
+      guestMessages: state.guestMessages,
     };
   }
   return {
@@ -686,11 +720,16 @@ document.querySelectorAll('input[name="template"]').forEach((radio) => {
 });
 
 function updateTemplateVisibility() {
-  const isOpening = getTemplate() === "opening";
-  els.standardPhotosSection.classList.toggle("hidden", isOpening);
-  els.standardSettingsSection.classList.toggle("hidden", isOpening);
+  const template = getTemplate();
+  const isStandard = template === "standard";
+  const isOpening = template === "opening";
+  const isEndroll = template === "endroll";
+  els.standardPhotosSection.classList.toggle("hidden", !isStandard);
+  els.standardSettingsSection.classList.toggle("hidden", !isStandard);
   els.openingSection.classList.toggle("hidden", !isOpening);
   els.openingPhotosSection.classList.toggle("hidden", !isOpening);
+  els.endrollSection.classList.toggle("hidden", !isEndroll);
+  els.endrollMessagesSection.classList.toggle("hidden", !isEndroll);
   updateDurationEstimate();
 }
 
@@ -705,7 +744,14 @@ function updateTemplateVisibility() {
   els.endMessage,
   els.opGroomName,
   els.opBrideName,
+  els.endrollTitle1,
+  els.endrollTitle2,
+  els.endrollDateText,
+  els.endrollHeaderLine1,
+  els.endrollHeaderLine2,
 ].forEach((el) => el.addEventListener("input", updateDurationEstimate));
+
+[els.endrollSpeed].forEach((el) => el.addEventListener("change", updateDurationEstimate));
 
 // --- BGM（複数曲）の追加・並べ替え ---
 
@@ -767,6 +813,101 @@ function renderBgmList() {
 function updateAddBgmButtonState() {
   els.addBgmBtn.disabled = state.bgmFiles.length === 0;
 }
+
+// --- エンドロール用: 来賓へのメッセージ一覧（名前＋メッセージ） ---
+
+function renderGuestMessageList() {
+  els.guestMessageList.innerHTML = "";
+  state.guestMessages.forEach((entry, index) => {
+    const row = document.createElement("div");
+    row.className = "guest-row";
+    row.draggable = true;
+    row.dataset.id = String(entry.id);
+
+    const top = document.createElement("div");
+    top.className = "guest-row-top";
+
+    const badge = document.createElement("span");
+    badge.className = "guest-order";
+    badge.textContent = String(index + 1);
+    top.appendChild(badge);
+
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.className = "guest-name-input";
+    nameInput.placeholder = "お名前";
+    nameInput.maxLength = MAX_GUEST_NAME_LENGTH;
+    nameInput.value = entry.name || "";
+    nameInput.draggable = false;
+    nameInput.addEventListener("input", () => {
+      entry.name = nameInput.value;
+      updateDurationEstimate();
+    });
+    top.appendChild(nameInput);
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "guest-remove";
+    removeBtn.type = "button";
+    removeBtn.textContent = "×";
+    removeBtn.addEventListener("click", () => {
+      state.guestMessages = state.guestMessages.filter((g) => g.id !== entry.id);
+      renderGuestMessageList();
+      updateDurationEstimate();
+    });
+    top.appendChild(removeBtn);
+
+    row.appendChild(top);
+
+    const messageInput = document.createElement("textarea");
+    messageInput.className = "guest-message-input";
+    messageInput.placeholder = "メッセージ（任意）";
+    messageInput.maxLength = MAX_GUEST_MESSAGE_LENGTH;
+    messageInput.rows = 2;
+    messageInput.value = entry.message || "";
+    messageInput.draggable = false;
+    messageInput.addEventListener("input", () => {
+      entry.message = messageInput.value;
+      updateDurationEstimate();
+    });
+    row.appendChild(messageInput);
+
+    row.addEventListener("dragstart", (e) => {
+      e.dataTransfer.setData("text/plain", String(entry.id));
+      e.dataTransfer.effectAllowed = "move";
+    });
+    row.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      row.classList.add("drag-over");
+    });
+    row.addEventListener("dragleave", () => row.classList.remove("drag-over"));
+    row.addEventListener("drop", (e) => {
+      e.preventDefault();
+      row.classList.remove("drag-over");
+      const draggedId = Number(e.dataTransfer.getData("text/plain"));
+      if (draggedId === entry.id) return;
+      const fromIndex = state.guestMessages.findIndex((g) => g.id === draggedId);
+      const toIndex = state.guestMessages.findIndex((g) => g.id === entry.id);
+      if (fromIndex < 0 || toIndex < 0) return;
+      const [moved] = state.guestMessages.splice(fromIndex, 1);
+      state.guestMessages.splice(toIndex, 0, moved);
+      renderGuestMessageList();
+    });
+
+    els.guestMessageList.appendChild(row);
+  });
+}
+
+function addGuestMessage() {
+  if (state.guestMessages.length >= MAX_GUEST_MESSAGES) {
+    alert(`メッセージは最大${MAX_GUEST_MESSAGES}件まで追加できます`);
+    return;
+  }
+  state.guestMessages.push({ id: state.nextGuestMessageId++, name: "", message: "" });
+  renderGuestMessageList();
+  updateDurationEstimate();
+}
+
+els.addGuestMessageBtn.addEventListener("click", addGuestMessage);
 
 function addBgmFiles(fileList) {
   const incoming = Array.from(fileList).filter((f) => looksLikeType(f, "audio/", AUDIO_EXTENSIONS));
@@ -933,13 +1074,82 @@ function computeOpeningTimeline(settings) {
   return finalizeTimeline(segments, settings.transitionDuration, duckIndices);
 }
 
+// 改行(\n)は保持しつつ、1行が長すぎる場合は指定幅に収まるよう自動で折り返す。
+// 日本語は単語区切りが無いため文字単位で判定する（英数字混在でも実用上問題ない）。
+function wrapText(ctx, text, maxWidth) {
+  const paragraphs = String(text).split("\n");
+  const result = [];
+  paragraphs.forEach((para) => {
+    if (para === "") {
+      result.push("");
+      return;
+    }
+    let line = "";
+    for (const ch of para) {
+      const test = line + ch;
+      if (line !== "" && ctx.measureText(test).width > maxWidth) {
+        result.push(line);
+        line = ch;
+      } else {
+        line = test;
+      }
+    }
+    if (line) result.push(line);
+  });
+  return result;
+}
+
+const ENDROLL_MAX_TEXT_WIDTH = CANVAS_W - 200;
+const ENDROLL_NAME_GAP = 44;
+const ENDROLL_MESSAGE_LINE_HEIGHT = 32;
+const ENDROLL_ENTRY_GAP = 56;
+
+// エンドロール本編（スクロールする内容全体）の高さをあらかじめ計算する。
+// 実際に描画はせず、計測専用に既存のオフスクリーンcanvasのcontextを流用する。
+function measureEndRollContentHeight(settings) {
+  const ctx = transitionCtxA;
+  let height = 100;
+  if (settings.endrollHeaderLine2) height += 40;
+  settings.guestMessages.forEach((entry) => {
+    height += ENDROLL_NAME_GAP;
+    ctx.font = "300 24px serif";
+    const lines = entry.message ? wrapText(ctx, entry.message, ENDROLL_MAX_TEXT_WIDTH) : [];
+    height += lines.length * ENDROLL_MESSAGE_LINE_HEIGHT;
+    height += ENDROLL_ENTRY_GAP;
+  });
+  return height;
+}
+
+function computeEndRollTimeline(settings) {
+  const contentHeight = measureEndRollContentHeight(settings);
+  const travel = CANVAS_H + contentHeight + 120;
+  const scrollDuration = Math.max(travel / settings.endrollSpeed, 3);
+
+  const segments = [];
+  segments.push({ type: "title", duration: INTRO_DUR, lines: introLines(settings) });
+  segments.push({
+    type: "endroll",
+    duration: scrollDuration,
+    headerLine1: settings.endrollHeaderLine1,
+    headerLine2: settings.endrollHeaderLine2,
+    entries: settings.guestMessages,
+    scrollSpeed: settings.endrollSpeed,
+  });
+  return finalizeTimeline(segments, settings.transitionDuration);
+}
+
 function computeTimeline(settings) {
-  return settings.template === "opening" ? computeOpeningTimeline(settings) : computeStandardTimeline(settings);
+  if (settings.template === "opening") return computeOpeningTimeline(settings);
+  if (settings.template === "endroll") return computeEndRollTimeline(settings);
+  return computeStandardTimeline(settings);
 }
 
 function countPhotos(settings) {
   if (settings.template === "opening") {
     return settings.groomPhotos.length + settings.bridePhotos.length + settings.togetherPhotos.length;
+  }
+  if (settings.template === "endroll") {
+    return settings.guestMessages.length;
   }
   return settings.photos.length;
 }
@@ -949,7 +1159,11 @@ function updateDurationEstimate() {
   const { total } = computeTimeline(settings);
   const mins = Math.floor(total / 60);
   const secs = Math.round(total % 60);
-  els.durationEstimate.textContent = `写真・動画 ${countPhotos(settings)}点 / 想定の動画の長さ: 約${mins > 0 ? mins + "分" : ""}${secs}秒`;
+  const countLabel =
+    settings.template === "endroll"
+      ? `来賓メッセージ ${countPhotos(settings)}件`
+      : `写真・動画 ${countPhotos(settings)}点`;
+  els.durationEstimate.textContent = `${countLabel} / 想定の動画の長さ: 約${mins > 0 ? mins + "分" : ""}${secs}秒`;
 }
 
 // --- 描画 ---
@@ -1598,6 +1812,54 @@ function drawFrame(ctx, timeline, t, settings) {
   }
 }
 
+// 映画のエンドロールのように、来賓へのメッセージが下から上へ流れ続ける演出。
+function drawEndRoll(ctx, seg, localT, settings) {
+  const theme = settings.theme;
+  const grad = ctx.createLinearGradient(0, 0, CANVAS_W, CANVAS_H);
+  grad.addColorStop(0, theme.bg1);
+  grad.addColorStop(1, theme.bg2);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  const visibleFrom = -80;
+  const visibleTo = CANVAS_H + 80;
+  let y = CANVAS_H - localT * seg.scrollSpeed;
+
+  ctx.font = "600 40px serif";
+  ctx.fillStyle = theme.text;
+  if (y > visibleFrom && y < visibleTo) ctx.fillText(seg.headerLine1, CANVAS_W / 2, y);
+  y += 56;
+  if (seg.headerLine2) {
+    ctx.font = "300 24px serif";
+    if (y > visibleFrom && y < visibleTo) ctx.fillText(seg.headerLine2, CANVAS_W / 2, y);
+    y += 44;
+  } else {
+    y += 44;
+  }
+
+  seg.entries.forEach((entry) => {
+    ctx.font = "600 30px serif";
+    ctx.fillStyle = theme.accent;
+    if (entry.name && y > visibleFrom && y < visibleTo) ctx.fillText(entry.name, CANVAS_W / 2, y);
+    y += ENDROLL_NAME_GAP;
+
+    ctx.font = "300 24px serif";
+    ctx.fillStyle = theme.text;
+    const lines = entry.message ? wrapText(ctx, entry.message, ENDROLL_MAX_TEXT_WIDTH) : [];
+    lines.forEach((line) => {
+      if (y > visibleFrom && y < visibleTo) ctx.fillText(line, CANVAS_W / 2, y);
+      y += ENDROLL_MESSAGE_LINE_HEIGHT;
+    });
+    y += ENDROLL_ENTRY_GAP;
+  });
+
+  ctx.restore();
+}
+
 function drawSegment(ctx, seg, localT, settings) {
   if (seg.type === "title") {
     drawTitleCard(ctx, seg, localT, settings);
@@ -1605,6 +1867,8 @@ function drawSegment(ctx, seg, localT, settings) {
     drawImpactCard(ctx, seg, localT, settings);
   } else if (seg.type === "countdown-number") {
     drawCountdownNumber(ctx, seg, localT, settings);
+  } else if (seg.type === "endroll") {
+    drawEndRoll(ctx, seg, localT, settings);
   } else {
     drawPhoto(ctx, seg, localT, settings);
   }
@@ -1861,7 +2125,7 @@ async function setupAudioPlaylist(audioFiles, totalDuration, audioDucks = []) {
 async function renderVideo({ audioFiles, beatSyncCutDuration, onProgress } = {}) {
   let settings = getSettings();
   if (countPhotos(settings) === 0) {
-    throw new Error("写真・動画を1つ以上追加してください");
+    throw new Error("写真・動画・メッセージを1つ以上追加してください");
   }
   if (beatSyncCutDuration) {
     settings = {
@@ -2067,6 +2331,13 @@ function collectDraftData() {
       opCaptionFade: els.opCaptionFade.value,
       beatSyncEnabled: els.beatSyncEnabled.checked,
       beatSyncInterval: els.beatSyncInterval.value,
+      endrollTitle1: els.endrollTitle1.value,
+      endrollTitle2: els.endrollTitle2.value,
+      endrollDateText: els.endrollDateText.value,
+      endrollTheme: els.endrollTheme.value,
+      endrollHeaderLine1: els.endrollHeaderLine1.value,
+      endrollHeaderLine2: els.endrollHeaderLine2.value,
+      endrollSpeed: els.endrollSpeed.value,
     },
     groups: {
       standard: collectGroupDraftItems(standardGroup),
@@ -2079,6 +2350,7 @@ function collectDraftData() {
       fileName: t.file.name,
       fileType: t.file.type,
     })),
+    guestMessages: state.guestMessages.map((g) => ({ name: g.name, message: g.message })),
   };
 }
 
@@ -2112,8 +2384,15 @@ async function restoreDraftData(data) {
   els.opCaptionFade.value = f.opCaptionFade || "fade";
   els.beatSyncEnabled.checked = !!f.beatSyncEnabled;
   els.beatSyncInterval.value = f.beatSyncInterval || 2;
+  els.endrollTitle1.value = f.endrollTitle1 || "";
+  els.endrollTitle2.value = f.endrollTitle2 || "";
+  els.endrollDateText.value = f.endrollDateText || "";
+  els.endrollTheme.value = f.endrollTheme || "pink";
+  els.endrollHeaderLine1.value = f.endrollHeaderLine1 || "";
+  els.endrollHeaderLine2.value = f.endrollHeaderLine2 || "";
+  els.endrollSpeed.value = f.endrollSpeed || "normal";
 
-  const templateValue = data.template === "opening" ? "opening" : "standard";
+  const templateValue = ["opening", "endroll"].includes(data.template) ? data.template : "standard";
   const templateRadio = document.querySelector(`input[name="template"][value="${templateValue}"]`);
   if (templateRadio) templateRadio.checked = true;
   updateTemplateVisibility();
@@ -2129,6 +2408,13 @@ async function restoreDraftData(data) {
   }));
   renderBgmList();
   updateAddBgmButtonState();
+
+  state.guestMessages = (data.guestMessages || []).map((g) => ({
+    id: state.nextGuestMessageId++,
+    name: g.name || "",
+    message: g.message || "",
+  }));
+  renderGuestMessageList();
 
   updateDurationEstimate();
 }
@@ -2166,8 +2452,13 @@ function updateShareButton(blob, filename, btnEl, hintEl) {
 }
 
 els.createBtn.addEventListener("click", async () => {
-  if (countPhotos(getSettings()) === 0) {
-    alert("写真・動画を1つ以上追加してください");
+  const initialSettings = getSettings();
+  if (countPhotos(initialSettings) === 0) {
+    alert(
+      initialSettings.template === "endroll"
+        ? "来賓へのメッセージを1件以上追加してください"
+        : "写真・動画を1つ以上追加してください"
+    );
     return;
   }
   els.createBtn.disabled = true;
