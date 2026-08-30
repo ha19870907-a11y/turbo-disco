@@ -30,9 +30,17 @@ npm run post:thread -- "投稿したいテキスト"
 
 ### 子育て・補助金情報の毎日自動投稿
 
-`scripts/thread-topics.json` に用意した子育て・補助金関連の投稿文（10種類）を、
+`scripts/thread-topics.json` に用意した子育て・補助金関連の投稿文を、
 `.github/workflows/daily-thread.yml` が毎日 朝8:00(JST) に1つずつ順番に自動投稿します。
 投稿文を追加・編集したい場合は `thread-topics.json` を直接編集してください（500文字以内）。
+
+### noteの記事下書きの週次自動生成
+
+noteには公式の投稿APIが無いため自動投稿はしていませんが、記事の下書きだけは自動化できます。
+`scripts/note-topics.json` に用意した記事ネタ（タイトル・無料部分・有料部分の構成案）を、
+`.github/workflows/weekly-note-draft.yml` が毎週月曜 朝9:00(JST) に1つずつ `note-drafts/` フォルダへ
+Markdownファイルとして書き出します。内容を確認し、そのままnoteにコピペして仕上げてください。
+ネタを追加したい場合は `note-topics.json` を編集してください。
 
 ## 結婚式ムービー作成ツール
 
