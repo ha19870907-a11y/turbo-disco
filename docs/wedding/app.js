@@ -24,7 +24,7 @@ const INTRO_DUR = 3.2;
 const OUTRO_DUR = 3.2;
 const FADE = 0.6;
 const ZOOM_AMOUNT = 0.16;
-const TRANSITION_TYPES = ["crossfade", "slide", "zoom", "wipe", "flash"];
+const TRANSITION_TYPES = ["crossfade", "slide", "zoom", "wipe", "flash", "circle", "rotatezoom", "blur"];
 const AUDIO_CROSSFADE_SEC = 1.2;
 
 // 入力ファイルに対する上限（悪意あるファイルやサイズの大きすぎるファイルで
@@ -417,6 +417,9 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
         ["fade", "フェード"],
         ["slide", "スライド＋フェード"],
         ["sparkle", "キラキラ出現"],
+        ["typewriter", "タイプライター"],
+        ["bounce", "バウンド"],
+        ["zoomin", "ズーム出現"],
         ["none", "常に表示"],
       ].forEach(([value, label]) => {
         const opt = document.createElement("option");
@@ -1020,28 +1023,49 @@ function roundRectPath(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-// キャプションの見せ方（フェード/スライド＋フェード/キラキラ出現/常に表示）に応じて
-// 透明度とスライド量（下からせり上がる量）を計算する。
+function easeOutBack(x) {
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
+}
+
+// キャプションの見せ方（フェード/スライド＋フェード/キラキラ出現/タイプライター/
+// バウンド/ズーム出現/常に表示）に応じて、透明度・スライド量・拡大率・文字の
+// 表示割合（タイプライター用）を計算する。
 function captionMotion(localT, duration, fadeMode) {
   const fadeLen = Math.min(FADE, duration / 2);
+  const inProgress = fadeLen > 0 ? Math.min(Math.max(localT / fadeLen, 0), 1) : 1;
+  const outProgress = fadeLen > 0 ? Math.min(Math.max((duration - localT) / fadeLen, 0), 1) : 1;
+  const edge = Math.min(inProgress, outProgress, 1);
+
   if (fadeMode === "none") {
-    return { alpha: 1, offsetY: 0 };
+    return { alpha: 1, offsetY: 0, scale: 1, reveal: 1 };
   }
   if (fadeMode === "slide") {
-    const inProgress = fadeLen > 0 ? Math.min(Math.max(localT / fadeLen, 0), 1) : 1;
-    const outProgress = fadeLen > 0 ? Math.min(Math.max((duration - localT) / fadeLen, 0), 1) : 1;
-    const edge = Math.min(inProgress, outProgress, 1);
-    return { alpha: edge, offsetY: (1 - edge) * 26 };
+    return { alpha: edge, offsetY: (1 - edge) * 26, scale: 1, reveal: 1 };
   }
   if (fadeMode === "sparkle") {
-    const inProgress = fadeLen > 0 ? Math.min(Math.max(localT / fadeLen, 0), 1) : 1;
-    const outProgress = fadeLen > 0 ? Math.min(Math.max((duration - localT) / fadeLen, 0), 1) : 1;
-    const edge = Math.min(inProgress, outProgress, 1);
     const ease = 1 - Math.pow(1 - inProgress, 3);
     // フェードだけでなく、下から浮かび上がるように少し大きめのスライド量を使う。
-    return { alpha: edge, offsetY: (1 - ease) * 34 };
+    return { alpha: edge, offsetY: (1 - ease) * 34, scale: 1, reveal: 1 };
   }
-  return { alpha: fadeAlpha(localT, duration, fadeLen), offsetY: 0 };
+  if (fadeMode === "typewriter") {
+    // 1文字ずつ打ち込まれるように表示する（CapCutのタイプライター演出風）。
+    const revealDur = Math.min(1.2, Math.max(duration * 0.6, 0.01));
+    const reveal = Math.min(Math.max(localT / revealDur, 0), 1);
+    return { alpha: outProgress, offsetY: 0, scale: 1, reveal };
+  }
+  if (fadeMode === "bounce") {
+    // 弾むように少し飛び出してから収まる（CapCutのバウンド演出風）。
+    const scale = Math.max(0, easeOutBack(inProgress));
+    return { alpha: edge, offsetY: 0, scale, reveal: 1 };
+  }
+  if (fadeMode === "zoomin") {
+    // 小さい状態から滑らかに等倍まで拡大しながら現れる。
+    const scale = 0.5 + 0.5 * easeOutCubic(inProgress);
+    return { alpha: edge, offsetY: 0, scale, reveal: 1 };
+  }
+  return { alpha: fadeAlpha(localT, duration, fadeLen), offsetY: 0, scale: 1, reveal: 1 };
 }
 
 // 疑似乱数（0〜1）。パーティクルごとに同じシード値なら毎フレーム同じ値になる。
@@ -1100,9 +1124,12 @@ function drawSparkleOverlay(ctx, cx, cy, halfWidth, localT, duration) {
 }
 
 function drawCaption(ctx, text, localT, duration, theme, style, fadeMode, fontSize) {
-  const { alpha, offsetY } = captionMotion(localT, duration, fadeMode || "fade");
+  const { alpha, offsetY, scale, reveal } = captionMotion(localT, duration, fadeMode || "fade");
   if (alpha <= 0) return;
   const size = fontSize || 32;
+  // タイプライター演出用に表示する文字数を絞り込む（それ以外は常に全文表示）。
+  const revealedText = reveal >= 0.999 ? text : text.slice(0, Math.max(0, Math.round(text.length * reveal)));
+  if (revealedText === "") return;
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.translate(0, offsetY);
@@ -1119,11 +1146,14 @@ function drawCaption(ctx, text, localT, duration, theme, style, fadeMode, fontSi
     ctx.font = `italic 400 ${fSize}px serif`;
     capCenterY = CANVAS_H - 76;
     capHalfWidth = Math.min(ctx.measureText(text).width, CANVAS_W - 100) / 2;
+    ctx.save();
+    ctx.translate(capCenterX, capCenterY);
+    ctx.scale(scale, scale);
     ctx.shadowColor = "rgba(0,0,0,0.7)";
     ctx.shadowBlur = 10;
     ctx.fillStyle = "#ffffff";
-    ctx.fillText(text, capCenterX, capCenterY, CANVAS_W - 100);
-    ctx.shadowBlur = 0;
+    ctx.fillText(revealedText, 0, 0, CANVAS_W - 100);
+    ctx.restore();
     ctx.strokeStyle = theme.accent;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
@@ -1147,10 +1177,14 @@ function drawCaption(ctx, text, localT, duration, theme, style, fadeMode, fontSi
     ctx.fillStyle = theme.accent;
     roundRectPath(ctx, pillX, pillY, pillW, pillH, pillH / 2);
     ctx.fill();
+    ctx.save();
+    ctx.translate(capCenterX, capCenterY + 2);
+    ctx.scale(scale, scale);
     ctx.fillStyle = "#ffffff";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(text, CANVAS_W / 2, pillY + pillH / 2 + 2, pillW - paddingX * 2);
+    ctx.fillText(revealedText, 0, 0, pillW - paddingX * 2);
+    ctx.restore();
   } else {
     // "simple"（既定）: 下から暗くなるグラデーションバー＋白文字＋アクセント下線。
     const fSize = size;
@@ -1162,14 +1196,18 @@ function drawCaption(ctx, text, localT, duration, theme, style, fadeMode, fontSi
     ctx.fillStyle = grad;
     ctx.fillRect(0, y, CANVAS_W, barHeight);
 
-    ctx.fillStyle = "#ffffff";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font = `500 ${fSize}px serif`;
     capCenterX = CANVAS_W / 2;
     capCenterY = CANVAS_H - barHeight / 2 + 8;
     capHalfWidth = Math.min(ctx.measureText(text).width, CANVAS_W - 80) / 2;
-    ctx.fillText(text, capCenterX, capCenterY, CANVAS_W - 80);
+    ctx.save();
+    ctx.translate(capCenterX, capCenterY);
+    ctx.scale(scale, scale);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(revealedText, 0, 0, CANVAS_W - 80);
+    ctx.restore();
 
     ctx.strokeStyle = theme.accent;
     ctx.lineWidth = 2;
@@ -1470,6 +1508,45 @@ function compositeTransition(ctx, canvasA, canvasB, progress, type) {
       }
       break;
     }
+    case "circle": {
+      // 中央から円形に広がりながら次の写真に切り替わる（CapCutの円形ワイプ風）
+      ctx.drawImage(canvasA, 0, 0);
+      const maxRadius = Math.hypot(CANVAS_W / 2, CANVAS_H / 2);
+      const radius = maxRadius * easeOutCubic(progress);
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(CANVAS_W / 2, CANVAS_H / 2, radius, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.drawImage(canvasB, 0, 0);
+      ctx.restore();
+      break;
+    }
+    case "rotatezoom": {
+      // 次の写真がわずかに回転しながらズームイン（CapCutのポップな回転演出風）
+      ctx.drawImage(canvasA, 0, 0);
+      ctx.save();
+      ctx.globalAlpha = progress;
+      ctx.translate(CANVAS_W / 2, CANVAS_H / 2);
+      ctx.rotate((1 - progress) * 0.35);
+      const scale = 0.7 + 0.3 * easeOutCubic(progress);
+      ctx.scale(scale, scale);
+      ctx.drawImage(canvasB, -CANVAS_W / 2, -CANVAS_H / 2);
+      ctx.restore();
+      break;
+    }
+    case "blur": {
+      // 山なりにぼかしながらクロスフェードする（CapCutのぼかしトランジション風）
+      const blurAmount = 16 * Math.sin(Math.min(Math.max(progress, 0), 1) * Math.PI);
+      ctx.save();
+      ctx.filter = blurAmount > 0.1 ? `blur(${blurAmount}px)` : "none";
+      ctx.globalAlpha = 1 - progress;
+      ctx.drawImage(canvasA, 0, 0);
+      ctx.globalAlpha = progress;
+      ctx.drawImage(canvasB, 0, 0);
+      ctx.filter = "none";
+      ctx.restore();
+      break;
+    }
     case "crossfade":
     default: {
       ctx.drawImage(canvasA, 0, 0);
@@ -1486,27 +1563,33 @@ function drawFrame(ctx, timeline, t, settings) {
   const { segments, startTimes, total } = timeline;
   t = Math.min(t, total);
 
+  // 「開始時刻 <= t」を満たす最後のセグメントが現在のセグメント。
+  // finalizeTimelineは切り替え時間の分だけ次のセグメントの開始時刻を早めているため、
+  // 1つ前のセグメントの本来の終了時刻（開始時刻+長さ）までは、まだ前のセグメントとの
+  // 重なり（トランジション）区間にいることになる。
   let activeIndex = 0;
   for (let i = 0; i < segments.length; i++) {
     if (startTimes[i] <= t) activeIndex = i;
   }
 
-  const seg = segments[activeIndex];
-  const localT = t - startTimes[activeIndex];
-  const hasNext = activeIndex < segments.length - 1;
-  const nextStart = hasNext ? startTimes[activeIndex + 1] : null;
-  const inTransition = hasNext && t >= nextStart;
+  const prevIndex = activeIndex - 1;
+  const prevEnd = prevIndex >= 0 ? startTimes[prevIndex] + segments[prevIndex].duration : -Infinity;
+  const inTransition = prevIndex >= 0 && t < prevEnd;
 
   if (!inTransition) {
-    drawSegment(ctx, seg, localT, settings);
+    const localT = t - startTimes[activeIndex];
+    drawSegment(ctx, segments[activeIndex], localT, settings);
   } else {
-    const nextSeg = segments[activeIndex + 1];
-    const progress = Math.min(Math.max((t - nextStart) / settings.transitionDuration, 0), 1);
+    const prevSeg = segments[prevIndex];
+    const curSeg = segments[activeIndex];
+    const prevLocalT = t - startTimes[prevIndex];
+    const curLocalT = t - startTimes[activeIndex];
+    const progress = Math.min(Math.max(curLocalT / settings.transitionDuration, 0), 1);
     transitionCtxA.clearRect(0, 0, CANVAS_W, CANVAS_H);
-    drawSegment(transitionCtxA, seg, localT, settings);
+    drawSegment(transitionCtxA, prevSeg, prevLocalT, settings);
     transitionCtxB.clearRect(0, 0, CANVAS_W, CANVAS_H);
-    drawSegment(transitionCtxB, nextSeg, t - nextStart, settings);
-    const type = pickTransitionType(settings, activeIndex);
+    drawSegment(transitionCtxB, curSeg, curLocalT, settings);
+    const type = pickTransitionType(settings, prevIndex);
     compositeTransition(ctx, transitionBufferA, transitionBufferB, progress, type);
   }
 
