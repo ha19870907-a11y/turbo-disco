@@ -12,7 +12,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob:; media-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none';" />
   <meta http-equiv="Referrer-Policy" content="no-referrer" />
 
-  <link rel="stylesheet" href="style.css?v=16" />
+  <link rel="stylesheet" href="style.css?v=17" />
 </head>
 <body>
   <header class="app-header">
@@ -31,6 +31,10 @@
         <label class="template-option">
           <input type="radio" name="template" value="opening" />
           <span><strong>オープニング演出</strong><br />黒背景×ネオン、カウントダウンから入場までの疾走感ムービー</span>
+        </label>
+        <label class="template-option">
+          <input type="radio" name="template" value="endroll" />
+          <span><strong>エンドロール</strong><br />映画のように、来賓の方々へのメッセージが下から上へ流れるムービー</span>
         </label>
       </div>
     </section>
@@ -240,6 +244,57 @@
       <div id="together-grid" class="photo-grid"></div>
     </section>
 
+    <!-- エンドロール: 設定 -->
+    <section class="panel hidden" id="endroll-section">
+      <h2>1. エンドロールの設定</h2>
+      <div class="form-grid">
+        <label>新郎・新婦の名前
+          <input id="endroll-title1" type="text" placeholder="例: 太郎" />
+        </label>
+        <label>（連名にする場合）
+          <input id="endroll-title2" type="text" placeholder="例: 花子" />
+        </label>
+        <label>日付・会場など（任意）
+          <input id="endroll-date-text" type="text" placeholder="例: 2026.10.10" />
+        </label>
+        <label>テーマカラー
+          <select id="endroll-theme">
+            <option value="pink">ピンク×ゴールド</option>
+            <option value="navy">ネイビー×ゴールド</option>
+            <option value="green">グリーン×アイボリー</option>
+          </select>
+        </label>
+        <label>見出し1行目
+          <input id="endroll-header-line1" type="text" placeholder="Thank You" />
+        </label>
+        <label>見出し2行目（任意）
+          <input id="endroll-header-line2" type="text" placeholder="例: 支えてくださった皆様へ" />
+        </label>
+        <label>スクロール速度
+          <select id="endroll-speed">
+            <option value="slow">遅い（じっくり読める）</option>
+            <option value="normal" selected>標準</option>
+            <option value="fast">速い</option>
+          </select>
+        </label>
+      </div>
+      <p class="hint">
+        最初にお二人の名前のタイトルカードが表示された後、見出しに続けて来賓の方々への
+        メッセージが映画のエンドロールのように下から上へスクロールします。
+      </p>
+    </section>
+
+    <!-- エンドロール: 来賓メッセージ -->
+    <section class="panel hidden" id="endroll-messages-section">
+      <h2>2. 来賓へのメッセージを追加</h2>
+      <p class="hint">
+        お一人ずつ、お名前とメッセージを入力してください（メッセージは任意）。並び順はドラッグして
+        入れ替えられます。
+      </p>
+      <div id="guest-message-list" class="guest-message-list"></div>
+      <button id="add-guest-message-btn" class="ghost-btn" type="button">＋ メッセージを追加</button>
+    </section>
+
     <section class="panel">
       <h2>3. ムービーを作成</h2>
       <p id="duration-estimate" class="hint"></p>
@@ -326,6 +381,6 @@
     </p>
   </footer>
 
-  <script src="app.js?v=16"></script>
+  <script src="app.js?v=17"></script>
 </body>
 </html>

@@ -411,6 +411,77 @@ main {
   line-height: 1;
 }
 
+.guest-message-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.guest-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  cursor: grab;
+}
+
+.guest-row.drag-over {
+  border-color: var(--accent-dark);
+}
+
+.guest-row-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.guest-order {
+  flex-shrink: 0;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.guest-name-input {
+  flex: 1;
+  font: inherit;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+}
+
+.guest-remove {
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.guest-message-input {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
 .beat-sync-box {
   margin: 16px 0;
   padding: 14px 16px;
