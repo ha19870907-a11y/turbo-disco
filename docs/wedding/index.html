@@ -12,7 +12,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob:; media-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none';" />
   <meta http-equiv="Referrer-Policy" content="no-referrer" />
 
-  <link rel="stylesheet" href="style.css?v=17" />
+  <link rel="stylesheet" href="style.css?v=18" />
 </head>
 <body>
   <header class="app-header">
@@ -284,9 +284,25 @@
       </p>
     </section>
 
+    <!-- エンドロール: 背景写真 -->
+    <section class="panel hidden" id="endroll-photos-section">
+      <h2>2. 背景に使う写真を追加（任意）</h2>
+      <div id="endroll-dropzone" class="dropzone">
+        <p>ここに写真をドラッグ＆ドロップ<br />またはクリックして選択</p>
+        <input id="endroll-file-input" type="file" accept="image/*,video/*" multiple hidden />
+      </div>
+      <p class="hint">
+        追加すると、来賓へのメッセージが流れる間、背景でKen Burns風にゆっくり切り替わりながら
+        ループ再生されます（文字を読みやすくするため暗めの半透明フィルターを重ねます）。
+        写真を追加しない場合はテーマカラーの背景になります。ここでのキャプション・詳細設定
+        （文字サイズ・エフェクト・表示サイズ）は背景には使用されません。
+      </p>
+      <div id="endroll-photo-grid" class="photo-grid"></div>
+    </section>
+
     <!-- エンドロール: 来賓メッセージ -->
     <section class="panel hidden" id="endroll-messages-section">
-      <h2>2. 来賓へのメッセージを追加</h2>
+      <h2>3. 来賓へのメッセージを追加</h2>
       <p class="hint">
         お一人ずつ、お名前とメッセージを入力してください（メッセージは任意）。並び順はドラッグして
         入れ替えられます。
@@ -381,6 +397,6 @@
     </p>
   </footer>
 
-  <script src="app.js?v=17"></script>
+  <script src="app.js?v=18"></script>
 </body>
 </html>

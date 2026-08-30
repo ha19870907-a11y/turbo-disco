@@ -69,7 +69,11 @@ const els = {
   openingSection: document.getElementById("opening-section"),
   openingPhotosSection: document.getElementById("opening-photos-section"),
   endrollSection: document.getElementById("endroll-section"),
+  endrollPhotosSection: document.getElementById("endroll-photos-section"),
   endrollMessagesSection: document.getElementById("endroll-messages-section"),
+  endrollDropzone: document.getElementById("endroll-dropzone"),
+  endrollFileInput: document.getElementById("endroll-file-input"),
+  endrollPhotoGrid: document.getElementById("endroll-photo-grid"),
 
   dropzone: document.getElementById("dropzone"),
   fileInput: document.getElementById("file-input"),
@@ -196,6 +200,7 @@ function getSettings() {
       endrollHeaderLine2: els.endrollHeaderLine2.value.trim(),
       endrollSpeed: ENDROLL_SPEED_MAP[els.endrollSpeed.value] || ENDROLL_SPEED_MAP.normal,
       guestMessages: state.guestMessages,
+      endrollPhotos: endrollGroup.photos,
     };
   }
   return {
@@ -714,6 +719,12 @@ const togetherGroup = createPhotoGroup({
   fileInputEl: els.togetherFileInput,
   onChange: () => updateDurationEstimate(),
 });
+const endrollGroup = createPhotoGroup({
+  gridEl: els.endrollPhotoGrid,
+  dropzoneEl: els.endrollDropzone,
+  fileInputEl: els.endrollFileInput,
+  onChange: () => updateDurationEstimate(),
+});
 
 document.querySelectorAll('input[name="template"]').forEach((radio) => {
   radio.addEventListener("change", updateTemplateVisibility);
@@ -729,6 +740,7 @@ function updateTemplateVisibility() {
   els.openingSection.classList.toggle("hidden", !isOpening);
   els.openingPhotosSection.classList.toggle("hidden", !isOpening);
   els.endrollSection.classList.toggle("hidden", !isEndroll);
+  els.endrollPhotosSection.classList.toggle("hidden", !isEndroll);
   els.endrollMessagesSection.classList.toggle("hidden", !isEndroll);
   updateDurationEstimate();
 }
@@ -1134,6 +1146,7 @@ function computeEndRollTimeline(settings) {
     headerLine2: settings.endrollHeaderLine2,
     entries: settings.guestMessages,
     scrollSpeed: settings.endrollSpeed,
+    photos: settings.endrollPhotos,
   });
   return finalizeTimeline(segments, settings.transitionDuration);
 }
@@ -1161,7 +1174,7 @@ function updateDurationEstimate() {
   const secs = Math.round(total % 60);
   const countLabel =
     settings.template === "endroll"
-      ? `来賓メッセージ ${countPhotos(settings)}件`
+      ? `来賓メッセージ ${countPhotos(settings)}件・背景写真 ${settings.endrollPhotos.length}枚`
       : `写真・動画 ${countPhotos(settings)}点`;
   els.durationEstimate.textContent = `${countLabel} / 想定の動画の長さ: 約${mins > 0 ? mins + "分" : ""}${secs}秒`;
 }
@@ -1665,6 +1678,18 @@ transitionBufferB.height = CANVAS_H;
 const transitionCtxA = transitionBufferA.getContext("2d");
 const transitionCtxB = transitionBufferB.getContext("2d");
 
+// エンドロールの背景写真スライドショー合成用のオフスクリーンバッファ。
+// トランジション用のバッファとは別に用意し、エンドロールへの切り替え時に
+// 互いの内容を上書きしてしまわないようにする。
+const endrollBgBufferA = document.createElement("canvas");
+const endrollBgBufferB = document.createElement("canvas");
+endrollBgBufferA.width = CANVAS_W;
+endrollBgBufferA.height = CANVAS_H;
+endrollBgBufferB.width = CANVAS_W;
+endrollBgBufferB.height = CANVAS_H;
+const endrollBgCtxA = endrollBgBufferA.getContext("2d");
+const endrollBgCtxB = endrollBgBufferB.getContext("2d");
+
 // "ランダム"指定時、写真の切り替えごとに使う効果を決める。
 // インデックスから決定的に導出するので、BGM追加時の再生成でも同じ映像になる。
 function pickTransitionType(settings, index) {
@@ -1813,13 +1838,117 @@ function drawFrame(ctx, timeline, t, settings) {
 }
 
 // 映画のエンドロールのように、来賓へのメッセージが下から上へ流れ続ける演出。
+function endRollPhotoImg(photo) {
+  return photo.kind === "video" ? photo.videoEl : photo.img;
+}
+
+// 背景として使う動画は、初回だけ再生を開始する（写真と混在させても壊れないように）。
+function ensureEndRollVideoPlaying(photo) {
+  if (photo.kind !== "video" || photo._bgStarted) return;
+  photo._bgStarted = true;
+  try {
+    photo.videoEl.currentTime = 0;
+  } catch (err) {
+    // seek前に呼ばれるブラウザもあるため失敗は無視する
+  }
+  photo.videoEl.play().catch(() => {
+    // 自動再生がブロックされても録画自体は続行する
+  });
+}
+
+// 指定した矩形いっぱいに、Ken Burns風のズーム/パンをかけながら写真・動画を描画する
+// （エンドロールの背景専用。キャプションや表示サイズ設定は考慮しない）。
+function drawCoverZoomPhoto(ctx, img, progress, variant, frameX, frameY, frameW, frameH) {
+  const zoomIn = variant % 2 === 0;
+  const scale = zoomIn ? 1 + ZOOM_AMOUNT * progress : 1 + ZOOM_AMOUNT * (1 - progress);
+  const { width: imgW, height: imgH } = intrinsicSize(img);
+  const imgRatio = imgW / imgH;
+  const frameRatio = frameW / frameH;
+  let baseW, baseH;
+  if (imgRatio > frameRatio) {
+    baseH = frameH;
+    baseW = baseH * imgRatio;
+  } else {
+    baseW = frameW;
+    baseH = baseW / imgRatio;
+  }
+  const drawW = baseW * scale;
+  const drawH = baseH * scale;
+  const maxOffsetX = (drawW - frameW) / 2;
+  const maxOffsetY = (drawH - frameH) / 2;
+  const directions = [
+    [-1, -1],
+    [1, 1],
+    [1, -1],
+    [-1, 1],
+  ];
+  const [dx, dy] = directions[variant % directions.length];
+  const panProgress = zoomIn ? progress : 1 - progress;
+  const offsetX = dx * maxOffsetX * panProgress;
+  const offsetY = dy * maxOffsetY * panProgress;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(frameX, frameY, frameW, frameH);
+  ctx.clip();
+  ctx.drawImage(
+    img,
+    frameX + frameW / 2 - drawW / 2 + offsetX,
+    frameY + frameH / 2 - drawH / 2 + offsetY,
+    drawW,
+    drawH
+  );
+  ctx.restore();
+}
+
+// エンドロールの背景。写真が無ければテーマカラーのグラデーション、
+// あれば全体の再生時間を均等割りしてKen Burns風に順番に切り替えながらループ表示する。
+// 文字を読みやすくするため、最後に暗めの半透明フィルターを重ねる。
+function drawEndRollBackground(ctx, seg, localT, settings) {
+  const theme = settings.theme;
+  const photos = seg.photos || [];
+
+  if (photos.length === 0) {
+    const grad = ctx.createLinearGradient(0, 0, CANVAS_W, CANVAS_H);
+    grad.addColorStop(0, theme.bg1);
+    grad.addColorStop(1, theme.bg2);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    return;
+  }
+
+  const n = photos.length;
+  const perDur = seg.duration / n;
+  const idx = Math.min(Math.floor(localT / perDur), n - 1);
+  const photoLocalT = localT - idx * perDur;
+  const progress = Math.min(Math.max(photoLocalT / perDur, 0), 1);
+  const crossfadeDur = Math.min(1, perDur / 3);
+
+  const currentPhoto = photos[idx];
+  ensureEndRollVideoPlaying(currentPhoto);
+  endrollBgCtxA.clearRect(0, 0, CANVAS_W, CANVAS_H);
+  drawCoverZoomPhoto(endrollBgCtxA, endRollPhotoImg(currentPhoto), progress, idx, 0, 0, CANVAS_W, CANVAS_H);
+
+  if (idx > 0 && photoLocalT < crossfadeDur) {
+    const prevPhoto = photos[idx - 1];
+    endrollBgCtxB.clearRect(0, 0, CANVAS_W, CANVAS_H);
+    drawCoverZoomPhoto(endrollBgCtxB, endRollPhotoImg(prevPhoto), 1, idx - 1, 0, 0, CANVAS_W, CANVAS_H);
+    ctx.drawImage(endrollBgBufferB, 0, 0);
+    ctx.save();
+    ctx.globalAlpha = photoLocalT / crossfadeDur;
+    ctx.drawImage(endrollBgBufferA, 0, 0);
+    ctx.restore();
+  } else {
+    ctx.drawImage(endrollBgBufferA, 0, 0);
+  }
+
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+}
+
 function drawEndRoll(ctx, seg, localT, settings) {
   const theme = settings.theme;
-  const grad = ctx.createLinearGradient(0, 0, CANVAS_W, CANVAS_H);
-  grad.addColorStop(0, theme.bg1);
-  grad.addColorStop(1, theme.bg2);
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  drawEndRollBackground(ctx, seg, localT, settings);
 
   ctx.save();
   ctx.textAlign = "center";
@@ -2197,6 +2326,18 @@ async function renderVideo({ audioFiles, beatSyncCutDuration, onProgress } = {})
         // 何もしない（サムネイル表示が先頭フレームに戻らないだけ）
       }
     }
+    if (seg.type === "endroll") {
+      (seg.photos || []).forEach((photo) => {
+        if (photo.kind !== "video") return;
+        photo.videoEl.pause();
+        photo._bgStarted = false;
+        try {
+          photo.videoEl.currentTime = 0;
+        } catch (err) {
+          // 何もしない（サムネイル表示が先頭フレームに戻らないだけ）
+        }
+      });
+    }
   });
   return blob;
 }
@@ -2344,6 +2485,7 @@ function collectDraftData() {
       groom: collectGroupDraftItems(groomGroup),
       bride: collectGroupDraftItems(brideGroup),
       together: collectGroupDraftItems(togetherGroup),
+      endroll: collectGroupDraftItems(endrollGroup),
     },
     bgmFiles: state.bgmFiles.map((t) => ({
       blob: t.file,
@@ -2401,6 +2543,7 @@ async function restoreDraftData(data) {
   await groomGroup.restoreItems((data.groups && data.groups.groom) || []);
   await brideGroup.restoreItems((data.groups && data.groups.bride) || []);
   await togetherGroup.restoreItems((data.groups && data.groups.together) || []);
+  await endrollGroup.restoreItems((data.groups && data.groups.endroll) || []);
 
   state.bgmFiles = (data.bgmFiles || []).map((b) => ({
     id: state.nextBgmId++,
