@@ -1112,6 +1112,8 @@ function wrapText(ctx, text, maxWidth) {
 }
 
 const ENDROLL_MAX_TEXT_WIDTH = CANVAS_W - 200;
+const ENDROLL_HEADER_LINE_GAP = 56; // 見出し1行目 → 2行目
+const ENDROLL_HEADER_TO_ENTRIES_GAP = 110; // 見出し → 最初の来賓メッセージ
 const ENDROLL_NAME_GAP = 44;
 const ENDROLL_MESSAGE_LINE_HEIGHT = 32;
 const ENDROLL_ENTRY_GAP = 56;
@@ -1120,8 +1122,7 @@ const ENDROLL_ENTRY_GAP = 56;
 // 実際に描画はせず、計測専用に既存のオフスクリーンcanvasのcontextを流用する。
 function measureEndRollContentHeight(settings) {
   const ctx = transitionCtxA;
-  let height = 100;
-  if (settings.endrollHeaderLine2) height += 40;
+  let height = ENDROLL_HEADER_LINE_GAP + ENDROLL_HEADER_TO_ENTRIES_GAP;
   settings.guestMessages.forEach((entry) => {
     height += ENDROLL_NAME_GAP;
     ctx.font = "300 24px serif";
@@ -1961,14 +1962,12 @@ function drawEndRoll(ctx, seg, localT, settings) {
   ctx.font = "600 40px serif";
   ctx.fillStyle = theme.text;
   if (y > visibleFrom && y < visibleTo) ctx.fillText(seg.headerLine1, CANVAS_W / 2, y);
-  y += 56;
+  y += ENDROLL_HEADER_LINE_GAP;
   if (seg.headerLine2) {
     ctx.font = "300 24px serif";
     if (y > visibleFrom && y < visibleTo) ctx.fillText(seg.headerLine2, CANVAS_W / 2, y);
-    y += 44;
-  } else {
-    y += 44;
   }
+  y += ENDROLL_HEADER_TO_ENTRIES_GAP;
 
   seg.entries.forEach((entry) => {
     ctx.font = "600 30px serif";
