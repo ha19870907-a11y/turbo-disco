@@ -1266,7 +1266,7 @@ function updateDurationEstimate() {
   const secs = Math.round(total % 60);
   const countLabel =
     settings.template === "endroll"
-      ? `来賓メッセージ ${countPhotos(settings)}件・背景写真 ${settings.endrollPhotos.length}枚`
+      ? `来賓メッセージ ${countPhotos(settings)}件・ページの写真 ${settings.endrollPhotos.length}枚`
       : `写真・動画 ${countPhotos(settings)}点`;
   els.durationEstimate.textContent = `${countLabel} / 想定の動画の長さ: 約${mins > 0 ? mins + "分" : ""}${secs}秒`;
 }
