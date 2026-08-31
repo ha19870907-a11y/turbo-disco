@@ -1136,10 +1136,33 @@ const ENDROLL_MAX_ENTRIES_PER_PAGE = 4; // 1ページに入れる来賓の人数
 const ENDROLL_NAME_GAP = 36;
 const ENDROLL_MESSAGE_LINE_HEIGHT = 26;
 const ENDROLL_ENTRY_GAP = 30;
-const ENDROLL_PAGE_PHOTO_W = 220;
-const ENDROLL_PAGE_PHOTO_H = 140;
-const ENDROLL_PAGE_PHOTO_GAP = 26;
 const ENDROLL_PAGE_GROUP_HEADING_GAP = 40;
+
+// タイピング演出（お名前→メッセージの順に1人ずつ1文字ずつ打ち込まれる）のペース。
+// settings.endrollSpeed（遅い/標準/速い）を掛けて全体の速さを調整する。
+const ENDROLL_TYPE_CHAR_SEC = 0.05; // 1文字あたりの基準タイピング時間
+const ENDROLL_TYPE_NAME_MIN_SEC = 0.45; // お名前が短くても一瞬で表示されないための最低時間
+const ENDROLL_TYPE_GAP_SEC = 0.25; // お名前とメッセージの間の間
+const ENDROLL_TYPE_INITIAL_DELAY = 0.35; // ページが開いてから1人目が打ち始まるまで
+const ENDROLL_TYPE_ENTRY_GAP = 0.3; // 1人分打ち終えてから次の人が始まるまで
+const ENDROLL_TYPE_FINAL_HOLD = 1.1; // 全員打ち終えてからページがめくれるまでの余韻
+
+// 各来賓のお名前・メッセージを1人ずつ順番にタイピングするためのスケジュール
+// （開始タイミングと所要時間）を計算する。ページの表示時間の算出と実際の描画の
+// 両方で使うため、必ずこの関数を通して同じ値を共有する。
+function computeEndRollTypingSchedule(entries, speed) {
+  let cursor = ENDROLL_TYPE_INITIAL_DELAY * speed;
+  return entries.map((entry) => {
+    const nameLen = (entry.name || "").length;
+    const messageLen = (entry.message || "").length;
+    const nameDur = nameLen > 0 ? Math.max(nameLen * ENDROLL_TYPE_CHAR_SEC, ENDROLL_TYPE_NAME_MIN_SEC) * speed : 0;
+    const gapDur = nameDur > 0 && messageLen > 0 ? ENDROLL_TYPE_GAP_SEC * speed : 0;
+    const messageDur = messageLen > 0 ? messageLen * ENDROLL_TYPE_CHAR_SEC * speed : 0;
+    const start = cursor;
+    cursor += nameDur + gapDur + messageDur + ENDROLL_TYPE_ENTRY_GAP * speed;
+    return { entry, start, nameDur, gapDur, messageDur };
+  });
+}
 
 // 来賓メッセージを「グループ」でまとめ、1ページにENDROLL_MAX_ENTRIES_PER_PAGE人まで
 // 入るように区切って、ページ（本のページに相当する単位）の配列にする。グループ名が
@@ -1184,19 +1207,15 @@ function buildEndRollPages(settings) {
   return pages;
 }
 
-// ページ内容量から、読むのに十分な表示時間を見積もる（速度設定で倍率調整）。
+// ページの表示時間を、タイピング演出が最後まで打ち終わって少し余韻が
+// 残るのに十分な長さになるよう、タイピングスケジュールから算出する。
 function computeEndRollPageDuration(page, settings) {
-  const ctx = transitionCtxA;
-  let readSeconds = 2;
-  if (page.group) readSeconds += 1.2;
-  if (page.photo) readSeconds += 0.6;
-  page.entries.forEach((entry) => {
-    readSeconds += 0.9;
-    ctx.font = "300 20px serif";
-    const lines = entry.message ? wrapText(ctx, entry.message, ENDROLL_MAX_TEXT_WIDTH) : [];
-    readSeconds += lines.length * 0.85;
-  });
-  return Math.min(Math.max(readSeconds * settings.endrollSpeed, 3), 14);
+  const speed = settings.endrollSpeed;
+  const schedule = computeEndRollTypingSchedule(page.entries, speed);
+  const last = schedule[schedule.length - 1];
+  const typingEnd = last ? last.start + last.nameDur + last.gapDur + last.messageDur : ENDROLL_TYPE_INITIAL_DELAY * speed;
+  const groupReadTime = page.group ? 0.6 * speed : 0;
+  return Math.min(Math.max(typingEnd + groupReadTime + ENDROLL_TYPE_FINAL_HOLD * speed, 3), 20);
 }
 
 function computeEndRollTimeline(settings) {
@@ -1985,40 +2004,82 @@ function drawCoverZoomPhoto(ctx, img, progress, variant, frameX, frameY, frameW,
 }
 
 // テーマカラーごとの「紙」の色味（背景の紙色・ビネット・インク色・アクセント線）。
+// onPhotoTextは、写真を背景にしたページでインクの代わりに使う明るい文字色
+// （紙の色ではなく写真+暗幕の上に乗るため、はっきり読める明るいトーンにしてある）。
 const ENDROLL_PAPER_THEMES = {
-  pink: { paper1: "#faf3e6", paper2: "#efe0c7", ink: "#4a3527", accent: "#b8865b" },
-  navy: { paper1: "#f2ede0", paper2: "#e2d9c2", ink: "#2c2a3a", accent: "#5a5470" },
-  green: { paper1: "#f5f1e2", paper2: "#e6ddbf", ink: "#33402c", accent: "#6b7d4f" },
+  pink: { paper1: "#faf3e6", paper2: "#efe0c7", ink: "#4a3527", accent: "#b8865b", onPhotoText: "#fdf6ec" },
+  navy: { paper1: "#f2ede0", paper2: "#e2d9c2", ink: "#2c2a3a", accent: "#5a5470", onPhotoText: "#f1eef8" },
+  green: { paper1: "#f5f1e2", paper2: "#e6ddbf", ink: "#33402c", accent: "#6b7d4f", onPhotoText: "#f2f6e6" },
 };
 
-// エンドロールの1ページ分を描画する。本のページのような紙の質感の背景に、
-// （見出しページなら）お礼のメッセージ、（通常ページなら）グループ見出し・
-// 写真・来賓の名前とメッセージを静止した状態で表示する（ページ間の動きは
-// compositeTransitionの"pageflip"が担当するため、ここでは静止画でよい）。
+// wrapTextと同じ折り返しアルゴリズムで行分割しつつ、各行の先頭が元のテキストの
+// 何文字目から始まるか（start）も一緒に返す。タイピング演出で「あと何文字まで
+// 見せるか（revealCount）」を各行にマッピングするために必要。
+function wrapTextWithOffsets(ctx, text, maxWidth) {
+  const paragraphs = String(text).split("\n");
+  const result = [];
+  let offset = 0;
+  paragraphs.forEach((para, pIdx) => {
+    if (para === "") {
+      result.push({ line: "", start: offset });
+    } else {
+      let line = "";
+      let lineStart = offset;
+      for (const ch of para) {
+        const test = line + ch;
+        if (line !== "" && ctx.measureText(test).width > maxWidth) {
+          result.push({ line, start: lineStart });
+          lineStart += line.length;
+          line = ch;
+        } else {
+          line = test;
+        }
+      }
+      if (line) result.push({ line, start: lineStart });
+    }
+    offset += para.length;
+    if (pIdx < paragraphs.length - 1) offset += 1; // 消費される"\n"の分
+  });
+  return result;
+}
+
+// エンドロールの1ページ分を描画する。見出しページは中央にお礼のメッセージを表示。
+// 通常ページは、写真があればページ全体を写真の背景にし（なければ本のページの
+// ような紙の質感の背景）、グループ見出し・来賓の名前とメッセージを、お名前→
+// メッセージの順に1人ずつ1文字ずつタイピングされるように表示する
+// （ページ間の動きはcompositeTransitionの"pageflip"が担当する）。
 function drawEndRollPage(ctx, seg, localT, settings) {
   const paper = ENDROLL_PAPER_THEMES[settings.endrollThemeKey] || ENDROLL_PAPER_THEMES.pink;
+  const hasPhotoBg = !seg.isHeaderPage && !!seg.photo;
 
-  const grad = ctx.createLinearGradient(0, 0, CANVAS_W, CANVAS_H);
-  grad.addColorStop(0, paper.paper1);
-  grad.addColorStop(1, paper.paper2);
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  if (hasPhotoBg) {
+    ensureEndRollVideoPlaying(seg.photo);
+    drawCoverZoomPhoto(ctx, endRollPhotoImg(seg.photo), 0.5, 0, 0, 0, CANVAS_W, CANVAS_H);
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  } else {
+    const grad = ctx.createLinearGradient(0, 0, CANVAS_W, CANVAS_H);
+    grad.addColorStop(0, paper.paper1);
+    grad.addColorStop(1, paper.paper2);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-  const vign = ctx.createRadialGradient(
-    CANVAS_W / 2,
-    CANVAS_H / 2,
-    CANVAS_H * 0.3,
-    CANVAS_W / 2,
-    CANVAS_H / 2,
-    CANVAS_H * 0.78
-  );
-  vign.addColorStop(0, "rgba(0,0,0,0)");
-  vign.addColorStop(1, "rgba(0,0,0,0.12)");
-  ctx.fillStyle = vign;
-  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    const vign = ctx.createRadialGradient(
+      CANVAS_W / 2,
+      CANVAS_H / 2,
+      CANVAS_H * 0.3,
+      CANVAS_W / 2,
+      CANVAS_H / 2,
+      CANVAS_H * 0.78
+    );
+    vign.addColorStop(0, "rgba(0,0,0,0)");
+    vign.addColorStop(1, "rgba(0,0,0,0.12)");
+    ctx.fillStyle = vign;
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  }
 
   ctx.save();
-  ctx.strokeStyle = paper.accent;
+  ctx.strokeStyle = hasPhotoBg ? "rgba(255,255,255,0.55)" : paper.accent;
   ctx.globalAlpha = 0.55;
   ctx.lineWidth = 2;
   ctx.strokeRect(30, 30, CANVAS_W - 60, CANVAS_H - 60);
@@ -2040,27 +2101,12 @@ function drawEndRollPage(ctx, seg, localT, settings) {
     return;
   }
 
+  const textColor = hasPhotoBg ? paper.onPhotoText : paper.ink;
   let y = 90;
-
-  if (seg.photo) {
-    const photoX = CANVAS_W / 2 - ENDROLL_PAGE_PHOTO_W / 2;
-    const photoY = y;
-    ctx.save();
-    ctx.fillStyle = "#ffffff";
-    ctx.shadowColor = "rgba(0,0,0,0.3)";
-    ctx.shadowBlur = 16;
-    ctx.shadowOffsetY = 8;
-    const border = 10;
-    ctx.fillRect(photoX - border, photoY - border, ENDROLL_PAGE_PHOTO_W + border * 2, ENDROLL_PAGE_PHOTO_H + border * 2);
-    ctx.restore();
-    ensureEndRollVideoPlaying(seg.photo);
-    drawCoverZoomPhoto(ctx, endRollPhotoImg(seg.photo), 0.5, 0, photoX, photoY, ENDROLL_PAGE_PHOTO_W, ENDROLL_PAGE_PHOTO_H);
-    y += ENDROLL_PAGE_PHOTO_H + ENDROLL_PAGE_PHOTO_GAP;
-  }
 
   if (seg.group) {
     ctx.font = "700 32px serif";
-    ctx.fillStyle = paper.ink;
+    ctx.fillStyle = textColor;
     ctx.fillText(seg.group + (seg.isContinuation ? "（つづき）" : ""), CANVAS_W / 2, y);
     y += 22;
     ctx.strokeStyle = paper.accent;
@@ -2074,17 +2120,48 @@ function drawEndRollPage(ctx, seg, localT, settings) {
     y += 20;
   }
 
-  seg.entries.forEach((entry) => {
+  const schedule = computeEndRollTypingSchedule(seg.entries, settings.endrollSpeed);
+
+  schedule.forEach(({ entry, start, nameDur, gapDur, messageDur }) => {
+    const elapsed = localT - start;
+
+    let revealedName = "";
+    if (entry.name) {
+      if (elapsed <= 0) {
+        revealedName = "";
+      } else if (nameDur <= 0) {
+        revealedName = entry.name;
+      } else {
+        const frac = Math.min(elapsed / nameDur, 1);
+        revealedName = entry.name.slice(0, Math.ceil(entry.name.length * frac));
+      }
+    }
     ctx.font = "600 26px serif";
     ctx.fillStyle = paper.accent;
-    if (entry.name) ctx.fillText(entry.name, CANVAS_W / 2, y);
+    if (revealedName) ctx.fillText(revealedName, CANVAS_W / 2, y);
     y += ENDROLL_NAME_GAP;
 
     ctx.font = "300 20px serif";
-    ctx.fillStyle = paper.ink;
-    const lines = entry.message ? wrapText(ctx, entry.message, ENDROLL_MAX_TEXT_WIDTH) : [];
-    lines.forEach((line) => {
-      ctx.fillText(line, CANVAS_W / 2, y);
+    ctx.fillStyle = textColor;
+    const fullLines = entry.message ? wrapTextWithOffsets(ctx, entry.message, ENDROLL_MAX_TEXT_WIDTH) : [];
+
+    let revealCount = 0;
+    if (entry.message) {
+      const messageElapsed = elapsed - nameDur - gapDur;
+      if (messageElapsed <= 0) {
+        revealCount = 0;
+      } else if (messageDur <= 0) {
+        revealCount = entry.message.length;
+      } else {
+        const frac = Math.min(messageElapsed / messageDur, 1);
+        revealCount = Math.ceil(entry.message.length * frac);
+      }
+    }
+
+    fullLines.forEach(({ line, start: lineStart }) => {
+      const shownLen = Math.max(0, Math.min(line.length, revealCount - lineStart));
+      const shown = line.slice(0, shownLen);
+      if (shown) ctx.fillText(shown, CANVAS_W / 2, y);
       y += ENDROLL_MESSAGE_LINE_HEIGHT;
     });
     y += ENDROLL_ENTRY_GAP;
