@@ -12,7 +12,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob:; media-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none';" />
   <meta http-equiv="Referrer-Policy" content="no-referrer" />
 
-  <link rel="stylesheet" href="style.css?v=18" />
+  <link rel="stylesheet" href="style.css?v=19" />
 </head>
 <body>
   <header class="app-header">
@@ -305,7 +305,9 @@
       <h2>3. 来賓へのメッセージを追加</h2>
       <p class="hint">
         お一人ずつ、お名前とメッセージを入力してください（メッセージは任意）。並び順はドラッグして
-        入れ替えられます。
+        入れ替えられます。「グループ」欄に「新郎友人」「新婦友人」「ご親族」などと入力すると、
+        同じグループ名が連続する行の先頭にまとめて見出しが表示されます（グループごとに
+        まとめたい場合は、ドラッグで同じグループの行を隣り合わせにしてください）。
       </p>
       <div id="guest-message-list" class="guest-message-list"></div>
       <button id="add-guest-message-btn" class="ghost-btn" type="button">＋ メッセージを追加</button>
@@ -397,6 +399,6 @@
     </p>
   </footer>
 
-  <script src="app.js?v=18"></script>
+  <script src="app.js?v=19"></script>
 </body>
 </html>

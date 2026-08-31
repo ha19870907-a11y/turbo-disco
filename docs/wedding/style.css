@@ -448,6 +448,16 @@ main {
   border-radius: 10px;
 }
 
+.guest-group-input {
+  flex: 0 0 110px;
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+}
+
 .guest-name-input {
   flex: 1;
   font: inherit;
