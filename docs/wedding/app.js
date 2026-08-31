@@ -375,7 +375,8 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange, endrollGr
         item.appendChild(clipLabel);
       } else {
         // 動画を当てこむ際など、写真ごとに表示秒数を個別調整したい場合の上書き設定。
-        // 空欄のときは共通設定（1枚あたりの表示時間）に従う。
+        // エンドロールの背景写真の場合は、同じグループのページ内でスライドショーに
+        // なったときの、その写真1枚分の表示秒数（空欄なら既定の長さ）になる。
         const durLabel = document.createElement("label");
         durLabel.className = "photo-field-label";
         durLabel.textContent = "表示秒数";
@@ -385,10 +386,12 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange, endrollGr
         durInput.min = "0.2";
         durInput.max = "20";
         durInput.step = "0.1";
-        durInput.placeholder = "共通";
+        durInput.placeholder = endrollGroupField ? "既定（自動）" : "共通";
         durInput.value = photo.duration != null ? photo.duration : "";
         durInput.draggable = false;
-        durInput.title = "空欄の場合は共通設定（1枚あたりの表示時間）が使われます";
+        durInput.title = endrollGroupField
+          ? "空欄の場合は既定の長さ（「ページを開いておく時間」の設定に応じて自動）が使われます"
+          : "空欄の場合は共通設定（1枚あたりの表示時間）が使われます";
         durInput.addEventListener("input", () => {
           if (durInput.value.trim() === "") {
             photo.duration = null;
@@ -1268,15 +1271,27 @@ function buildEndRollPages(settings) {
   return pages;
 }
 
-// ページの表示時間を、タイピング演出が最後まで打ち終わって少し余韻が
-// 残るのに十分な長さになるよう、タイピングスケジュールから算出する。
+const ENDROLL_PHOTO_DEFAULT_SLIDE_SEC = 3; // 背景写真の表示秒数が未設定の場合の既定の長さ（×speed）
+
+// ページに紐づく背景写真それぞれの表示秒数（個別に設定されていればその値、
+// 未設定なら既定値×speed）を配列で返す。ページの表示時間の算出と、実際の
+// スライドショー描画の両方で使うため、必ずこの関数を通して同じ値を共有する。
+function endRollPhotoSlideDurations(photos, speed) {
+  return (photos || []).map((p) => (p.duration != null ? p.duration : ENDROLL_PHOTO_DEFAULT_SLIDE_SEC * speed));
+}
+
+// ページの表示時間を、タイピング演出が最後まで打ち終わって少し余韻が残るのに
+// 十分な長さと、背景写真のスライドショーに必要な長さ（各写真の表示秒数の合計）の
+// 両方を満たすように算出する。
 function computeEndRollPageDuration(page, settings) {
   const speed = settings.endrollSpeed;
   const schedule = computeEndRollTypingSchedule(page.entries, speed);
   const last = schedule[schedule.length - 1];
   const typingEnd = last ? last.start + last.nameDur + last.gapDur + last.messageDur : ENDROLL_TYPE_INITIAL_DELAY * speed;
   const groupReadTime = page.group ? 0.6 * speed : 0;
-  return Math.min(Math.max(typingEnd + groupReadTime + ENDROLL_TYPE_FINAL_HOLD * speed, 3), 20);
+  const typingBasedDuration = Math.min(Math.max(typingEnd + groupReadTime + ENDROLL_TYPE_FINAL_HOLD * speed, 3), 20);
+  const slidesDuration = endRollPhotoSlideDurations(page.photos, speed).reduce((sum, d) => sum + d, 0);
+  return Math.max(typingBasedDuration, slidesDuration);
 }
 
 function computeEndRollTimeline(settings) {
@@ -2143,14 +2158,21 @@ const ENDROLL_PHOTO_CROSSFADE_SEC = 0.6; // 背景写真が複数ある場合の
 // ページに紐づく背景写真（1枚〜複数枚）を描画する。複数枚ある場合は、ページの
 // 表示時間を均等に分けて1枚ずつ順番に表示し、切り替わり時はクロスフェードする
 // （1ページしかないグループに複数枚設定した場合の簡易スライドショー）。
-function drawEndRollPhotoBackground(ctx, photos, localT, pageDuration) {
-  if (photos.length <= 1) {
-    if (photos.length === 1) drawEndRollPhotoLayer(ctx, photos[0], 1);
+function drawEndRollPhotoBackground(ctx, photos, localT, speed) {
+  if (photos.length === 0) return;
+  if (photos.length === 1) {
+    drawEndRollPhotoLayer(ctx, photos[0], 1);
     return;
   }
-  const slideDur = pageDuration / photos.length;
-  const idx = Math.min(Math.floor(localT / slideDur), photos.length - 1);
-  const elapsedInSlide = localT - idx * slideDur;
+  const slideDurs = endRollPhotoSlideDurations(photos, speed);
+  let idx = 0;
+  let slideStart = 0;
+  while (idx < slideDurs.length - 1 && localT >= slideStart + slideDurs[idx]) {
+    slideStart += slideDurs[idx];
+    idx++;
+  }
+  const slideDur = slideDurs[idx];
+  const elapsedInSlide = localT - slideStart;
   drawEndRollPhotoLayer(ctx, photos[idx], 1);
   if (idx < photos.length - 1) {
     const fade = Math.min(ENDROLL_PHOTO_CROSSFADE_SEC, slideDur * 0.4);
@@ -2172,7 +2194,7 @@ function drawEndRollPage(ctx, seg, localT, settings) {
   const hasPhotoBg = photos.length > 0;
 
   if (hasPhotoBg) {
-    drawEndRollPhotoBackground(ctx, photos, localT, seg.duration);
+    drawEndRollPhotoBackground(ctx, photos, localT, settings.endrollSpeed);
     ctx.fillStyle = "rgba(0,0,0,0.45)";
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
   } else {
