@@ -47,6 +47,10 @@ const MAX_GUEST_MESSAGES = 100;
 const MAX_GUEST_NAME_LENGTH = 30;
 const MAX_GUEST_GROUP_LENGTH = 20;
 const MAX_GUEST_MESSAGE_LENGTH = 200;
+// グループ欄の入力候補。iOS Safariは<datalist>の候補が正しく反応しない（タップしても
+// 入力されない）ことがあるため、確実に動作するネイティブの<select>から選ぶと
+// グループ欄に反映される「候補から選ぶ」を用意する（自由入力も引き続き可能）。
+const GUEST_GROUP_PRESETS = ["新郎家族", "新郎友人", "新郎先輩", "新郎会社先輩", "新婦家族", "新婦友人", "新婦会社"];
 // 「遅い/標準/速い」に対応する、ページ表示時間・切り替え時間への倍率。
 const ENDROLL_SPEED_MAP = { slow: 1.35, normal: 1, fast: 0.75 };
 
@@ -428,14 +432,37 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange, endrollGr
         bgGroupInput.maxLength = MAX_GUEST_GROUP_LENGTH;
         bgGroupInput.value = photo.endrollGroup || "";
         bgGroupInput.draggable = false;
-        bgGroupInput.setAttribute("list", "guest-group-suggestions");
-        bgGroupInput.title = "来賓メッセージの「グループ」欄と同じ名前を入れると、そのグループのページの背景にこの写真が使われます";
+        bgGroupInput.title = "来賓メッセージの「グループ」欄と同じ名前を入れると、そのグループのページの背景にこの写真が使われます（下の「候補から選ぶ」も使えます）";
         bgGroupInput.addEventListener("input", () => {
           photo.endrollGroup = bgGroupInput.value;
           onChange();
         });
         bgGroupLabel.appendChild(bgGroupInput);
         item.appendChild(bgGroupLabel);
+
+        // グループ欄の入力候補（<select>）。iOS Safariでは<datalist>の候補が
+        // タップしても反応しないことがあるため、ネイティブの<select>で確実に選べるようにする。
+        const bgGroupPresetSelect = document.createElement("select");
+        bgGroupPresetSelect.className = "photo-field-input endroll-bg-group-preset-select";
+        bgGroupPresetSelect.draggable = false;
+        const bgGroupPlaceholder = document.createElement("option");
+        bgGroupPlaceholder.value = "";
+        bgGroupPlaceholder.textContent = "候補から選ぶ…";
+        bgGroupPresetSelect.appendChild(bgGroupPlaceholder);
+        GUEST_GROUP_PRESETS.forEach((name) => {
+          const opt = document.createElement("option");
+          opt.value = name;
+          opt.textContent = name;
+          bgGroupPresetSelect.appendChild(opt);
+        });
+        bgGroupPresetSelect.addEventListener("change", () => {
+          if (!bgGroupPresetSelect.value) return;
+          bgGroupInput.value = bgGroupPresetSelect.value;
+          photo.endrollGroup = bgGroupInput.value;
+          bgGroupPresetSelect.value = "";
+          onChange();
+        });
+        item.appendChild(bgGroupPresetSelect);
       }
 
       // 詳細設定（この写真だけの文字サイズ・エフェクト・表示サイズの上書き）。
@@ -887,8 +914,7 @@ function renderGuestMessageList() {
     groupInput.maxLength = MAX_GUEST_GROUP_LENGTH;
     groupInput.value = entry.group || "";
     groupInput.draggable = false;
-    groupInput.setAttribute("list", "guest-group-suggestions");
-    groupInput.title = "候補（新郎家族／新郎友人／新郎先輩／新郎会社先輩／新婦家族／新婦友人／新婦会社）から選ぶか自由入力。同じグループ名の行はまとめて見出しが表示されます";
+    groupInput.title = "自由に入力するか、下の「候補から選ぶ」を使えます。同じグループ名の行はまとめて見出しが表示されます";
     groupInput.addEventListener("input", () => {
       entry.group = groupInput.value;
       updateDurationEstimate();
@@ -920,6 +946,30 @@ function renderGuestMessageList() {
     top.appendChild(removeBtn);
 
     row.appendChild(top);
+
+    // グループ欄の入力候補（<select>）。選ぶとグループ欄に反映され、
+    // 選択状態は毎回リセットする（あくまで入力を補助するボタン的な役割）。
+    const groupPresetSelect = document.createElement("select");
+    groupPresetSelect.className = "guest-group-preset-select";
+    groupPresetSelect.draggable = false;
+    const groupPresetPlaceholder = document.createElement("option");
+    groupPresetPlaceholder.value = "";
+    groupPresetPlaceholder.textContent = "グループの候補から選ぶ…";
+    groupPresetSelect.appendChild(groupPresetPlaceholder);
+    GUEST_GROUP_PRESETS.forEach((name) => {
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name;
+      groupPresetSelect.appendChild(opt);
+    });
+    groupPresetSelect.addEventListener("change", () => {
+      if (!groupPresetSelect.value) return;
+      groupInput.value = groupPresetSelect.value;
+      entry.group = groupInput.value;
+      groupPresetSelect.value = "";
+      updateDurationEstimate();
+    });
+    row.appendChild(groupPresetSelect);
 
     const messageInput = document.createElement("textarea");
     messageInput.className = "guest-message-input";
