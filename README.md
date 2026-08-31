@@ -31,7 +31,7 @@ npm run post:thread -- "投稿したいテキスト"
 ### 子育て・補助金情報の毎日自動投稿
 
 `scripts/thread-topics.json` に用意した子育て・補助金関連の投稿文を、
-`.github/workflows/daily-thread.yml` が毎日 朝8:00(JST) に1つずつ順番に自動投稿します。
+`.github/workflows/daily-thread.yml` が毎日 **8:00・13:00・20:00(JST)** の3回、順番に自動投稿します。
 投稿文を追加・編集したい場合は `thread-topics.json` を直接編集してください（500文字以内）。
 
 ### noteの記事下書きの週次自動生成
