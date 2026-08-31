@@ -1210,23 +1210,31 @@ function buildEndRollPages(settings) {
   });
 
   const pages = [];
+  const pagesByGroup = new Map();
   order.forEach((groupName) => {
     const entries = buckets.get(groupName);
+    const groupPages = [];
     for (let i = 0; i < entries.length; i += ENDROLL_MAX_ENTRIES_PER_PAGE) {
-      pages.push({
+      const page = {
         group: groupName,
         isContinuation: i > 0,
         entries: entries.slice(i, i + ENDROLL_MAX_ENTRIES_PER_PAGE),
-        photo: null,
-      });
+        photos: [],
+      };
+      pages.push(page);
+      groupPages.push(page);
     }
+    pagesByGroup.set(groupName, groupPages);
   });
 
   // 写真ごとに「背景にするグループ」が指定されていれば、そのグループ名と一致する
   // ページ（つづきページも含む）の背景に使う。同じグループ名の写真が複数あれば、
-  // そのグループのページ（つづきページも含む）に順番に1枚ずつ使われ、ページ数の方が
-  // 多い場合は先頭に戻って繰り返す。グループ未指定の写真は、これまで通り順番に、
-  // 専用の写真が無いグループの最初のページにだけ割り当てる。
+  // そのグループのページ数に応じて均等に振り分け、1ページに複数枚割り当たった
+  // 場合はそのページの中でスライドショーのように順番に切り替わる（1ページしか
+  // ないグループでも、複数枚設定すればそのページ内で全部使われる）。ページ数の
+  // 方が写真の枚数より多い場合は、足りない分だけ先頭の写真に戻って繰り返す。
+  // グループ未指定の写真は、これまで通り順番に、専用の写真が無いグループの
+  // 最初のページにだけ割り当てる。
   const photos = settings.endrollPhotos || [];
   const targetedByGroup = new Map();
   const untargeted = [];
@@ -1240,16 +1248,19 @@ function buildEndRollPages(settings) {
     }
   });
 
-  const targetedIndexByGroup = new Map();
+  targetedByGroup.forEach((targetedList, groupName) => {
+    const groupPages = pagesByGroup.get(groupName) || [];
+    groupPages.forEach((page, j) => {
+      const assigned = targetedList.filter((_, idx) => idx % groupPages.length === j);
+      page.photos = assigned.length > 0 ? assigned : [targetedList[j % targetedList.length]];
+    });
+  });
+
   let untargetedIndex = 0;
   pages.forEach((page) => {
-    const targetedList = page.group && targetedByGroup.get(page.group);
-    if (targetedList && targetedList.length > 0) {
-      const i = targetedIndexByGroup.get(page.group) || 0;
-      page.photo = targetedList[i % targetedList.length];
-      targetedIndexByGroup.set(page.group, i + 1);
-    } else if (!page.isContinuation && untargeted.length > 0) {
-      page.photo = untargeted[untargetedIndex % untargeted.length];
+    if (page.photos.length > 0) return; // 専用の写真が既に割り当て済み
+    if (!page.isContinuation && untargeted.length > 0) {
+      page.photos = [untargeted[untargetedIndex % untargeted.length]];
       untargetedIndex++;
     }
   });
@@ -1288,7 +1299,7 @@ function computeEndRollTimeline(settings) {
       group: page.group,
       isContinuation: page.isContinuation,
       entries: page.entries,
-      photo: page.photo,
+      photos: page.photos,
     });
   });
 
@@ -2111,6 +2122,45 @@ function drawContainPhoto(ctx, img, frameX, frameY, frameW, frameH) {
   ctx.drawImage(img, frameX + (frameW - drawW) / 2, frameY + (frameH - drawH) / 2, drawW, drawH);
 }
 
+// 背景用の写真を1枚、指定した不透明度で描画する。写真が見切れないよう、まず
+// 拡大＆ぼかした同じ写真でページ全体を埋め、その上に写真全体（縦横比そのまま）を
+// 重ねて表示する。
+function drawEndRollPhotoLayer(ctx, photo, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ensureEndRollVideoPlaying(photo);
+  const img = endRollPhotoImg(photo);
+  ctx.save();
+  ctx.filter = "blur(24px)";
+  drawCoverZoomPhoto(ctx, img, 0.5, 0, 0, 0, CANVAS_W, CANVAS_H);
+  ctx.restore();
+  drawContainPhoto(ctx, img, 0, 0, CANVAS_W, CANVAS_H);
+  ctx.restore();
+}
+
+const ENDROLL_PHOTO_CROSSFADE_SEC = 0.6; // 背景写真が複数ある場合の切り替わりのクロスフェード時間
+
+// ページに紐づく背景写真（1枚〜複数枚）を描画する。複数枚ある場合は、ページの
+// 表示時間を均等に分けて1枚ずつ順番に表示し、切り替わり時はクロスフェードする
+// （1ページしかないグループに複数枚設定した場合の簡易スライドショー）。
+function drawEndRollPhotoBackground(ctx, photos, localT, pageDuration) {
+  if (photos.length <= 1) {
+    if (photos.length === 1) drawEndRollPhotoLayer(ctx, photos[0], 1);
+    return;
+  }
+  const slideDur = pageDuration / photos.length;
+  const idx = Math.min(Math.floor(localT / slideDur), photos.length - 1);
+  const elapsedInSlide = localT - idx * slideDur;
+  drawEndRollPhotoLayer(ctx, photos[idx], 1);
+  if (idx < photos.length - 1) {
+    const fade = Math.min(ENDROLL_PHOTO_CROSSFADE_SEC, slideDur * 0.4);
+    if (fade > 0 && elapsedInSlide > slideDur - fade) {
+      const alpha = (elapsedInSlide - (slideDur - fade)) / fade;
+      drawEndRollPhotoLayer(ctx, photos[idx + 1], alpha);
+    }
+  }
+}
+
 // エンドロールの1ページ分を描画する。見出しページは中央にお礼のメッセージを表示。
 // 通常ページは、写真があればページ全体を写真の背景にし（なければ本のページの
 // ような紙の質感の背景）、グループ見出し・来賓の名前とメッセージを、お名前→
@@ -2118,18 +2168,11 @@ function drawContainPhoto(ctx, img, frameX, frameY, frameW, frameH) {
 // （ページ間の動きはcompositeTransitionの"pageflip"が担当する）。
 function drawEndRollPage(ctx, seg, localT, settings) {
   const paper = ENDROLL_PAPER_THEMES[settings.endrollThemeKey] || ENDROLL_PAPER_THEMES.pink;
-  const hasPhotoBg = !seg.isHeaderPage && !!seg.photo;
+  const photos = (!seg.isHeaderPage && seg.photos) || [];
+  const hasPhotoBg = photos.length > 0;
 
   if (hasPhotoBg) {
-    ensureEndRollVideoPlaying(seg.photo);
-    const bgImg = endRollPhotoImg(seg.photo);
-    // 写真が見切れないよう、まず拡大＆ぼかした同じ写真でページ全体を埋め、
-    // その上に写真全体（縦横比そのまま）を重ねて表示する。
-    ctx.save();
-    ctx.filter = "blur(24px)";
-    drawCoverZoomPhoto(ctx, bgImg, 0.5, 0, 0, 0, CANVAS_W, CANVAS_H);
-    ctx.restore();
-    drawContainPhoto(ctx, bgImg, 0, 0, CANVAS_W, CANVAS_H);
+    drawEndRollPhotoBackground(ctx, photos, localT, seg.duration);
     ctx.fillStyle = "rgba(0,0,0,0.45)";
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
   } else {
@@ -2582,14 +2625,17 @@ async function renderVideo({ audioFiles, beatSyncCutDuration, onProgress } = {})
         // 何もしない（サムネイル表示が先頭フレームに戻らないだけ）
       }
     }
-    if (seg.type === "endroll-page" && seg.photo && seg.photo.kind === "video") {
-      seg.photo.videoEl.pause();
-      seg.photo._bgStarted = false;
-      try {
-        seg.photo.videoEl.currentTime = 0;
-      } catch (err) {
-        // 何もしない（サムネイル表示が先頭フレームに戻らないだけ）
-      }
+    if (seg.type === "endroll-page" && seg.photos) {
+      seg.photos.forEach((photo) => {
+        if (photo.kind !== "video") return;
+        photo.videoEl.pause();
+        photo._bgStarted = false;
+        try {
+          photo.videoEl.currentTime = 0;
+        } catch (err) {
+          // 何もしない（サムネイル表示が先頭フレームに戻らないだけ）
+        }
+      });
     }
   });
   return blob;
