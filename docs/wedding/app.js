@@ -1275,26 +1275,31 @@ function buildEndRollPages(settings) {
   });
 
   // 写真ごとに「背景にするグループ」が指定されていれば、そのグループ名と一致する
-  // ページ（つづきページも含む）すべての背景にその写真を使う。グループ未指定の
-  // 写真は、これまで通り順番に、専用の写真が無いグループの最初のページにだけ
-  // 割り当てる。
+  // ページ（つづきページも含む）の背景に使う。同じグループ名の写真が複数あれば、
+  // そのグループのページ（つづきページも含む）に順番に1枚ずつ使われ、ページ数の方が
+  // 多い場合は先頭に戻って繰り返す。グループ未指定の写真は、これまで通り順番に、
+  // 専用の写真が無いグループの最初のページにだけ割り当てる。
   const photos = settings.endrollPhotos || [];
   const targetedByGroup = new Map();
   const untargeted = [];
   photos.forEach((photo) => {
     const key = (photo.endrollGroup || "").trim();
-    if (key && !targetedByGroup.has(key)) {
-      targetedByGroup.set(key, photo);
-    } else if (!key) {
+    if (key) {
+      if (!targetedByGroup.has(key)) targetedByGroup.set(key, []);
+      targetedByGroup.get(key).push(photo);
+    } else {
       untargeted.push(photo);
     }
   });
 
+  const targetedIndexByGroup = new Map();
   let untargetedIndex = 0;
   pages.forEach((page) => {
-    const targeted = page.group && targetedByGroup.get(page.group);
-    if (targeted) {
-      page.photo = targeted;
+    const targetedList = page.group && targetedByGroup.get(page.group);
+    if (targetedList && targetedList.length > 0) {
+      const i = targetedIndexByGroup.get(page.group) || 0;
+      page.photo = targetedList[i % targetedList.length];
+      targetedIndexByGroup.set(page.group, i + 1);
     } else if (!page.isContinuation && untargeted.length > 0) {
       page.photo = untargeted[untargetedIndex % untargeted.length];
       untargetedIndex++;
