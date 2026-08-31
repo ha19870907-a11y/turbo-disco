@@ -469,18 +469,6 @@ main {
   color: var(--text);
 }
 
-.guest-group-preset-select {
-  font: inherit;
-  font-size: 0.78rem;
-  padding: 5px 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--muted);
-  background: #fff;
-  width: 100%;
-  box-sizing: border-box;
-}
-
 .guest-remove {
   flex-shrink: 0;
   background: rgba(0, 0, 0, 0.5);
