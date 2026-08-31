@@ -36,11 +36,44 @@ npm run post:thread -- "投稿したいテキスト"
 
 ### noteの記事下書きの週次自動生成
 
-noteには公式の投稿APIが無いため自動投稿はしていませんが、記事の下書きだけは自動化できます。
 `scripts/note-topics.json` に用意した記事ネタ（タイトル・無料部分・有料部分の構成案）を、
 `.github/workflows/weekly-note-draft.yml` が毎週月曜 朝9:00(JST) に1つずつ `note-drafts/` フォルダへ
-Markdownファイルとして書き出します。内容を確認し、そのままnoteにコピペして仕上げてください。
-ネタを追加したい場合は `note-topics.json` を編集してください。
+Markdownファイルとして書き出します。ネタを追加したい場合は `note-topics.json` を編集してください。
+
+### noteへの自動投稿ツール
+
+noteには公式の投稿APIが無いため、ブラウザ自動操作（Playwright）でログイン状態を再利用し、
+記事エディタへの入力〜投稿までを自動化するスクリプトです（`scripts/note-login.js` /
+`scripts/post-note.js`）。note側のページ構造(HTML)が変わると動かなくなる可能性がある
+**非公式の手段**であることを理解した上でご利用ください。
+
+```bash
+npm install
+npx playwright install chromium
+
+# 1. 初回のみ: ブラウザが開くので手動でnoteにログインする（メール/パスワードや
+#    二段階認証をこのスクリプトに直接渡すことはしない）
+npm run login:note
+
+# 2. note-drafts/ 内の最新ファイルをnote側に「下書き保存」する
+npm run post:note
+
+# ファイルを指定したい／そのまま公開したい場合
+npm run post:note -- note-drafts/2026-08-31-xxxx.md --publish
+```
+
+- `npm run login:note` はブラウザを開いて手動ログインしてもらい、ログイン状態（Cookie等）を
+  `note-session.json` に保存します。このファイルはパスワード同様の機密情報です。
+  `.gitignore` 済みですが、第三者と共有しないでください。
+- `npm run post:note` はデフォルトでは note 側に**下書き保存**するだけで、実際の公開は行いません。
+  内容を確認してから `--publish` を付けて実行すると公開まで行います。
+- GitHub Actionsから使う場合は、`note-session.json` の中身をbase64化した文字列を
+  `NOTE_STORAGE_STATE_B64` シークレットに設定してください（例:
+  `base64 -i note-session.json | pbcopy`）。`.github/workflows/post-note.yml` を
+  Actionsタブから手動実行（Run workflow）すると、対象ファイルと公開有無を指定して投稿できます。
+  ログイン状態には有効期限があるため、投稿に失敗するようになったら `npm run login:note` を
+  再実行してシークレットを更新してください。
+- noteの利用規約の範囲内で、自分のアカウントの投稿作業を効率化する目的でのみ使用してください。
 
 ## 結婚式ムービー作成ツール
 

@@ -8,12 +8,17 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "post:thread": "node scripts/post-thread.js"
+    "post:thread": "node scripts/post-thread.js",
+    "login:note": "node scripts/note-login.js",
+    "post:note": "node scripts/post-note.js"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
     "express": "^4.19.2"
+  },
+  "optionalDependencies": {
+    "playwright": "^1.47.0"
   }
 }

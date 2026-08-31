@@ -1,0 +1,45 @@
+name: Post to note
+
+on:
+  workflow_dispatch:
+    inputs:
+      file:
+        description: "投稿するnote-drafts/内のファイル名（空欄なら最新の下書き）"
+        required: false
+        type: string
+      publish:
+        description: "trueで公開、falseでnote側に下書き保存のみ"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Post to note
+        env:
+          NOTE_STORAGE_STATE_B64: ${{ secrets.NOTE_STORAGE_STATE_B64 }}
+        run: |
+          ARGS=""
+          if [ -n "${{ inputs.file }}" ]; then
+            ARGS="note-drafts/${{ inputs.file }}"
+          fi
+          if [ "${{ inputs.publish }}" = "true" ]; then
+            ARGS="$ARGS --publish"
+          fi
+          node scripts/post-note.js $ARGS
