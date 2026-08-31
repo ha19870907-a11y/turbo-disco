@@ -1132,21 +1132,20 @@ function wrapText(ctx, text, maxWidth) {
 }
 
 const ENDROLL_MAX_TEXT_WIDTH = CANVAS_W - 200;
-const ENDROLL_NAME_GAP = 44;
-const ENDROLL_MESSAGE_LINE_HEIGHT = 32;
-const ENDROLL_ENTRY_GAP = 56;
-const ENDROLL_PAGE_CONTENT_BUDGET = 430; // 1ページに収める本文（名前+メッセージ）の高さの目安
-const ENDROLL_PAGE_PHOTO_W = 300;
-const ENDROLL_PAGE_PHOTO_H = 200;
-const ENDROLL_PAGE_PHOTO_GAP = 40;
-const ENDROLL_PAGE_GROUP_HEADING_GAP = 60;
+const ENDROLL_MAX_ENTRIES_PER_PAGE = 4; // 1ページに入れる来賓の人数
+const ENDROLL_NAME_GAP = 36;
+const ENDROLL_MESSAGE_LINE_HEIGHT = 26;
+const ENDROLL_ENTRY_GAP = 30;
+const ENDROLL_PAGE_PHOTO_W = 220;
+const ENDROLL_PAGE_PHOTO_H = 140;
+const ENDROLL_PAGE_PHOTO_GAP = 26;
+const ENDROLL_PAGE_GROUP_HEADING_GAP = 40;
 
-// 来賓メッセージを「グループ」でまとめ、1ページに収まる分量ごとに区切って
-// ページ（本のページに相当する単位）の配列にする。グループ名が同じ行は
-// 並び順に関係なく1つのグループとしてまとめる（初出のグループ順でページ化）。
-// 収まりきらない場合は同じグループ内で複数ページに分割する（つづきページ）。
+// 来賓メッセージを「グループ」でまとめ、1ページにENDROLL_MAX_ENTRIES_PER_PAGE人まで
+// 入るように区切って、ページ（本のページに相当する単位）の配列にする。グループ名が
+// 同じ行は並び順に関係なく1つのグループとしてまとめる（初出のグループ順でページ化）。
+// 人数が多いグループは同じグループ内で複数ページに分割する（つづきページ）。
 function buildEndRollPages(settings) {
-  const ctx = transitionCtxA;
   const order = [];
   const buckets = new Map();
   settings.guestMessages.forEach((entry) => {
@@ -1160,31 +1159,15 @@ function buildEndRollPages(settings) {
 
   const pages = [];
   order.forEach((groupName) => {
-    let current = [];
-    let currentHeight = 0;
-    const flush = () => {
-      if (current.length === 0) return;
-      const prevPage = pages[pages.length - 1];
+    const entries = buckets.get(groupName);
+    for (let i = 0; i < entries.length; i += ENDROLL_MAX_ENTRIES_PER_PAGE) {
       pages.push({
         group: groupName,
-        isContinuation: !!prevPage && prevPage.group === groupName,
-        entries: current,
+        isContinuation: i > 0,
+        entries: entries.slice(i, i + ENDROLL_MAX_ENTRIES_PER_PAGE),
         photo: null,
       });
-      current = [];
-      currentHeight = 0;
-    };
-    buckets.get(groupName).forEach((entry) => {
-      ctx.font = "300 24px serif";
-      const lines = entry.message ? wrapText(ctx, entry.message, ENDROLL_MAX_TEXT_WIDTH) : [];
-      const entryHeight = ENDROLL_NAME_GAP + lines.length * ENDROLL_MESSAGE_LINE_HEIGHT + ENDROLL_ENTRY_GAP;
-      if (current.length > 0 && currentHeight + entryHeight > ENDROLL_PAGE_CONTENT_BUDGET) {
-        flush();
-      }
-      current.push(entry);
-      currentHeight += entryHeight;
-    });
-    flush();
+    }
   });
 
   const photos = settings.endrollPhotos || [];
@@ -1209,7 +1192,7 @@ function computeEndRollPageDuration(page, settings) {
   if (page.photo) readSeconds += 0.6;
   page.entries.forEach((entry) => {
     readSeconds += 0.9;
-    ctx.font = "300 24px serif";
+    ctx.font = "300 20px serif";
     const lines = entry.message ? wrapText(ctx, entry.message, ENDROLL_MAX_TEXT_WIDTH) : [];
     readSeconds += lines.length * 0.85;
   });
@@ -2057,7 +2040,7 @@ function drawEndRollPage(ctx, seg, localT, settings) {
     return;
   }
 
-  let y = 120;
+  let y = 90;
 
   if (seg.photo) {
     const photoX = CANVAS_W / 2 - ENDROLL_PAGE_PHOTO_W / 2;
@@ -2076,10 +2059,10 @@ function drawEndRollPage(ctx, seg, localT, settings) {
   }
 
   if (seg.group) {
-    ctx.font = "700 38px serif";
+    ctx.font = "700 32px serif";
     ctx.fillStyle = paper.ink;
     ctx.fillText(seg.group + (seg.isContinuation ? "（つづき）" : ""), CANVAS_W / 2, y);
-    y += 26;
+    y += 22;
     ctx.strokeStyle = paper.accent;
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -2092,12 +2075,12 @@ function drawEndRollPage(ctx, seg, localT, settings) {
   }
 
   seg.entries.forEach((entry) => {
-    ctx.font = "600 30px serif";
+    ctx.font = "600 26px serif";
     ctx.fillStyle = paper.accent;
     if (entry.name) ctx.fillText(entry.name, CANVAS_W / 2, y);
     y += ENDROLL_NAME_GAP;
 
-    ctx.font = "300 24px serif";
+    ctx.font = "300 20px serif";
     ctx.fillStyle = paper.ink;
     const lines = entry.message ? wrapText(ctx, entry.message, ENDROLL_MAX_TEXT_WIDTH) : [];
     lines.forEach((line) => {
