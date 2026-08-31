@@ -2043,6 +2043,24 @@ function wrapTextWithOffsets(ctx, text, maxWidth) {
   return result;
 }
 
+// 写真の縦横比を保ったまま、写真全体が見切れないようにフレーム内に収めて描画する
+// （drawCoverZoomPhotoの「はみ出た分を切り取って埋める」のとは逆に、余る分は
+// 何も描かない＝呼び出し側で背景を別に埋めておく前提）。
+function drawContainPhoto(ctx, img, frameX, frameY, frameW, frameH) {
+  const { width: imgW, height: imgH } = intrinsicSize(img);
+  const imgRatio = imgW / imgH;
+  const frameRatio = frameW / frameH;
+  let drawW, drawH;
+  if (imgRatio > frameRatio) {
+    drawW = frameW;
+    drawH = drawW / imgRatio;
+  } else {
+    drawH = frameH;
+    drawW = drawH * imgRatio;
+  }
+  ctx.drawImage(img, frameX + (frameW - drawW) / 2, frameY + (frameH - drawH) / 2, drawW, drawH);
+}
+
 // エンドロールの1ページ分を描画する。見出しページは中央にお礼のメッセージを表示。
 // 通常ページは、写真があればページ全体を写真の背景にし（なければ本のページの
 // ような紙の質感の背景）、グループ見出し・来賓の名前とメッセージを、お名前→
@@ -2054,7 +2072,14 @@ function drawEndRollPage(ctx, seg, localT, settings) {
 
   if (hasPhotoBg) {
     ensureEndRollVideoPlaying(seg.photo);
-    drawCoverZoomPhoto(ctx, endRollPhotoImg(seg.photo), 0.5, 0, 0, 0, CANVAS_W, CANVAS_H);
+    const bgImg = endRollPhotoImg(seg.photo);
+    // 写真が見切れないよう、まず拡大＆ぼかした同じ写真でページ全体を埋め、
+    // その上に写真全体（縦横比そのまま）を重ねて表示する。
+    ctx.save();
+    ctx.filter = "blur(24px)";
+    drawCoverZoomPhoto(ctx, bgImg, 0.5, 0, 0, 0, CANVAS_W, CANVAS_H);
+    ctx.restore();
+    drawContainPhoto(ctx, bgImg, 0, 0, CANVAS_W, CANVAS_H);
     ctx.fillStyle = "rgba(0,0,0,0.45)";
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
   } else {
