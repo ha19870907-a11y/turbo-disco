@@ -857,7 +857,8 @@ function renderGuestMessageList() {
     groupInput.maxLength = MAX_GUEST_GROUP_LENGTH;
     groupInput.value = entry.group || "";
     groupInput.draggable = false;
-    groupInput.title = "例: 新郎友人、新婦友人、ご親族など。同じグループ名が連続する行はまとめて見出しが表示されます";
+    groupInput.setAttribute("list", "guest-group-suggestions");
+    groupInput.title = "候補（新郎家族／新郎友人／新郎先輩／新郎会社先輩／新婦家族／新婦友人／新婦会社）から選ぶか自由入力。同じグループ名の行はまとめて見出しが表示されます";
     groupInput.addEventListener("input", () => {
       entry.group = groupInput.value;
       updateDurationEstimate();
