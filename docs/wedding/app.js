@@ -47,7 +47,8 @@ const MAX_GUEST_MESSAGES = 100;
 const MAX_GUEST_NAME_LENGTH = 30;
 const MAX_GUEST_GROUP_LENGTH = 20;
 const MAX_GUEST_MESSAGE_LENGTH = 200;
-const ENDROLL_SPEED_MAP = { slow: 40, normal: 60, fast: 90 };
+// 「遅い/標準/速い」に対応する、ページ表示時間・切り替え時間への倍率。
+const ENDROLL_SPEED_MAP = { slow: 1.35, normal: 1, fast: 0.75 };
 
 const state = {
   bgmFiles: [], // { id, file }
@@ -189,17 +190,19 @@ function getSettings() {
     };
   }
   if (template === "endroll") {
+    const endrollSpeedMultiplier = ENDROLL_SPEED_MAP[els.endrollSpeed.value] || ENDROLL_SPEED_MAP.normal;
     return {
       template,
       title1: els.endrollTitle1.value.trim(),
       title2: els.endrollTitle2.value.trim(),
       dateText: els.endrollDateText.value.trim(),
       theme: THEMES[els.endrollTheme.value] || THEMES.pink,
-      transitionType: "crossfade",
-      transitionDuration: 1,
+      endrollThemeKey: els.endrollTheme.value || "pink",
+      transitionType: "pageflip",
+      transitionDuration: Math.min(Math.max(0.9 * endrollSpeedMultiplier, 0.5), 1.3),
       endrollHeaderLine1: els.endrollHeaderLine1.value.trim() || "Thank You",
       endrollHeaderLine2: els.endrollHeaderLine2.value.trim(),
-      endrollSpeed: ENDROLL_SPEED_MAP[els.endrollSpeed.value] || ENDROLL_SPEED_MAP.normal,
+      endrollSpeed: endrollSpeedMultiplier,
       guestMessages: state.guestMessages,
       endrollPhotos: endrollGroup.photos,
     };
@@ -1129,52 +1132,114 @@ function wrapText(ctx, text, maxWidth) {
 }
 
 const ENDROLL_MAX_TEXT_WIDTH = CANVAS_W - 200;
-const ENDROLL_HEADER_LINE_GAP = 56; // 見出し1行目 → 2行目
-const ENDROLL_HEADER_TO_ENTRIES_GAP = 110; // 見出し → 最初の来賓メッセージ
 const ENDROLL_NAME_GAP = 44;
 const ENDROLL_MESSAGE_LINE_HEIGHT = 32;
 const ENDROLL_ENTRY_GAP = 56;
-const ENDROLL_GROUP_GAP_BEFORE = 30; // 直前の内容とグループ見出しの間
-const ENDROLL_GROUP_HEADING_GAP = 50; // グループ見出しと、そのグループ最初の名前の間
+const ENDROLL_PAGE_CONTENT_BUDGET = 430; // 1ページに収める本文（名前+メッセージ）の高さの目安
+const ENDROLL_PAGE_PHOTO_W = 300;
+const ENDROLL_PAGE_PHOTO_H = 200;
+const ENDROLL_PAGE_PHOTO_GAP = 40;
+const ENDROLL_PAGE_GROUP_HEADING_GAP = 60;
 
-// エンドロール本編（スクロールする内容全体）の高さをあらかじめ計算する。
-// 実際に描画はせず、計測専用に既存のオフスクリーンcanvasのcontextを流用する。
-function measureEndRollContentHeight(settings) {
+// 来賓メッセージを「グループ」でまとめ、1ページに収まる分量ごとに区切って
+// ページ（本のページに相当する単位）の配列にする。グループ名が同じ行は
+// 並び順に関係なく1つのグループとしてまとめる（初出のグループ順でページ化）。
+// 収まりきらない場合は同じグループ内で複数ページに分割する（つづきページ）。
+function buildEndRollPages(settings) {
   const ctx = transitionCtxA;
-  let height = ENDROLL_HEADER_LINE_GAP + ENDROLL_HEADER_TO_ENTRIES_GAP;
-  let prevGroup = null;
+  const order = [];
+  const buckets = new Map();
   settings.guestMessages.forEach((entry) => {
-    const group = (entry.group || "").trim();
-    if (group && group !== prevGroup) {
-      height += ENDROLL_GROUP_GAP_BEFORE + ENDROLL_GROUP_HEADING_GAP;
+    const key = (entry.group || "").trim();
+    if (!buckets.has(key)) {
+      buckets.set(key, []);
+      order.push(key);
     }
-    prevGroup = group;
+    buckets.get(key).push(entry);
+  });
 
-    height += ENDROLL_NAME_GAP;
+  const pages = [];
+  order.forEach((groupName) => {
+    let current = [];
+    let currentHeight = 0;
+    const flush = () => {
+      if (current.length === 0) return;
+      const prevPage = pages[pages.length - 1];
+      pages.push({
+        group: groupName,
+        isContinuation: !!prevPage && prevPage.group === groupName,
+        entries: current,
+        photo: null,
+      });
+      current = [];
+      currentHeight = 0;
+    };
+    buckets.get(groupName).forEach((entry) => {
+      ctx.font = "300 24px serif";
+      const lines = entry.message ? wrapText(ctx, entry.message, ENDROLL_MAX_TEXT_WIDTH) : [];
+      const entryHeight = ENDROLL_NAME_GAP + lines.length * ENDROLL_MESSAGE_LINE_HEIGHT + ENDROLL_ENTRY_GAP;
+      if (current.length > 0 && currentHeight + entryHeight > ENDROLL_PAGE_CONTENT_BUDGET) {
+        flush();
+      }
+      current.push(entry);
+      currentHeight += entryHeight;
+    });
+    flush();
+  });
+
+  const photos = settings.endrollPhotos || [];
+  if (photos.length > 0) {
+    let photoIndex = 0;
+    pages.forEach((page) => {
+      if (!page.isContinuation) {
+        page.photo = photos[photoIndex % photos.length];
+        photoIndex++;
+      }
+    });
+  }
+
+  return pages;
+}
+
+// ページ内容量から、読むのに十分な表示時間を見積もる（速度設定で倍率調整）。
+function computeEndRollPageDuration(page, settings) {
+  const ctx = transitionCtxA;
+  let readSeconds = 2;
+  if (page.group) readSeconds += 1.2;
+  if (page.photo) readSeconds += 0.6;
+  page.entries.forEach((entry) => {
+    readSeconds += 0.9;
     ctx.font = "300 24px serif";
     const lines = entry.message ? wrapText(ctx, entry.message, ENDROLL_MAX_TEXT_WIDTH) : [];
-    height += lines.length * ENDROLL_MESSAGE_LINE_HEIGHT;
-    height += ENDROLL_ENTRY_GAP;
+    readSeconds += lines.length * 0.85;
   });
-  return height;
+  return Math.min(Math.max(readSeconds * settings.endrollSpeed, 3), 14);
 }
 
 function computeEndRollTimeline(settings) {
-  const contentHeight = measureEndRollContentHeight(settings);
-  const travel = CANVAS_H + contentHeight + 120;
-  const scrollDuration = Math.max(travel / settings.endrollSpeed, 3);
-
   const segments = [];
   segments.push({ type: "title", duration: INTRO_DUR, lines: introLines(settings) });
+
+  const headerSeconds = (settings.endrollHeaderLine2 ? 3.5 : 2.5) * settings.endrollSpeed;
   segments.push({
-    type: "endroll",
-    duration: scrollDuration,
+    type: "endroll-page",
+    duration: Math.max(headerSeconds, 2.5),
+    isHeaderPage: true,
     headerLine1: settings.endrollHeaderLine1,
     headerLine2: settings.endrollHeaderLine2,
-    entries: settings.guestMessages,
-    scrollSpeed: settings.endrollSpeed,
-    photos: settings.endrollPhotos,
   });
+
+  buildEndRollPages(settings).forEach((page) => {
+    segments.push({
+      type: "endroll-page",
+      duration: computeEndRollPageDuration(page, settings),
+      group: page.group,
+      isContinuation: page.isContinuation,
+      entries: page.entries,
+      photo: page.photo,
+    });
+  });
+
   return finalizeTimeline(segments, settings.transitionDuration);
 }
 
@@ -1705,18 +1770,6 @@ transitionBufferB.height = CANVAS_H;
 const transitionCtxA = transitionBufferA.getContext("2d");
 const transitionCtxB = transitionBufferB.getContext("2d");
 
-// エンドロールの背景写真スライドショー合成用のオフスクリーンバッファ。
-// トランジション用のバッファとは別に用意し、エンドロールへの切り替え時に
-// 互いの内容を上書きしてしまわないようにする。
-const endrollBgBufferA = document.createElement("canvas");
-const endrollBgBufferB = document.createElement("canvas");
-endrollBgBufferA.width = CANVAS_W;
-endrollBgBufferA.height = CANVAS_H;
-endrollBgBufferB.width = CANVAS_W;
-endrollBgBufferB.height = CANVAS_H;
-const endrollBgCtxA = endrollBgBufferA.getContext("2d");
-const endrollBgCtxB = endrollBgBufferB.getContext("2d");
-
 // "ランダム"指定時、写真の切り替えごとに使う効果を決める。
 // インデックスから決定的に導出するので、BGM追加時の再生成でも同じ映像になる。
 function pickTransitionType(settings, index) {
@@ -1813,6 +1866,25 @@ function compositeTransition(ctx, canvasA, canvasB, progress, type) {
       ctx.restore();
       break;
     }
+    case "pageflip": {
+      // 本のページをめくるような演出（エンドロール専用）。
+      // 次のページを先に敷いておき、現在のページを左端（本の綴じ目）を軸に
+      // 横方向へ縮めていくことで、ページが奥へめくれていくように見せる。
+      ctx.drawImage(canvasB, 0, 0);
+      const scaleX = Math.max(1 - progress, 0.001);
+      ctx.save();
+      ctx.scale(scaleX, 1);
+      ctx.drawImage(canvasA, 0, 0);
+      ctx.restore();
+
+      const shadowW = CANVAS_W * scaleX;
+      const grad = ctx.createLinearGradient(shadowW * 0.55, 0, shadowW, 0);
+      grad.addColorStop(0, "rgba(0,0,0,0)");
+      grad.addColorStop(1, `rgba(0,0,0,${0.5 * progress})`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, shadowW, CANVAS_H);
+      break;
+    }
     case "crossfade":
     default: {
       ctx.drawImage(canvasA, 0, 0);
@@ -1864,12 +1936,13 @@ function drawFrame(ctx, timeline, t, settings) {
   }
 }
 
-// 映画のエンドロールのように、来賓へのメッセージが下から上へ流れ続ける演出。
+// --- エンドロール（本のページをめくる演出）---
+
 function endRollPhotoImg(photo) {
   return photo.kind === "video" ? photo.videoEl : photo.img;
 }
 
-// 背景として使う動画は、初回だけ再生を開始する（写真と混在させても壊れないように）。
+// ページに動画を使う場合、初回だけ再生を開始する（写真と混在させても壊れないように）。
 function ensureEndRollVideoPlaying(photo) {
   if (photo.kind !== "video" || photo._bgStarted) return;
   photo._bgStarted = true;
@@ -1884,7 +1957,7 @@ function ensureEndRollVideoPlaying(photo) {
 }
 
 // 指定した矩形いっぱいに、Ken Burns風のズーム/パンをかけながら写真・動画を描画する
-// （エンドロールの背景専用。キャプションや表示サイズ設定は考慮しない）。
+// （エンドロールのページ写真専用。キャプションや表示サイズ設定は考慮しない）。
 function drawCoverZoomPhoto(ctx, img, progress, variant, frameX, frameY, frameW, frameH) {
   const zoomIn = variant % 2 === 0;
   const scale = zoomIn ? 1 + ZOOM_AMOUNT * progress : 1 + ZOOM_AMOUNT * (1 - progress);
@@ -1928,95 +2001,107 @@ function drawCoverZoomPhoto(ctx, img, progress, variant, frameX, frameY, frameW,
   ctx.restore();
 }
 
-// エンドロールの背景。写真が無ければテーマカラーのグラデーション、
-// あれば全体の再生時間を均等割りしてKen Burns風に順番に切り替えながらループ表示する。
-// 文字を読みやすくするため、最後に暗めの半透明フィルターを重ねる。
-function drawEndRollBackground(ctx, seg, localT, settings) {
-  const theme = settings.theme;
-  const photos = seg.photos || [];
+// テーマカラーごとの「紙」の色味（背景の紙色・ビネット・インク色・アクセント線）。
+const ENDROLL_PAPER_THEMES = {
+  pink: { paper1: "#faf3e6", paper2: "#efe0c7", ink: "#4a3527", accent: "#b8865b" },
+  navy: { paper1: "#f2ede0", paper2: "#e2d9c2", ink: "#2c2a3a", accent: "#5a5470" },
+  green: { paper1: "#f5f1e2", paper2: "#e6ddbf", ink: "#33402c", accent: "#6b7d4f" },
+};
 
-  if (photos.length === 0) {
-    const grad = ctx.createLinearGradient(0, 0, CANVAS_W, CANVAS_H);
-    grad.addColorStop(0, theme.bg1);
-    grad.addColorStop(1, theme.bg2);
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-    return;
-  }
+// エンドロールの1ページ分を描画する。本のページのような紙の質感の背景に、
+// （見出しページなら）お礼のメッセージ、（通常ページなら）グループ見出し・
+// 写真・来賓の名前とメッセージを静止した状態で表示する（ページ間の動きは
+// compositeTransitionの"pageflip"が担当するため、ここでは静止画でよい）。
+function drawEndRollPage(ctx, seg, localT, settings) {
+  const paper = ENDROLL_PAPER_THEMES[settings.endrollThemeKey] || ENDROLL_PAPER_THEMES.pink;
 
-  const n = photos.length;
-  const perDur = seg.duration / n;
-  const idx = Math.min(Math.floor(localT / perDur), n - 1);
-  const photoLocalT = localT - idx * perDur;
-  const progress = Math.min(Math.max(photoLocalT / perDur, 0), 1);
-  const crossfadeDur = Math.min(1, perDur / 3);
-
-  const currentPhoto = photos[idx];
-  ensureEndRollVideoPlaying(currentPhoto);
-  endrollBgCtxA.clearRect(0, 0, CANVAS_W, CANVAS_H);
-  drawCoverZoomPhoto(endrollBgCtxA, endRollPhotoImg(currentPhoto), progress, idx, 0, 0, CANVAS_W, CANVAS_H);
-
-  if (idx > 0 && photoLocalT < crossfadeDur) {
-    const prevPhoto = photos[idx - 1];
-    endrollBgCtxB.clearRect(0, 0, CANVAS_W, CANVAS_H);
-    drawCoverZoomPhoto(endrollBgCtxB, endRollPhotoImg(prevPhoto), 1, idx - 1, 0, 0, CANVAS_W, CANVAS_H);
-    ctx.drawImage(endrollBgBufferB, 0, 0);
-    ctx.save();
-    ctx.globalAlpha = photoLocalT / crossfadeDur;
-    ctx.drawImage(endrollBgBufferA, 0, 0);
-    ctx.restore();
-  } else {
-    ctx.drawImage(endrollBgBufferA, 0, 0);
-  }
-
-  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  const grad = ctx.createLinearGradient(0, 0, CANVAS_W, CANVAS_H);
+  grad.addColorStop(0, paper.paper1);
+  grad.addColorStop(1, paper.paper2);
+  ctx.fillStyle = grad;
   ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-}
 
-function drawEndRoll(ctx, seg, localT, settings) {
-  const theme = settings.theme;
-  drawEndRollBackground(ctx, seg, localT, settings);
+  const vign = ctx.createRadialGradient(
+    CANVAS_W / 2,
+    CANVAS_H / 2,
+    CANVAS_H * 0.3,
+    CANVAS_W / 2,
+    CANVAS_H / 2,
+    CANVAS_H * 0.78
+  );
+  vign.addColorStop(0, "rgba(0,0,0,0)");
+  vign.addColorStop(1, "rgba(0,0,0,0.12)");
+  ctx.fillStyle = vign;
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+  ctx.save();
+  ctx.strokeStyle = paper.accent;
+  ctx.globalAlpha = 0.55;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(30, 30, CANVAS_W - 60, CANVAS_H - 60);
+  ctx.restore();
 
   ctx.save();
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
-  const visibleFrom = -80;
-  const visibleTo = CANVAS_H + 80;
-  let y = CANVAS_H - localT * seg.scrollSpeed;
-
-  ctx.font = "600 40px serif";
-  ctx.fillStyle = theme.text;
-  if (y > visibleFrom && y < visibleTo) ctx.fillText(seg.headerLine1, CANVAS_W / 2, y);
-  y += ENDROLL_HEADER_LINE_GAP;
-  if (seg.headerLine2) {
-    ctx.font = "300 24px serif";
-    if (y > visibleFrom && y < visibleTo) ctx.fillText(seg.headerLine2, CANVAS_W / 2, y);
-  }
-  y += ENDROLL_HEADER_TO_ENTRIES_GAP;
-
-  let prevGroup = null;
-  seg.entries.forEach((entry) => {
-    const group = (entry.group || "").trim();
-    if (group && group !== prevGroup) {
-      y += ENDROLL_GROUP_GAP_BEFORE;
-      ctx.font = "700 32px serif";
-      ctx.fillStyle = theme.text;
-      if (y > visibleFrom && y < visibleTo) ctx.fillText(group, CANVAS_W / 2, y);
-      y += ENDROLL_GROUP_HEADING_GAP;
+  if (seg.isHeaderPage) {
+    ctx.font = "700 46px serif";
+    ctx.fillStyle = paper.ink;
+    ctx.fillText(seg.headerLine1, CANVAS_W / 2, CANVAS_H / 2 - (seg.headerLine2 ? 26 : 0));
+    if (seg.headerLine2) {
+      ctx.font = "300 26px serif";
+      ctx.fillText(seg.headerLine2, CANVAS_W / 2, CANVAS_H / 2 + 30);
     }
-    prevGroup = group;
+    ctx.restore();
+    return;
+  }
 
+  let y = 120;
+
+  if (seg.photo) {
+    const photoX = CANVAS_W / 2 - ENDROLL_PAGE_PHOTO_W / 2;
+    const photoY = y;
+    ctx.save();
+    ctx.fillStyle = "#ffffff";
+    ctx.shadowColor = "rgba(0,0,0,0.3)";
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetY = 8;
+    const border = 10;
+    ctx.fillRect(photoX - border, photoY - border, ENDROLL_PAGE_PHOTO_W + border * 2, ENDROLL_PAGE_PHOTO_H + border * 2);
+    ctx.restore();
+    ensureEndRollVideoPlaying(seg.photo);
+    drawCoverZoomPhoto(ctx, endRollPhotoImg(seg.photo), 0.5, 0, photoX, photoY, ENDROLL_PAGE_PHOTO_W, ENDROLL_PAGE_PHOTO_H);
+    y += ENDROLL_PAGE_PHOTO_H + ENDROLL_PAGE_PHOTO_GAP;
+  }
+
+  if (seg.group) {
+    ctx.font = "700 38px serif";
+    ctx.fillStyle = paper.ink;
+    ctx.fillText(seg.group + (seg.isContinuation ? "（つづき）" : ""), CANVAS_W / 2, y);
+    y += 26;
+    ctx.strokeStyle = paper.accent;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(CANVAS_W / 2 - 70, y);
+    ctx.lineTo(CANVAS_W / 2 + 70, y);
+    ctx.stroke();
+    y += ENDROLL_PAGE_GROUP_HEADING_GAP;
+  } else {
+    y += 20;
+  }
+
+  seg.entries.forEach((entry) => {
     ctx.font = "600 30px serif";
-    ctx.fillStyle = theme.accent;
-    if (entry.name && y > visibleFrom && y < visibleTo) ctx.fillText(entry.name, CANVAS_W / 2, y);
+    ctx.fillStyle = paper.accent;
+    if (entry.name) ctx.fillText(entry.name, CANVAS_W / 2, y);
     y += ENDROLL_NAME_GAP;
 
     ctx.font = "300 24px serif";
-    ctx.fillStyle = theme.text;
+    ctx.fillStyle = paper.ink;
     const lines = entry.message ? wrapText(ctx, entry.message, ENDROLL_MAX_TEXT_WIDTH) : [];
     lines.forEach((line) => {
-      if (y > visibleFrom && y < visibleTo) ctx.fillText(line, CANVAS_W / 2, y);
+      ctx.fillText(line, CANVAS_W / 2, y);
       y += ENDROLL_MESSAGE_LINE_HEIGHT;
     });
     y += ENDROLL_ENTRY_GAP;
@@ -2032,8 +2117,8 @@ function drawSegment(ctx, seg, localT, settings) {
     drawImpactCard(ctx, seg, localT, settings);
   } else if (seg.type === "countdown-number") {
     drawCountdownNumber(ctx, seg, localT, settings);
-  } else if (seg.type === "endroll") {
-    drawEndRoll(ctx, seg, localT, settings);
+  } else if (seg.type === "endroll-page") {
+    drawEndRollPage(ctx, seg, localT, settings);
   } else {
     drawPhoto(ctx, seg, localT, settings);
   }
@@ -2362,17 +2447,14 @@ async function renderVideo({ audioFiles, beatSyncCutDuration, onProgress } = {})
         // 何もしない（サムネイル表示が先頭フレームに戻らないだけ）
       }
     }
-    if (seg.type === "endroll") {
-      (seg.photos || []).forEach((photo) => {
-        if (photo.kind !== "video") return;
-        photo.videoEl.pause();
-        photo._bgStarted = false;
-        try {
-          photo.videoEl.currentTime = 0;
-        } catch (err) {
-          // 何もしない（サムネイル表示が先頭フレームに戻らないだけ）
-        }
-      });
+    if (seg.type === "endroll-page" && seg.photo && seg.photo.kind === "video") {
+      seg.photo.videoEl.pause();
+      seg.photo._bgStarted = false;
+      try {
+        seg.photo.videoEl.currentTime = 0;
+      } catch (err) {
+        // 何もしない（サムネイル表示が先頭フレームに戻らないだけ）
+      }
     }
   });
   return blob;

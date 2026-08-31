@@ -12,7 +12,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob:; media-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none';" />
   <meta http-equiv="Referrer-Policy" content="no-referrer" />
 
-  <link rel="stylesheet" href="style.css?v=19" />
+  <link rel="stylesheet" href="style.css?v=20" />
 </head>
 <body>
   <header class="app-header">
@@ -34,7 +34,7 @@
         </label>
         <label class="template-option">
           <input type="radio" name="template" value="endroll" />
-          <span><strong>エンドロール</strong><br />映画のように、来賓の方々へのメッセージが下から上へ流れるムービー</span>
+          <span><strong>エンドロール</strong><br />本のページをめくるように、来賓の方々へのメッセージが1ページずつ流れるムービー</span>
         </label>
       </div>
     </section>
@@ -257,7 +257,7 @@
         <label>日付・会場など（任意）
           <input id="endroll-date-text" type="text" placeholder="例: 2026.10.10" />
         </label>
-        <label>テーマカラー
+        <label>紙の色味
           <select id="endroll-theme">
             <option value="pink">ピンク×ゴールド</option>
             <option value="navy">ネイビー×ゴールド</option>
@@ -270,7 +270,7 @@
         <label>見出し2行目（任意）
           <input id="endroll-header-line2" type="text" placeholder="例: 支えてくださった皆様へ" />
         </label>
-        <label>スクロール速度
+        <label>ページを開いておく時間
           <select id="endroll-speed">
             <option value="slow">遅い（じっくり読める）</option>
             <option value="normal" selected>標準</option>
@@ -279,23 +279,24 @@
         </label>
       </div>
       <p class="hint">
-        最初にお二人の名前のタイトルカードが表示された後、見出しに続けて来賓の方々への
-        メッセージが映画のエンドロールのように下から上へスクロールします。
+        最初にお二人の名前のタイトルカードが表示された後、見出しのページに続けて、
+        本のページをめくるように来賓の方々へのメッセージが1ページずつ表示されます。
       </p>
     </section>
 
-    <!-- エンドロール: 背景写真 -->
+    <!-- エンドロール: ページの写真 -->
     <section class="panel hidden" id="endroll-photos-section">
-      <h2>2. 背景に使う写真を追加（任意）</h2>
+      <h2>2. ページに使う写真を追加（任意）</h2>
       <div id="endroll-dropzone" class="dropzone">
         <p>ここに写真をドラッグ＆ドロップ<br />またはクリックして選択</p>
         <input id="endroll-file-input" type="file" accept="image/*,video/*" multiple hidden />
       </div>
       <p class="hint">
-        追加すると、来賓へのメッセージが流れる間、背景でKen Burns風にゆっくり切り替わりながら
-        ループ再生されます（文字を読みやすくするため暗めの半透明フィルターを重ねます）。
-        写真を追加しない場合はテーマカラーの背景になります。ここでのキャプション・詳細設定
-        （文字サイズ・エフェクト・表示サイズ）は背景には使用されません。
+        追加すると、グループ（見出し）ごとの最初のページに、写真が1枚ずつ順番に貼り付けた
+        ように表示されます（グループの数より写真が多い場合は使い切れない分があり、
+        少ない場合は繰り返し使われます）。追加しない場合は写真なしのページになります。
+        ここでのキャプション・詳細設定（文字サイズ・エフェクト・表示サイズ）はページには
+        使用されません。
       </p>
       <div id="endroll-photo-grid" class="photo-grid"></div>
     </section>
@@ -304,10 +305,12 @@
     <section class="panel hidden" id="endroll-messages-section">
       <h2>3. 来賓へのメッセージを追加</h2>
       <p class="hint">
-        お一人ずつ、お名前とメッセージを入力してください（メッセージは任意）。並び順はドラッグして
-        入れ替えられます。「グループ」欄に「新郎友人」「新婦友人」「ご親族」などと入力すると、
-        同じグループ名が連続する行の先頭にまとめて見出しが表示されます（グループごとに
-        まとめたい場合は、ドラッグで同じグループの行を隣り合わせにしてください）。
+        お一人ずつ、お名前とメッセージを入力してください（メッセージは任意）。「グループ」欄に
+        「新郎友人」「新婦友人」「ご親族」などと入力すると、同じグループ名の行は（並び順に
+        関係なく）まとめて1ページになり、そのグループ名が見出しとして表示されます。ページの
+        順番は、グループ名が最初に登場した行の順序になります。1ページに収まりきらない
+        場合は自動で「（つづき）」ページに分かれます。グループ欄が空欄の行は、同じく空欄の
+        行同士でまとめて見出しなしのページになります。
       </p>
       <div id="guest-message-list" class="guest-message-list"></div>
       <button id="add-guest-message-btn" class="ghost-btn" type="button">＋ メッセージを追加</button>
@@ -399,6 +402,6 @@
     </p>
   </footer>
 
-  <script src="app.js?v=19"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>
