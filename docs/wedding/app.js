@@ -45,6 +45,7 @@ const BEAT_MAX_BPM = 180;
 
 const MAX_GUEST_MESSAGES = 100;
 const MAX_GUEST_NAME_LENGTH = 30;
+const MAX_GUEST_GROUP_LENGTH = 20;
 const MAX_GUEST_MESSAGE_LENGTH = 200;
 const ENDROLL_SPEED_MAP = { slow: 40, normal: 60, fast: 90 };
 
@@ -844,6 +845,22 @@ function renderGuestMessageList() {
     badge.textContent = String(index + 1);
     top.appendChild(badge);
 
+    // グループ名（任意）。同じグループ名の行が連続していると、エンドロールに
+    // その名前の見出しがまとめて1回だけ表示される（並び順はドラッグで調整）。
+    const groupInput = document.createElement("input");
+    groupInput.type = "text";
+    groupInput.className = "guest-group-input";
+    groupInput.placeholder = "グループ（任意）";
+    groupInput.maxLength = MAX_GUEST_GROUP_LENGTH;
+    groupInput.value = entry.group || "";
+    groupInput.draggable = false;
+    groupInput.title = "例: 新郎友人、新婦友人、ご親族など。同じグループ名が連続する行はまとめて見出しが表示されます";
+    groupInput.addEventListener("input", () => {
+      entry.group = groupInput.value;
+      updateDurationEstimate();
+    });
+    top.appendChild(groupInput);
+
     const nameInput = document.createElement("input");
     nameInput.type = "text";
     nameInput.className = "guest-name-input";
@@ -914,7 +931,7 @@ function addGuestMessage() {
     alert(`メッセージは最大${MAX_GUEST_MESSAGES}件まで追加できます`);
     return;
   }
-  state.guestMessages.push({ id: state.nextGuestMessageId++, name: "", message: "" });
+  state.guestMessages.push({ id: state.nextGuestMessageId++, name: "", group: "", message: "" });
   renderGuestMessageList();
   updateDurationEstimate();
 }
@@ -1117,13 +1134,22 @@ const ENDROLL_HEADER_TO_ENTRIES_GAP = 110; // 見出し → 最初の来賓メ�
 const ENDROLL_NAME_GAP = 44;
 const ENDROLL_MESSAGE_LINE_HEIGHT = 32;
 const ENDROLL_ENTRY_GAP = 56;
+const ENDROLL_GROUP_GAP_BEFORE = 30; // 直前の内容とグループ見出しの間
+const ENDROLL_GROUP_HEADING_GAP = 50; // グループ見出しと、そのグループ最初の名前の間
 
 // エンドロール本編（スクロールする内容全体）の高さをあらかじめ計算する。
 // 実際に描画はせず、計測専用に既存のオフスクリーンcanvasのcontextを流用する。
 function measureEndRollContentHeight(settings) {
   const ctx = transitionCtxA;
   let height = ENDROLL_HEADER_LINE_GAP + ENDROLL_HEADER_TO_ENTRIES_GAP;
+  let prevGroup = null;
   settings.guestMessages.forEach((entry) => {
+    const group = (entry.group || "").trim();
+    if (group && group !== prevGroup) {
+      height += ENDROLL_GROUP_GAP_BEFORE + ENDROLL_GROUP_HEADING_GAP;
+    }
+    prevGroup = group;
+
     height += ENDROLL_NAME_GAP;
     ctx.font = "300 24px serif";
     const lines = entry.message ? wrapText(ctx, entry.message, ENDROLL_MAX_TEXT_WIDTH) : [];
@@ -1969,7 +1995,18 @@ function drawEndRoll(ctx, seg, localT, settings) {
   }
   y += ENDROLL_HEADER_TO_ENTRIES_GAP;
 
+  let prevGroup = null;
   seg.entries.forEach((entry) => {
+    const group = (entry.group || "").trim();
+    if (group && group !== prevGroup) {
+      y += ENDROLL_GROUP_GAP_BEFORE;
+      ctx.font = "700 32px serif";
+      ctx.fillStyle = theme.text;
+      if (y > visibleFrom && y < visibleTo) ctx.fillText(group, CANVAS_W / 2, y);
+      y += ENDROLL_GROUP_HEADING_GAP;
+    }
+    prevGroup = group;
+
     ctx.font = "600 30px serif";
     ctx.fillStyle = theme.accent;
     if (entry.name && y > visibleFrom && y < visibleTo) ctx.fillText(entry.name, CANVAS_W / 2, y);
@@ -2491,7 +2528,7 @@ function collectDraftData() {
       fileName: t.file.name,
       fileType: t.file.type,
     })),
-    guestMessages: state.guestMessages.map((g) => ({ name: g.name, message: g.message })),
+    guestMessages: state.guestMessages.map((g) => ({ name: g.name, group: g.group, message: g.message })),
   };
 }
 
@@ -2554,6 +2591,7 @@ async function restoreDraftData(data) {
   state.guestMessages = (data.guestMessages || []).map((g) => ({
     id: state.nextGuestMessageId++,
     name: g.name || "",
+    group: g.group || "",
     message: g.message || "",
   }));
   renderGuestMessageList();
