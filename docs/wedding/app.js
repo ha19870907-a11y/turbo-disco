@@ -305,7 +305,7 @@ function capImageSize(img) {
 // 写真の追加・並べ替え・キャプション入力・削除をまとめたUIコンポーネント。
 // スタンダードの単一グループと、オープニング演出の新郎/新婦/2人パートの
 // 3グループで同じロジックを使い回す。
-function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
+function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange, endrollGroupField = false }) {
   const group = { photos: [], nextId: 1 };
 
   function render() {
@@ -412,6 +412,31 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
         photo.caption = captionInput.value;
       });
       item.appendChild(captionInput);
+
+      if (endrollGroupField) {
+        // この写真を、来賓メッセージの特定の「グループ」ページの背景専用にしたい場合の指定欄。
+        // 来賓メッセージのグループ欄と同じ名前を入れると、そのグループのページ（つづきページも
+        // 含む）すべての背景にこの写真が使われる。空欄の写真は、専用の写真が無いグループに
+        // これまで通り順番に割り当てられる。
+        const bgGroupLabel = document.createElement("label");
+        bgGroupLabel.className = "photo-field-label";
+        bgGroupLabel.textContent = "背景にするグループ";
+        const bgGroupInput = document.createElement("input");
+        bgGroupInput.type = "text";
+        bgGroupInput.className = "photo-field-input";
+        bgGroupInput.placeholder = "未指定（順番に自動割り当て）";
+        bgGroupInput.maxLength = MAX_GUEST_GROUP_LENGTH;
+        bgGroupInput.value = photo.endrollGroup || "";
+        bgGroupInput.draggable = false;
+        bgGroupInput.setAttribute("list", "guest-group-suggestions");
+        bgGroupInput.title = "来賓メッセージの「グループ」欄と同じ名前を入れると、そのグループのページの背景にこの写真が使われます";
+        bgGroupInput.addEventListener("input", () => {
+          photo.endrollGroup = bgGroupInput.value;
+          onChange();
+        });
+        bgGroupLabel.appendChild(bgGroupInput);
+        item.appendChild(bgGroupLabel);
+      }
 
       // 詳細設定（この写真だけの文字サイズ・エフェクト・表示サイズの上書き）。
       // 空欄／「共通」のときは共通設定に従う。
@@ -572,6 +597,7 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
             captionFontSize: null,
             captionFade: null,
             displayScale: null,
+            endrollGroup: "",
             ...videoItem,
           });
           videoCount++;
@@ -600,6 +626,7 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
           captionFontSize: null,
           captionFade: null,
           displayScale: null,
+          endrollGroup: "",
         });
       } catch (err) {
         skippedInvalid++;
@@ -662,6 +689,7 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
             captionFontSize: saved.captionFontSize != null ? saved.captionFontSize : null,
             captionFade: saved.captionFade || null,
             displayScale: saved.displayScale != null ? saved.displayScale : null,
+            endrollGroup: saved.endrollGroup || "",
             ...videoItem,
             clipSeconds: Math.min(saved.clipSeconds || videoItem.clipSeconds, maxAllowed),
           });
@@ -684,6 +712,7 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
             captionFontSize: saved.captionFontSize != null ? saved.captionFontSize : null,
             captionFade: saved.captionFade || null,
             displayScale: saved.displayScale != null ? saved.displayScale : null,
+            endrollGroup: saved.endrollGroup || "",
           });
         } catch (err) {
           URL.revokeObjectURL(url);
@@ -728,6 +757,7 @@ const endrollGroup = createPhotoGroup({
   dropzoneEl: els.endrollDropzone,
   fileInputEl: els.endrollFileInput,
   onChange: () => updateDurationEstimate(),
+  endrollGroupField: true,
 });
 
 document.querySelectorAll('input[name="template"]').forEach((radio) => {
@@ -1194,16 +1224,32 @@ function buildEndRollPages(settings) {
     }
   });
 
+  // 写真ごとに「背景にするグループ」が指定されていれば、そのグループ名と一致する
+  // ページ（つづきページも含む）すべての背景にその写真を使う。グループ未指定の
+  // 写真は、これまで通り順番に、専用の写真が無いグループの最初のページにだけ
+  // 割り当てる。
   const photos = settings.endrollPhotos || [];
-  if (photos.length > 0) {
-    let photoIndex = 0;
-    pages.forEach((page) => {
-      if (!page.isContinuation) {
-        page.photo = photos[photoIndex % photos.length];
-        photoIndex++;
-      }
-    });
-  }
+  const targetedByGroup = new Map();
+  const untargeted = [];
+  photos.forEach((photo) => {
+    const key = (photo.endrollGroup || "").trim();
+    if (key && !targetedByGroup.has(key)) {
+      targetedByGroup.set(key, photo);
+    } else if (!key) {
+      untargeted.push(photo);
+    }
+  });
+
+  let untargetedIndex = 0;
+  pages.forEach((page) => {
+    const targeted = page.group && targetedByGroup.get(page.group);
+    if (targeted) {
+      page.photo = targeted;
+    } else if (!page.isContinuation && untargeted.length > 0) {
+      page.photo = untargeted[untargetedIndex % untargeted.length];
+      untargetedIndex++;
+    }
+  });
 
   return pages;
 }
@@ -2640,6 +2686,7 @@ function collectGroupDraftItems(group) {
       captionFontSize: p.captionFontSize,
       captionFade: p.captionFade,
       displayScale: p.displayScale,
+      endrollGroup: p.endrollGroup || "",
     }));
 }
 
