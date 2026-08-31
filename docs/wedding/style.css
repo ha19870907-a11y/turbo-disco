@@ -449,7 +449,8 @@ main {
 }
 
 .guest-group-input {
-  flex: 0 0 110px;
+  flex: 0 1 90px;
+  min-width: 55px;
   font: inherit;
   font-size: 0.78rem;
   padding: 6px 8px;
@@ -459,7 +460,8 @@ main {
 }
 
 .guest-name-input {
-  flex: 1;
+  flex: 1 1 80px;
+  min-width: 0;
   font: inherit;
   padding: 6px 8px;
   border: 1px solid var(--border);
