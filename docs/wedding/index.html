@@ -12,7 +12,15 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob:; media-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none';" />
   <meta http-equiv="Referrer-Policy" content="no-referrer" />
 
-  <link rel="stylesheet" href="style.css?v=20" />
+  <!-- HTML本体（このファイル自体）がスマホのブラウザにキャッシュされ続けると、
+       app.js/style.cssの?v=番号を上げても、キャッシュされた古いHTMLが古い番号の
+       URLを参照し続けてしまい、更新が反映されない場合がある。念のためHTTP経由の
+       キャッシュも避けるよう明示しておく（対応状況はブラウザ依存の保険的対策）。 -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+
+  <link rel="stylesheet" href="style.css?v=21" />
 </head>
 <body>
   <header class="app-header">
@@ -402,6 +410,6 @@
     </p>
   </footer>
 
-  <script src="app.js?v=20"></script>
+  <script src="app.js?v=21"></script>
 </body>
 </html>
