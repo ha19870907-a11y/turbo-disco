@@ -20,7 +20,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
 
-  <link rel="stylesheet" href="style.css?v=23" />
+  <link rel="stylesheet" href="style.css?v=24" />
 </head>
 <body>
   <header class="app-header">
@@ -289,6 +289,8 @@
       <p class="hint">
         最初にお二人の名前のタイトルカードが表示された後、見出しのページに続けて、
         本のページをめくるように来賓の方々へのメッセージが1ページずつ表示されます。
+        お名前とメッセージは1人ずつ順番にタイピングされるように表示されます
+        （タイピングの速さは「ページを開いておく時間」の設定に合わせて変わります）。
       </p>
     </section>
 
@@ -300,9 +302,9 @@
         <input id="endroll-file-input" type="file" accept="image/*,video/*" multiple hidden />
       </div>
       <p class="hint">
-        追加すると、グループ（見出し）ごとの最初のページに、写真が1枚ずつ順番に貼り付けた
-        ように表示されます（グループの数より写真が多い場合は使い切れない分があり、
-        少ない場合は繰り返し使われます）。追加しない場合は写真なしのページになります。
+        追加すると、グループ（見出し）ごとの最初のページで、写真がページ全体の背景として
+        表示されます（グループの数より写真が多い場合は使い切れない分があり、少ない場合は
+        繰り返し使われます）。追加しない場合は紙の質感の背景のページになります。
         ここでのキャプション・詳細設定（文字サイズ・エフェクト・表示サイズ）はページには
         使用されません。
       </p>
@@ -410,6 +412,6 @@
     </p>
   </footer>
 
-  <script src="app.js?v=23"></script>
+  <script src="app.js?v=24"></script>
 </body>
 </html>
