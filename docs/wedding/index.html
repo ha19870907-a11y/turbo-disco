@@ -20,7 +20,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
 
-  <link rel="stylesheet" href="style.css?v=32" />
+  <link rel="stylesheet" href="style.css?v=33" />
 </head>
 <body>
   <header class="app-header">
@@ -30,7 +30,7 @@
 
   <main>
     <section class="panel">
-      <h2>0. テンプレートを選ぶ</h2>
+      <h2><span class="step-badge">1</span>テンプレートを選ぶ</h2>
       <div class="template-toggle">
         <label class="template-option">
           <input type="radio" name="template" value="standard" checked />
@@ -48,7 +48,7 @@
     </section>
 
     <section class="panel" id="draft-section">
-      <h2>📝 下書きの保存・復元</h2>
+      <h2><span class="step-icon">📝</span>下書きの保存・復元</h2>
       <p class="hint">
         写真・動画・入力した文章は、ブラウザを閉じたりページを再読み込みすると消えてしまいます。
         作業を中断する前にここで一時保存しておくと、次回このページを開いたときに続きから再開できます
@@ -65,7 +65,7 @@
 
     <!-- スタンダード: 写真 -->
     <section class="panel" id="standard-photos-section">
-      <h2>1. 写真・動画を追加</h2>
+      <h2><span class="step-badge">2</span>写真・動画を追加</h2>
       <div id="dropzone" class="dropzone">
         <p>ここに写真・動画をドラッグ＆ドロップ<br />またはクリックして選択</p>
         <input id="file-input" type="file" accept="image/*,video/*" multiple hidden />
@@ -76,7 +76,7 @@
 
     <!-- スタンダード: タイトル設定 -->
     <section class="panel" id="standard-settings-section">
-      <h2>2. タイトル・演出設定</h2>
+      <h2><span class="step-badge">3</span>タイトル・演出設定</h2>
       <div class="form-grid">
         <label>新郎・新婦の名前
           <input id="title1" type="text" placeholder="例: 太郎" />
@@ -145,7 +145,7 @@
 
     <!-- オープニング演出: 設定 -->
     <section class="panel hidden" id="opening-section">
-      <h2>1. オープニング演出の設定</h2>
+      <h2><span class="step-badge">2</span>オープニング演出の設定</h2>
       <div class="form-grid">
         <label>新郎の名前（英字推奨）
           <input id="op-groom-name" type="text" placeholder="TARO" />
@@ -227,7 +227,7 @@
 
     <!-- オープニング演出: 写真（パートごと） -->
     <section class="panel hidden" id="opening-photos-section">
-      <h2>2. 写真・動画を追加（パートごと）</h2>
+      <h2><span class="step-badge">3</span>写真・動画を追加（パートごと）</h2>
       <p class="hint">各パートに写真・動画をまとめて追加できます。動画は「使用秒数」欄でムービー内で使う長さ（最大15秒）を調整できます。動画自体の音声は収録されません（BGMのみ収録）。</p>
 
       <h3>新郎パート</h3>
@@ -254,7 +254,7 @@
 
     <!-- エンドロール: 設定 -->
     <section class="panel hidden" id="endroll-section">
-      <h2>1. エンドロールの設定</h2>
+      <h2><span class="step-badge">2</span>エンドロールの設定</h2>
       <div class="form-grid">
         <label>新郎・新婦の名前
           <input id="endroll-title1" type="text" placeholder="例: 太郎" />
@@ -296,7 +296,7 @@
 
     <!-- エンドロール: ページの写真 -->
     <section class="panel hidden" id="endroll-photos-section">
-      <h2>2. ページに使う写真を追加（任意）</h2>
+      <h2><span class="step-badge">3</span>ページに使う写真を追加（任意）</h2>
       <div id="endroll-dropzone" class="dropzone">
         <p>ここに写真をドラッグ＆ドロップ<br />またはクリックして選択</p>
         <input id="endroll-file-input" type="file" accept="image/*,video/*" multiple hidden />
@@ -322,7 +322,7 @@
 
     <!-- エンドロール: 来賓メッセージ -->
     <section class="panel hidden" id="endroll-messages-section">
-      <h2>3. 来賓へのメッセージを追加</h2>
+      <h2><span class="step-badge">4</span>来賓へのメッセージを追加</h2>
       <p class="hint">
         お一人ずつ、お名前とメッセージを入力してください（メッセージは任意）。「グループ」欄に
         「新郎友人」「新婦友人」「ご親族」などと直接入力すると、同じグループ名の行は
@@ -335,8 +335,8 @@
       <button id="add-guest-message-btn" class="ghost-btn" type="button">＋ メッセージを追加</button>
     </section>
 
-    <section class="panel">
-      <h2>3. ムービーを作成</h2>
+    <section class="panel panel-cta">
+      <h2><span class="step-icon">🎬</span>ムービーを作成</h2>
       <p id="duration-estimate" class="hint"></p>
       <button id="create-btn" class="primary-btn" type="button">ムービーを作成（音声なし）</button>
       <div id="progress-box" class="progress-box hidden">
@@ -358,8 +358,8 @@
       </div>
     </section>
 
-    <section id="bgm-section" class="panel disabled">
-      <h2>4. BGMを追加</h2>
+    <section id="bgm-section" class="panel panel-cta disabled">
+      <h2><span class="step-icon">🎵</span>BGMを追加</h2>
       <p class="hint">先に音声なしムービーを作成すると、この欄が使えるようになります。動画と同じ長さで書き出し直します。複数曲を選ぶと選んだ順にクロスフェードしながら再生し、動画の長さに足りない分は自動で繰り返します（末尾はフェードアウトします）。</p>
       <p class="hint">
         スマホで音楽ファイルを選ぶ画面がうまく開かない場合は、LINEなど他のアプリ内で開いたリンクではなく、
@@ -421,6 +421,6 @@
     </p>
   </footer>
 
-  <script src="app.js?v=32"></script>
+  <script src="app.js?v=33"></script>
 </body>
 </html>
