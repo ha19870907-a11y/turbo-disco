@@ -34,6 +34,14 @@ npm run post:thread -- "投稿したいテキスト"
 `.github/workflows/daily-thread.yml` が毎日 **8:00・13:00・20:00(JST)** の3回、順番に自動投稿します。
 投稿文を追加・編集したい場合は `thread-topics.json` を直接編集してください（500文字以内）。
 
+### コメントへの自動返信
+
+`.github/workflows/reply-to-comments.yml` が20分おきに、自分の投稿についた新しいコメントを確認し、
+Claude(Anthropic API)が内容を読んで自動で返信します（`scripts/reply-to-comments.js`）。
+具体的な金額・法律要件などを断定的に答えないよう、システムプロンプトでガードレールを設けています。
+返信済みのコメントIDは `replied-comments.json` に記録し、二重返信を防ぎます。
+利用には `ANTHROPIC_API_KEY` と、Threads側の `threads_manage_replies` / `threads_read_replies` 権限が必要です。
+
 ### noteの記事下書きの週次自動生成
 
 noteには公式の投稿APIが無いため自動投稿はしていませんが、記事の下書きだけは自動化できます。
