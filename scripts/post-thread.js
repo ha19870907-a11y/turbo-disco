@@ -34,6 +34,9 @@ async function postToThreads(text, { userId, accessToken } = {}) {
     throw new Error(`投稿の作成に失敗しました: ${JSON.stringify(createBody)}`);
   }
 
+  // コンテナ作成直後は公開に失敗することがあるため、少し待ってから公開する。
+  await new Promise((resolve) => setTimeout(resolve, 5000));
+
   const publishUrl = new URL(`${API_BASE}/${userId}/threads_publish`);
   publishUrl.searchParams.set('creation_id', createBody.id);
   publishUrl.searchParams.set('access_token', accessToken);
