@@ -11,6 +11,13 @@
 
   var STORAGE_KEY = "activegym_reservations";
   var MEMBER_KEY = "activegym_member";
+  var MEMBERS_KEY = "activegym_members";
+
+  var SEED_MEMBERS = [
+    { id: "seed1", lastName: "佐藤", firstName: "健太", lastKana: "サトウ", firstKana: "ケンタ", gender: "male", birthLabel: "1992年4月10日", email: "kenta.sato@example.com", joinedAt: "2026-06-02" },
+    { id: "seed2", lastName: "鈴木", firstName: "美咲", lastKana: "スズキ", firstKana: "ミサキ", gender: "female", birthLabel: "1998年11月23日", email: "misaki.suzuki@example.com", joinedAt: "2026-07-15" },
+    { id: "seed3", lastName: "高橋", firstName: "陸", lastKana: "タカハシ", firstKana: "リク", gender: "male", birthLabel: "1985年1月5日", email: "riku.takahashi@example.com", joinedAt: "2026-08-20" }
+  ];
 
   var state = {
     store: null,
@@ -67,6 +74,24 @@
     return localStorage.getItem(MEMBER_KEY) === "1";
   }
 
+  function loadMembers() {
+    try {
+      return JSON.parse(localStorage.getItem(MEMBERS_KEY) || "[]");
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveMembers(list) {
+    localStorage.setItem(MEMBERS_KEY, JSON.stringify(list));
+  }
+
+  function ensureSeedMembers() {
+    if (!localStorage.getItem(MEMBERS_KEY)) {
+      saveMembers(SEED_MEMBERS);
+    }
+  }
+
   function toast(msg) {
     var el = document.getElementById("toast");
     el.textContent = msg;
@@ -76,12 +101,13 @@
   }
 
   // ---------- navigation ----------
-  var SCREEN_IDS = ["home", "trial-store", "trial-datetime", "trial-confirm", "trial-done", "join", "join-done", "schedule"];
+  var SCREEN_IDS = ["home", "trial-store", "trial-datetime", "trial-confirm", "trial-done", "join", "join-done", "schedule", "admin"];
   var NAV_GROUP = {
     "home": "home",
     "join": "join", "join-done": "join",
     "trial-store": "trial-store", "trial-datetime": "trial-store", "trial-confirm": "trial-store", "trial-done": "trial-store",
-    "schedule": "schedule"
+    "schedule": "schedule",
+    "admin": "admin"
   };
   var TITLES = {
     "trial-store": "体験予約 - 店舗選択",
@@ -90,7 +116,8 @@
     "trial-done": "体験予約 完了",
     "join": "会員登録",
     "join-done": "登録完了",
-    "schedule": "スケジュール管理"
+    "schedule": "スケジュール管理",
+    "admin": "管理画面（スタッフ用）"
   };
 
   function show(screenId, opts) {
@@ -151,6 +178,7 @@
     if (screenId === "trial-confirm") renderConfirm();
     if (screenId === "schedule") renderSchedule();
     if (screenId === "join") prefillJoinDates();
+    if (screenId === "admin") renderAdmin();
   }
 
   function renderHome() {
@@ -271,6 +299,61 @@
     });
   }
 
+  function renderAdmin() {
+    var members = loadMembers();
+    var reservations = loadReservations();
+
+    document.getElementById("statMembers").textContent = members.length;
+    document.getElementById("statReservations").textContent = reservations.length;
+    document.getElementById("statStores").textContent = STORES.length;
+
+    var memberWrap = document.getElementById("memberList");
+    if (!members.length) {
+      memberWrap.innerHTML = '<div class="empty-note">会員が登録されるとここに表示されます。</div>';
+    } else {
+      var sorted = members.slice().sort(function (a, b) { return (b.joinedAt || "").localeCompare(a.joinedAt || ""); });
+      memberWrap.innerHTML = sorted.map(function (m) {
+        var genderLabel = m.gender === "male" ? "男性" : (m.gender === "female" ? "女性" : "回答なし");
+        return (
+          '<div class="member-card">' +
+          '  <div class="name-row"><span class="name">' + m.lastName + ' ' + m.firstName + '</span><span class="kana">（' + m.lastKana + ' ' + m.firstKana + '）</span></div>' +
+          '  <div class="meta">' +
+          '    <span>性別: <b>' + genderLabel + '</b></span>' +
+          '    <span>生年月日: <b>' + m.birthLabel + '</b></span><br>' +
+          '    <span>メール: <b>' + m.email + '</b></span>' +
+          '    <span>登録日: <b>' + m.joinedAt + '</b></span>' +
+          '  </div>' +
+          '</div>'
+        );
+      }).join("");
+    }
+
+    var resWrap = document.getElementById("adminResList");
+    if (!reservations.length) {
+      resWrap.innerHTML = '<div class="empty-note">現在、体験予約はありません。</div>';
+    } else {
+      var sortedRes = reservations.slice().sort(function (a, b) { return a.sortKey - b.sortKey; });
+      resWrap.innerHTML = "";
+      sortedRes.forEach(function (r) {
+        var card = document.createElement("div");
+        card.className = "res-card";
+        card.innerHTML =
+          '<div class="top-row"><span class="res-tag trial">体験</span><span class="date-big">' + r.dateLabel + '</span></div>' +
+          '<div class="meta">' + r.storeName + '　' + r.time + '</div>' +
+          '<div class="actions"><button data-id="' + r.id + '">キャンセルする</button></div>';
+        card.querySelector("button").addEventListener("click", function () {
+          if (confirm("この予約をキャンセルしますか？")) {
+            var updated = loadReservations().filter(function (x) { return x.id !== r.id; });
+            saveReservations(updated);
+            renderAdmin();
+            toast("予約をキャンセルしました");
+          }
+        });
+        resWrap.appendChild(card);
+      });
+    }
+  }
+
   // ---------- join form ----------
   function prefillJoinDates() {
     var y = document.getElementById("birthYear");
@@ -338,6 +421,29 @@
         toast("利用規約への同意が必要です");
         return;
       }
+
+      var genderPill = document.querySelector("#genderPills .pill.selected");
+      var y = document.getElementById("birthYear").value;
+      var m = document.getElementById("birthMonth").value;
+      var d = document.getElementById("birthDay").value;
+      var birthLabel = (y && m && d) ? (y + "年" + m + "月" + d + "日") : "未回答";
+      var today = new Date();
+      var joinedAt = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
+
+      var members = loadMembers();
+      members.push({
+        id: "m" + Date.now(),
+        lastName: document.getElementById("lastName").value.trim(),
+        firstName: document.getElementById("firstName").value.trim(),
+        lastKana: document.getElementById("lastKana").value.trim(),
+        firstKana: document.getElementById("firstKana").value.trim(),
+        gender: genderPill ? genderPill.getAttribute("data-val") : "none",
+        birthLabel: birthLabel,
+        email: document.getElementById("joinEmail").value.trim(),
+        joinedAt: joinedAt
+      });
+      saveMembers(members);
+
       localStorage.setItem(MEMBER_KEY, "1");
       go("join-done");
     });
@@ -386,6 +492,7 @@
 
   // ---------- init ----------
   document.addEventListener("DOMContentLoaded", function () {
+    ensureSeedMembers();
     setupGlobalNav();
     setupTrial();
     setupJoin();

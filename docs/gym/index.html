@@ -58,6 +58,8 @@
           <div class="chev">›</div>
         </button>
       </div>
+
+      <button class="staff-link" data-go="admin">🛠️ スタッフの方はこちら（管理画面）</button>
     </section>
 
     <!-- ============ TRIAL: STEP 1 STORE ============ -->
@@ -184,6 +186,32 @@
       <button class="btn btn-secondary" data-go="trial-store" style="margin-top:18px">＋ 体験を新しく予約する</button>
     </section>
 
+    <!-- ============ ADMIN (staff) ============ -->
+    <section class="screen" id="screen-admin">
+      <div class="admin-banner">🛠️ スタッフ用の管理画面です。会員・予約状況を確認できます。</div>
+
+      <div class="stat-grid">
+        <div class="stat-tile">
+          <div class="num" id="statMembers">0</div>
+          <div class="lbl">会員数</div>
+        </div>
+        <div class="stat-tile">
+          <div class="num" id="statReservations">0</div>
+          <div class="lbl">体験予約</div>
+        </div>
+        <div class="stat-tile">
+          <div class="num" id="statStores">0</div>
+          <div class="lbl">店舗数</div>
+        </div>
+      </div>
+
+      <div class="section-head" style="margin-top:0"><span class="badge admin-badge">👥</span>会員一覧</div>
+      <div id="memberList"></div>
+
+      <div class="section-head"><span class="badge admin-badge">📋</span>体験予約一覧</div>
+      <div id="adminResList"></div>
+    </section>
+
   </main>
 
   <!-- Bottom nav -->
@@ -192,6 +220,7 @@
     <button class="nav-btn" data-go="join"><span class="ic">📝</span><span class="lb">入会</span></button>
     <button class="nav-btn" data-go="trial-store"><span class="ic">🏋️</span><span class="lb">体験</span></button>
     <button class="nav-btn" data-go="schedule"><span class="ic">📅</span><span class="lb">スケジュール</span></button>
+    <button class="nav-btn" data-go="admin"><span class="ic">🛠️</span><span class="lb">管理</span></button>
   </nav>
 
   <div class="toast" id="toast"></div>
