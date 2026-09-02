@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ACTIVE GYM | 入会・体験・スケジュール管理</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- Top bar -->
+  <header class="topbar" id="topbar">
+    <button class="back-btn" id="backBtn" hidden>&#8249;</button>
+    <div class="brand"><span class="dot"></span>ACTIVE GYM</div>
+    <div class="title" id="topbarTitle" hidden></div>
+  </header>
+
+  <main>
+
+    <!-- ============ HOME ============ -->
+    <section class="screen" id="screen-home">
+      <div class="hero">
+        <h1>ようこそ、ACTIVE GYMへ</h1>
+        <p>入会・体験・予約の確認まで、ここから3ステップで完結します。</p>
+      </div>
+
+      <div class="box-list">
+        <button class="feature-box join" data-go="join">
+          <div class="icon">📝</div>
+          <div class="body">
+            <div class="kicker">MEMBERSHIP</div>
+            <div class="heading">入会（会員登録）</div>
+            <div class="desc">必要情報を1画面でまとめて入力。最短1分で登録できます。</div>
+            <div id="joinStatusPill"></div>
+          </div>
+          <div class="chev">›</div>
+        </button>
+
+        <button class="feature-box trial" data-go="trial-store">
+          <div class="icon">🏋️</div>
+          <div class="body">
+            <div class="kicker">TRIAL</div>
+            <div class="heading">体験（トライアル予約）</div>
+            <div class="desc">店舗・日時を選ぶだけ。空き枠数がひと目でわかります。</div>
+          </div>
+          <div class="chev">›</div>
+        </button>
+
+        <button class="feature-box schedule" data-go="schedule">
+          <div class="icon">📅</div>
+          <div class="body">
+            <div class="kicker">SCHEDULE</div>
+            <div class="heading">スケジュール管理</div>
+            <div class="desc">予約中の体験・レッスンを一覧で確認・キャンセル。</div>
+            <div id="scheduleStatusPill"></div>
+          </div>
+          <div class="chev">›</div>
+        </button>
+      </div>
+    </section>
+
+    <!-- ============ TRIAL: STEP 1 STORE ============ -->
+    <section class="screen" id="screen-trial-store">
+      <div class="progress-dots">
+        <div class="seg done"></div><div class="seg"></div><div class="seg"></div>
+      </div>
+      <div class="section-head"><span class="badge">1</span>店舗を選択してください</div>
+      <div id="storeList"></div>
+    </section>
+
+    <!-- ============ TRIAL: STEP 2 DATE/TIME ============ -->
+    <section class="screen" id="screen-trial-datetime">
+      <div class="progress-dots">
+        <div class="seg done"></div><div class="seg done"></div><div class="seg"></div>
+      </div>
+      <div class="section-head"><span class="badge">2</span>日付を選択してください</div>
+      <div class="date-tabs" id="dateTabs"></div>
+      <div class="section-head"><span class="badge">3</span>時間帯を選択してください</div>
+      <div class="slot-grid" id="slotGrid"></div>
+      <div style="margin-top:22px">
+        <button class="btn btn-primary" id="toConfirmBtn" disabled>この内容で確認する</button>
+      </div>
+    </section>
+
+    <!-- ============ TRIAL: STEP 3 CONFIRM ============ -->
+    <section class="screen" id="screen-trial-confirm">
+      <div class="progress-dots">
+        <div class="seg done"></div><div class="seg done"></div><div class="seg done"></div>
+      </div>
+      <div class="section-head"><span class="badge">✓</span>予約内容の確認</div>
+      <div class="summary-card" id="trialSummary"></div>
+      <div class="notice-box">体験予約は、当日の開始時刻の30分前までキャンセル可能です。無断キャンセルが続くと、体験予約をご利用いただけなくなる場合があります。</div>
+      <button class="btn btn-primary" id="confirmTrialBtn">体験予約を確定する</button>
+    </section>
+
+    <!-- ============ TRIAL: DONE ============ -->
+    <section class="screen" id="screen-trial-done">
+      <div class="done-wrap">
+        <div class="done-icon">✓</div>
+        <h2>体験予約が完了しました</h2>
+        <p>ご予約内容はスケジュール管理からいつでも確認・キャンセルできます。</p>
+      </div>
+      <button class="btn btn-primary" data-go="schedule">スケジュールを確認する</button>
+      <button class="btn btn-secondary" data-go="home">ホームへ戻る</button>
+    </section>
+
+    <!-- ============ JOIN (single page form) ============ -->
+    <section class="screen" id="screen-join">
+      <p class="hint" style="margin-bottom:18px;font-size:13px">氏名・生年月日・ログイン情報の3項目だけで登録できます。すべてこの画面内で入力が完了します。</p>
+
+      <div class="section-head"><span class="badge">1</span>基本情報</div>
+      <div class="form-card">
+        <div class="field">
+          <label>氏名 <span class="req">必須</span></label>
+          <div class="field-row">
+            <input type="text" id="lastName" placeholder="姓 例）山田">
+            <input type="text" id="firstName" placeholder="名 例）太郎">
+          </div>
+          <div class="error-text">氏名を入力してください</div>
+        </div>
+        <div class="field">
+          <label>氏名（カナ） <span class="req">必須</span></label>
+          <div class="field-row">
+            <input type="text" id="lastKana" placeholder="セイ 例）ヤマダ">
+            <input type="text" id="firstKana" placeholder="メイ 例）タロウ">
+          </div>
+        </div>
+        <div class="field">
+          <label>性別 <span class="opt">任意</span></label>
+          <div class="pill-group" id="genderPills">
+            <div class="pill" data-val="male">男性</div>
+            <div class="pill" data-val="female">女性</div>
+            <div class="pill" data-val="none">回答しない</div>
+          </div>
+        </div>
+        <div class="field">
+          <label>生年月日 <span class="req">必須</span></label>
+          <div class="field-row">
+            <select id="birthYear"></select>
+            <select id="birthMonth"></select>
+            <select id="birthDay"></select>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-head"><span class="badge">2</span>ログイン情報</div>
+      <div class="form-card">
+        <div class="field">
+          <label>メールアドレス <span class="req">必須</span></label>
+          <input type="email" id="joinEmail" placeholder="example@mail.com">
+          <div class="error-text">正しいメールアドレスを入力してください</div>
+        </div>
+        <div class="field">
+          <label>パスワード <span class="req">必須</span></label>
+          <input type="password" id="joinPassword" placeholder="8文字以上の半角英数字">
+          <div class="hint">英字・数字を含む8文字以上で設定してください。</div>
+          <div class="error-text">8文字以上で入力してください</div>
+        </div>
+      </div>
+
+      <label class="checkbox-row">
+        <input type="checkbox" id="agreeCheck">
+        <span><a href="#">利用規約</a>および<a href="#">プライバシーポリシー</a>に同意して登録します。</span>
+      </label>
+
+      <button class="btn btn-primary" id="submitJoinBtn">登録する</button>
+    </section>
+
+    <section class="screen" id="screen-join-done">
+      <div class="done-wrap">
+        <div class="done-icon">🎉</div>
+        <h2>ご入会ありがとうございます</h2>
+        <p>会員登録が完了しました。引き続き、体験レッスンのご予約やスケジュール管理をご利用いただけます。</p>
+      </div>
+      <button class="btn btn-primary" data-go="trial-store">体験を予約する</button>
+      <button class="btn btn-secondary" data-go="home">ホームへ戻る</button>
+    </section>
+
+    <!-- ============ SCHEDULE ============ -->
+    <section class="screen" id="screen-schedule">
+      <div class="section-head" style="margin-top:0">予約中の予定</div>
+      <div id="resList"></div>
+      <button class="btn btn-secondary" data-go="trial-store" style="margin-top:18px">＋ 体験を新しく予約する</button>
+    </section>
+
+  </main>
+
+  <!-- Bottom nav -->
+  <nav class="bottom-nav">
+    <button class="nav-btn" data-go="home"><span class="ic">🏠</span><span class="lb">ホーム</span></button>
+    <button class="nav-btn" data-go="join"><span class="ic">📝</span><span class="lb">入会</span></button>
+    <button class="nav-btn" data-go="trial-store"><span class="ic">🏋️</span><span class="lb">体験</span></button>
+    <button class="nav-btn" data-go="schedule"><span class="ic">📅</span><span class="lb">スケジュール</span></button>
+  </nav>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
