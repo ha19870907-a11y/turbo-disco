@@ -1,5 +1,5 @@
 (() => {
-  const API_BASE = "https://api.jgrants-portal.go.jp/exp/v1/public/subsidies";
+  const DATA_URL = "data/subsidies.json";
   const STORAGE_KEY = "subsidyToolProfile";
 
   const form = document.getElementById("profile-form");
@@ -12,6 +12,9 @@
   const statusEl = document.getElementById("status");
   const resultsListEl = document.getElementById("results-list");
   const referenceListEl = document.getElementById("reference-list");
+  const dataInfoEl = document.getElementById("data-info");
+
+  let subsidyData = { fetchedAt: null, count: 0, items: [] };
 
   function initOptions() {
     for (const pref of PREFECTURES) {
@@ -85,130 +88,113 @@
     }
   }
 
-  function buildParams({ keyword, prefecture, employees, acceptingOnly }) {
-    const params = new URLSearchParams();
-    params.set("keyword", keyword);
-    params.set("sort", "acceptance_end_datetime");
-    params.set("order", "ASC");
-    params.set("acceptance", acceptingOnly ? "1" : "0");
-    if (prefecture) params.set("target_area_search", prefecture);
-    if (employees) params.set("target_number_of_employees", employees);
-    return params;
-  }
-
-  async function fetchSubsidies(params) {
-    const res = await fetch(`${API_BASE}?${params.toString()}`);
-    if (!res.ok) {
-      const err = new Error(`API error: ${res.status}`);
-      err.status = res.status;
-      throw err;
+  async function loadSubsidyData() {
+    try {
+      const res = await fetch(DATA_URL, { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      subsidyData = await res.json();
+    } catch (e) {
+      dataInfoEl.textContent = "補助金データの読み込みに失敗しました。ページを再読み込みしてお試しください。";
+      return;
     }
-    return res.json();
+    renderDataInfo();
   }
 
-  // jGrantsが未対応・想定外の値を返した場合に備え、条件を段階的に緩めて再試行する。
-  async function searchWithFallback(profile) {
-    const attempts = [];
-    attempts.push({ ...profile });
-    if (profile.employees) attempts.push({ ...profile, employees: "" });
-    if (profile.prefecture) attempts.push({ ...profile, employees: "", prefecture: "" });
-
-    let lastError = null;
-    for (let i = 0; i < attempts.length; i++) {
-      const attempt = attempts[i];
-      const params = buildParams(attempt);
-      try {
-        const data = await fetchSubsidies(params);
-        const relaxed = i > 0;
-        return { data, relaxed, attempt };
-      } catch (e) {
-        lastError = e;
-      }
+  function renderDataInfo() {
+    if (!subsidyData.fetchedAt) {
+      dataInfoEl.textContent = "まだ補助金データが取得されていません(初回のデータ取得処理が完了するまでお待ちください)。下の「参考」リストはご利用いただけます。";
+      return;
     }
-    throw lastError;
+    const fetchedDate = new Date(subsidyData.fetchedAt);
+    const formatted = Number.isNaN(fetchedDate.getTime())
+      ? subsidyData.fetchedAt
+      : fetchedDate.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" });
+    dataInfoEl.textContent = `検索対象データ: ${subsidyData.count}件(${formatted} 時点・日本時間、1日1回更新)`;
   }
 
-  function formatDate(value) {
-    if (!value) return "未定";
-    // jGrantsは "YYYY-MM-DD" 形式のことが多いが、念のためそのまま表示にフォールバックする
-    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  function formatDate(iso) {
+    if (!iso) return "未定";
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
     if (m) return `${m[1]}/${m[2]}/${m[3]}`;
-    return value;
+    return iso;
   }
 
-  function renderResults(items, { relaxed } = {}) {
+  function isAccepting(item) {
+    if (!item.acceptanceEndDatetime) return true;
+    return new Date(item.acceptanceEndDatetime).getTime() >= Date.now();
+  }
+
+  function matchesKeyword(item, terms) {
+    if (!terms.length) return true;
+    const haystack = `${item.title} ${item.institutionName || ""}`.toLowerCase();
+    return terms.every((t) => haystack.includes(t.toLowerCase()));
+  }
+
+  function runSearch(profile) {
+    const terms = profile.keyword.length ? profile.keyword.split(/\s+/) : [];
+    const matches = subsidyData.items.filter((item) => {
+      if (profile.prefecture && item.targetAreaSearch && item.targetAreaSearch !== "全国" && item.targetAreaSearch !== profile.prefecture) {
+        return false;
+      }
+      if (profile.employees && item.targetNumberOfEmployees && item.targetNumberOfEmployees !== profile.employees) {
+        return false;
+      }
+      if (profile.acceptingOnly && !isAccepting(item)) return false;
+      if (!matchesKeyword(item, terms)) return false;
+      return true;
+    });
+    renderResults(matches);
+  }
+
+  function renderResults(items) {
     resultsListEl.innerHTML = "";
-    if (relaxed) {
-      const note = document.createElement("p");
-      note.className = "notice";
-      note.textContent = "一部の絞り込み条件（従業員数・都道府県など）では結果が得られなかったため、条件を緩めて再検索しました。表示された制度がご自身の条件に合うか、詳細ページで確認してください。";
-      resultsListEl.before(note);
-    }
-    if (!items || items.length === 0) {
+    if (!items.length) {
       statusEl.textContent = "条件に合う制度が見つかりませんでした。キーワードを変えるか、都道府県・従業員数の指定を外してみてください。";
       return;
     }
     statusEl.textContent = `${items.length}件の制度が見つかりました。`;
     for (const item of items) {
+      const accepting = isAccepting(item);
       const li = document.createElement("li");
       li.className = "result-item";
-      const title = item.title || item.name || "（名称未取得）";
-      const area = item.target_area_search || "";
       li.innerHTML = `
-        <button type="button" class="result-toggle">
-          <span class="result-title">${escapeHtml(title)}</span>
+        <button type="button" class="result-toggle" aria-expanded="false">
+          <span class="result-title">${escapeHtml(item.title || "(名称未取得)")}</span>
           <span class="result-meta">
-            ${area ? `対象地域: ${escapeHtml(area)} ／ ` : ""}
-            募集終了: ${escapeHtml(formatDate(item.acceptance_end_datetime))}
+            ${item.targetAreaSearch ? `対象地域: ${escapeHtml(item.targetAreaSearch)} ／ ` : ""}
+            募集終了: ${escapeHtml(formatDate(item.acceptanceEndDatetime))}
+            ${accepting ? "" : " ／ 募集終了済み"}
           </span>
         </button>
-        <div class="result-detail" hidden></div>
+        <div class="result-detail" hidden>
+          <dl class="detail-list">
+            ${item.institutionName ? `<dt>実施団体</dt><dd>${escapeHtml(item.institutionName)}</dd>` : ""}
+            ${item.subsidyMaxLimit ? `<dt>補助上限額</dt><dd>${escapeHtml(String(item.subsidyMaxLimit))}円</dd>` : ""}
+            ${item.subsidyRate ? `<dt>補助率</dt><dd>${escapeHtml(item.subsidyRate)}</dd>` : ""}
+            <dt>募集開始</dt><dd>${escapeHtml(formatDate(item.acceptanceStartDatetime))}</dd>
+            <dt>募集終了</dt><dd>${escapeHtml(formatDate(item.acceptanceEndDatetime))}</dd>
+            ${item.targetNumberOfEmployees ? `<dt>対象従業員数</dt><dd>${escapeHtml(item.targetNumberOfEmployees)}</dd>` : ""}
+          </dl>
+          <p><a href="https://www.jgrants-portal.go.jp/subsidy/${encodeURIComponent(item.id)}" target="_blank" rel="noopener">jGrantsで詳細・公募要領を見る →</a></p>
+        </div>
       `;
       const toggle = li.querySelector(".result-toggle");
       const detailEl = li.querySelector(".result-detail");
-      toggle.addEventListener("click", () => toggleDetail(item.id, detailEl));
+      toggle.addEventListener("click", () => {
+        const hidden = detailEl.hasAttribute("hidden");
+        if (hidden) {
+          detailEl.removeAttribute("hidden");
+          toggle.setAttribute("aria-expanded", "true");
+        } else {
+          detailEl.setAttribute("hidden", "");
+          toggle.setAttribute("aria-expanded", "false");
+        }
+      });
       resultsListEl.appendChild(li);
     }
   }
 
-  const detailCache = new Map();
-
-  async function toggleDetail(id, detailEl) {
-    const isHidden = detailEl.hasAttribute("hidden");
-    if (!isHidden) {
-      detailEl.setAttribute("hidden", "");
-      return;
-    }
-    detailEl.removeAttribute("hidden");
-    if (detailCache.has(id)) {
-      detailEl.innerHTML = detailCache.get(id);
-      return;
-    }
-    detailEl.innerHTML = `<p class="hint">読み込み中...</p>`;
-    try {
-      const res = await fetch(`${API_BASE}/id/${encodeURIComponent(id)}`);
-      if (!res.ok) throw new Error(`API error: ${res.status}`);
-      const data = await res.json();
-      const info = (data && data.result && data.result[0]) || {};
-      const html = `
-        <dl class="detail-list">
-          ${info.subsidy_max_limit ? `<dt>補助上限額</dt><dd>${escapeHtml(String(info.subsidy_max_limit))}円</dd>` : ""}
-          ${info.subsidy_rate ? `<dt>補助率</dt><dd>${escapeHtml(info.subsidy_rate)}</dd>` : ""}
-          ${info.acceptance_start_datetime ? `<dt>募集開始</dt><dd>${escapeHtml(formatDate(info.acceptance_start_datetime))}</dd>` : ""}
-          ${info.acceptance_end_datetime ? `<dt>募集終了</dt><dd>${escapeHtml(formatDate(info.acceptance_end_datetime))}</dd>` : ""}
-          ${info.target_area_search ? `<dt>対象地域</dt><dd>${escapeHtml(info.target_area_search)}</dd>` : ""}
-          ${info.target_number_of_employees ? `<dt>対象従業員数</dt><dd>${escapeHtml(info.target_number_of_employees)}</dd>` : ""}
-        </dl>
-        <p><a href="https://www.jgrants-portal.go.jp/subsidy/${encodeURIComponent(id)}" target="_blank" rel="noopener">jGrantsで詳細・公募要領を見る →</a></p>
-      `;
-      detailCache.set(id, html);
-      detailEl.innerHTML = html;
-    } catch (e) {
-      detailEl.innerHTML = `<p class="notice">詳細情報の取得に失敗しました。<a href="https://www.jgrants-portal.go.jp/" target="_blank" rel="noopener">jGrantsのサイト</a>で名称を検索してご確認ください。</p>`;
-    }
-  }
-
-  async function handleSubmit(ev) {
+  function handleSubmit(ev) {
     ev.preventDefault();
     const profile = {
       orgType: form.querySelector('input[name="orgType"]:checked').value,
@@ -223,21 +209,15 @@
       return;
     }
     saveProfile(profile);
-
-    statusEl.textContent = "検索中...";
-    resultsListEl.innerHTML = "";
-    const staleNote = resultsListEl.parentElement.querySelector(".notice");
-    if (staleNote) staleNote.remove();
-
-    try {
-      const { data, relaxed } = await searchWithFallback(profile);
-      renderResults(data && data.result, { relaxed });
-    } catch (e) {
-      statusEl.textContent = "検索に失敗しました。通信環境をご確認のうえ、しばらくしてから再度お試しください。下の「参考」リストもあわせてご確認ください。";
-    }
+    runSearch(profile);
   }
 
-  initOptions();
-  loadProfile();
-  form.addEventListener("submit", handleSubmit);
+  async function init() {
+    initOptions();
+    loadProfile();
+    form.addEventListener("submit", handleSubmit);
+    await loadSubsidyData();
+  }
+
+  init();
 })();

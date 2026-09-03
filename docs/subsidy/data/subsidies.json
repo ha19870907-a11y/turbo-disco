@@ -1,0 +1,7 @@
+{
+  "fetchedAt": null,
+  "source": "jGrants (https://www.jgrants-portal.go.jp/)",
+  "note": "初回のGitHub Actions実行がまだ行われていません。.github/workflows/refresh-subsidies.yml を手動実行(workflow_dispatch)するか、毎日6:00 JSTの自動実行を待ってください。",
+  "count": 0,
+  "items": []
+}
