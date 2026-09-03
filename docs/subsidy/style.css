@@ -137,6 +137,12 @@ select {
   background: #e4e8f5;
 }
 
+.tag-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 .btn-primary {
   background: var(--accent);
   color: #fff;
