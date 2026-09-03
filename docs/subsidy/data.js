@@ -109,6 +109,60 @@ const SUPPORT_PROGRAMS = [
 // あわせて探すためのキーワード。
 const DECLINE_KEYWORDS = ["売上減少", "セーフティネット", "経営安定", "業況悪化", "事業継続"];
 
+// 「現在のお困りごと・予定」として複数選択できる項目。
+// id は CTA(専門家相談)の優先度判定にも使う。
+const CONCERNS = [
+  { id: "equipment", label: "設備投資をしたい" },
+  { id: "itDx", label: "IT・DX化したい" },
+  { id: "hiring", label: "従業員を採用したい" },
+  { id: "laborCost", label: "人件費・社会保険料を見直したい" },
+  { id: "financing", label: "融資を受けたい" },
+  { id: "taxSaving", label: "節税について相談したい" },
+  { id: "findTaxAccountant", label: "税理士を探している" },
+  { id: "subsidyConsult", label: "補助金申請を専門家に相談したい" },
+  { id: "incorporate", label: "法人化を検討している" },
+  { id: "cashFlow", label: "資金繰りを改善したい" },
+];
+
+// 専門家紹介(アフィリエイト)の設定。あとからURLを入力するだけで有効化できる。
+// enabled が false のサービスはCTA自体を表示しない。enabled: true でも
+// url が空のままの場合は、リンクではなく「準備中」の非活性ボタンとして表示する
+// (未設定のリンクへ誤って移動させないため)。
+// priority は同点だった場合の並び順の目安(小さいほど優先)。
+const AFFILIATE_CONFIG = {
+  taxAccountant: {
+    enabled: true,
+    name: "税理士無料相談",
+    url: "",
+    description: "税務・節税・補助金について専門家に相談できます。",
+    priority: 1,
+  },
+  socialInsurance: {
+    enabled: false,
+    name: "社労士無料相談",
+    url: "",
+    description: "助成金・労務・社会保険について相談できます。",
+    priority: 2,
+  },
+  subsidySupport: {
+    enabled: false,
+    name: "補助金専門家に相談",
+    url: "",
+    description: "補助金申請について専門家に相談できます。",
+    priority: 3,
+  },
+  finance: {
+    enabled: false,
+    name: "資金調達を相談",
+    url: "",
+    description: "融資・資金調達について相談できます。",
+    priority: 4,
+  },
+};
+
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { PREFECTURES, PURPOSE_TAGS, REFERENCE_PROGRAMS, SUPPORT_PROGRAMS, DECLINE_KEYWORDS };
+  module.exports = {
+    PREFECTURES, PURPOSE_TAGS, REFERENCE_PROGRAMS, SUPPORT_PROGRAMS,
+    DECLINE_KEYWORDS, CONCERNS, AFFILIATE_CONFIG,
+  };
 }
