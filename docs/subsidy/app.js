@@ -15,11 +15,11 @@
   const statusEl = document.getElementById("status");
   const resultsListEl = document.getElementById("results-list");
   const referenceListEl = document.getElementById("reference-list");
+  const supportListEl = document.getElementById("support-list");
   const dataInfoEl = document.getElementById("data-info");
   const declineSectionEl = document.getElementById("decline-section");
   const declineNoteEl = document.getElementById("decline-note");
   const declineListEl = document.getElementById("decline-list");
-  const declineReferenceListEl = document.getElementById("decline-reference-list");
 
   let subsidyData = { fetchedAt: null, count: 0, items: [] };
   const selectedThemes = new Set();
@@ -64,8 +64,8 @@
     for (const program of REFERENCE_PROGRAMS) {
       referenceListEl.appendChild(buildReferenceItem(program));
     }
-    for (const program of DECLINE_REFERENCE_PROGRAMS) {
-      declineReferenceListEl.appendChild(buildReferenceItem(program));
+    for (const program of SUPPORT_PROGRAMS) {
+      supportListEl.appendChild(buildReferenceItem(program));
     }
   }
 
@@ -226,7 +226,7 @@
     declineNoteEl.textContent =
       `前年度から${unit}が約${Math.round(decline)}%減少しています。売上減少を要件とする資金繰り支援制度` +
       `（セーフティネット保証など）の対象になる場合があります。対象業種・減少率などの具体的な要件は` +
-      `制度・時期によって異なるため、下の参考制度や公式情報で必ずご確認ください。`;
+      `制度・時期によって異なるため、下の「支援制度（参考）」欄や公式情報で必ずご確認ください。`;
 
     const matches = subsidyData.items.filter((item) => {
       if (!prefectureMatches(item, profile.prefecture)) return false;
