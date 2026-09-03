@@ -8,10 +8,17 @@
   --accent-dark: #1d4ed8;
   --notice-bg: #fff7ed;
   --notice-border: #fdba74;
+  --cta-bg: #f4f8fc;
+  --cta-border: #cfe0f5;
+  --star-color: #d97706;
 }
 
 * {
   box-sizing: border-box;
+}
+
+html {
+  overflow-x: hidden;
 }
 
 body {
@@ -20,6 +27,7 @@ body {
   background: var(--bg);
   color: var(--text);
   line-height: 1.6;
+  overflow-x: hidden;
 }
 
 .page-header {
@@ -100,12 +108,14 @@ label {
 }
 
 input[type="text"],
+input[type="number"],
 select {
   width: 100%;
-  padding: 0.55rem 0.7rem;
+  padding: 0.65rem 0.7rem;
   border: 1px solid var(--border);
   border-radius: 8px;
   font-size: 1rem;
+  min-height: 44px;
   background: #fff;
   color: var(--text);
 }
@@ -128,8 +138,9 @@ select {
   background: #f0f2f8;
   color: var(--text);
   border-radius: 999px;
-  padding: 0.3rem 0.75rem;
-  font-size: 0.82rem;
+  padding: 0.5rem 0.9rem;
+  min-height: 40px;
+  font-size: 0.85rem;
   cursor: pointer;
 }
 
@@ -144,12 +155,14 @@ select {
 }
 
 .btn-primary {
+  width: 100%;
   background: var(--accent);
   color: #fff;
   border: none;
   border-radius: 8px;
-  padding: 0.7rem 1.4rem;
-  font-size: 1rem;
+  padding: 0.85rem 1.4rem;
+  min-height: 48px;
+  font-size: 1.05rem;
   font-weight: 600;
   cursor: pointer;
 }
@@ -261,6 +274,132 @@ select {
 
 .note-card li {
   margin-bottom: 0.5rem;
+}
+
+/* お困りごと・予定（複数選択チェックボックス） */
+.concern-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 0.5rem;
+}
+
+.concern-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: normal;
+  padding: 0.5rem 0.2rem;
+  min-height: 40px;
+  cursor: pointer;
+}
+
+.concern-item input[type="checkbox"] {
+  width: 1.2rem;
+  height: 1.2rem;
+  flex: none;
+}
+
+/* 簡易診断（★評価） */
+.diagnosis-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.diagnosis-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.diagnosis-row:last-child {
+  border-bottom: none;
+}
+
+.diagnosis-label {
+  font-weight: 600;
+}
+
+.diagnosis-stars {
+  color: var(--star-color);
+  letter-spacing: 0.1em;
+  font-size: 1.05rem;
+}
+
+/* 専門家相談CTA */
+.consult-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.cta-card {
+  border: 1px solid var(--cta-border);
+  background: var(--cta-bg);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.cta-card p {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.cta-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  background: var(--accent);
+  color: #fff;
+  text-decoration: none;
+  border-radius: 8px;
+  padding: 0.65rem 1.1rem;
+  min-height: 44px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cta-button:hover {
+  background: var(--accent-dark);
+}
+
+.cta-button-disabled {
+  background: #e5e7eb;
+  color: var(--muted);
+  cursor: default;
+}
+
+.card-cta {
+  margin-top: 0.9rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.card-cta-question {
+  margin: 0;
+  font-weight: 600;
+}
+
+.card-cta-text {
+  margin: 0 0 0.3rem;
+  font-size: 0.85rem;
+  color: var(--muted);
 }
 
 .page-footer {

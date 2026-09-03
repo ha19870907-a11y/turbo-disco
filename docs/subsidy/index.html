@@ -5,14 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 <meta http-equiv="Pragma" content="no-cache" />
-<title>補助金・助成金マッチングツール</title>
-<meta name="description" content="個人事業主・法人向けに、jGrants（電子申請システム）のデータから条件に合う補助金・助成金を検索できるツールです。" />
+<title>補助金・助成金検索｜中小企業支援制度診断ツール</title>
+<meta name="description" content="会社の所在地、従業員数、事業内容などから利用できる可能性のある補助金・助成金・支援制度を検索できる無料ツールです。" />
 <link rel="stylesheet" href="style.css?v=2" />
 </head>
 <body>
 <header class="page-header">
   <h1>補助金・助成金マッチングツール</h1>
   <p class="lead">
+    補助金・助成金だけでなく、融資・税制優遇・専門家相談までまとめて確認できる中小企業支援ツールです。
     事業の情報を入力すると、<a href="https://www.jgrants-portal.go.jp/" target="_blank" rel="noopener">jGrants（国の補助金電子申請システム）</a>
     に登録されている補助金の中から、条件に近いものを検索します。
   </p>
@@ -71,6 +72,12 @@
       </div>
 
       <div class="field">
+        <span class="field-label">現在のお困りごと・予定（任意・複数選択可）</span>
+        <div id="concern-list" class="concern-list" role="group" aria-label="お困りごと・予定"></div>
+        <p class="hint">選んでいただくと、検索結果とあわせて相談先の案内を出す際の参考にします。</p>
+      </div>
+
+      <div class="field">
         <label class="checkbox-row">
           <input type="checkbox" id="acceptingOnly" name="acceptingOnly" checked />
           現在募集中の制度のみ表示する
@@ -81,8 +88,14 @@
     </form>
   </section>
 
+  <section class="card" id="diagnosis-section" hidden aria-live="polite">
+    <h2>あなたの会社の支援制度診断</h2>
+    <ul id="diagnosis-list" class="diagnosis-list"></ul>
+    <p class="hint">※これは簡易的な参考判定であり、制度の利用を保証するものではありません。</p>
+  </section>
+
   <section class="card" id="results-section" aria-live="polite">
-    <h2>検索結果</h2>
+    <h2>あなたの会社におすすめの支援制度</h2>
     <div id="status" class="status"></div>
     <ul id="results-list" class="results-list"></ul>
   </section>
@@ -112,6 +125,15 @@
     <ul id="support-list" class="reference-list"></ul>
   </section>
 
+  <section class="card" id="consult-section" hidden>
+    <h2>さらに専門家に相談する</h2>
+    <p class="hint">
+      補助金・助成金の活用や、税務・労務・資金調達については、専門家に無料で相談できます。
+      ご入力いただいた内容から、参考になりそうな相談先を表示しています。
+    </p>
+    <div id="consult-list" class="consult-list"></div>
+  </section>
+
   <section class="card note-card">
     <h2>データについて・ご注意</h2>
     <ul>
@@ -131,7 +153,9 @@
         （雇用調整助成金、キャリアアップ助成金など）は含まれません。
       </li>
       <li>この検索結果は申請の可否を保証するものではありません。応募要件・締切・提出書類は必ず公式情報でご確認ください。</li>
-      <li>入力した情報はこの端末のブラウザ内にのみ保存され、外部には送信されません。</li>
+      <li>掲載している情報は最新の情報と異なる場合があります。申請条件・募集期間・対象経費などは必ず公式情報をご確認ください。</li>
+      <li>専門家への相談・紹介については、各サービス提供会社の条件が適用されます。当ツールが相談内容や結果を保証するものではありません。</li>
+      <li>入力した情報はこの端末のブラウザ内にのみ保存され、外部には送信されません。専門家紹介のボタンをクリックした場合のみ、その先の紹介サービスのサイトへ移動します（クリックしただけで氏名・連絡先等が自動的に送信されることはありません）。</li>
     </ul>
   </section>
 </main>
