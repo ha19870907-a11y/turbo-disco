@@ -4,7 +4,7 @@
 
   const form = document.getElementById("profile-form");
   const prefectureSelect = document.getElementById("prefecture");
-  const employeesSelect = document.getElementById("employees");
+  const employeesInput = document.getElementById("employees");
   const keywordInput = document.getElementById("keyword");
   const cityInput = document.getElementById("city");
   const acceptingOnlyInput = document.getElementById("acceptingOnly");
@@ -22,12 +22,6 @@
       opt.value = pref;
       opt.textContent = pref;
       prefectureSelect.appendChild(opt);
-    }
-    for (const bucket of EMPLOYEE_BUCKETS) {
-      const opt = document.createElement("option");
-      opt.value = bucket.value;
-      opt.textContent = bucket.label;
-      employeesSelect.appendChild(opt);
     }
     for (const tag of PURPOSE_TAGS) {
       const btn = document.createElement("button");
@@ -72,7 +66,7 @@
       }
       if (profile.prefecture) prefectureSelect.value = profile.prefecture;
       if (profile.city) cityInput.value = profile.city;
-      if (profile.employees) employeesSelect.value = profile.employees;
+      if (profile.employees) employeesInput.value = profile.employees;
       if (profile.keyword) keywordInput.value = profile.keyword;
       if (typeof profile.acceptingOnly === "boolean") acceptingOnlyInput.checked = profile.acceptingOnly;
     } catch (e) {
@@ -130,15 +124,35 @@
     return terms.every((t) => haystack.includes(t.toLowerCase()));
   }
 
+  // targetAreaSearch は "東京都" のような単一の値だけでなく、
+  // "北海道/宮城県/.../東京都/..." のように複数県がスラッシュ区切りで
+  // まとめて入っていることがあるため、リストに分割してから判定する。
+  function prefectureMatches(item, prefecture) {
+    if (!prefecture) return true;
+    const raw = item.targetAreaSearch;
+    if (!raw) return true;
+    const areas = raw.split("/").map((s) => s.trim());
+    return areas.includes("全国") || areas.includes(prefecture);
+  }
+
+  // targetNumberOfEmployees は "20名以下" "300名以下" "901名以上"
+  // "従業員数の制約なし" のような形式。数値として比較する。
+  function employeesMatches(item, employeeCount) {
+    if (!employeeCount) return true;
+    const raw = item.targetNumberOfEmployees;
+    if (!raw || raw.includes("制約なし")) return true;
+    const atMost = /^(\d+)名以下$/.exec(raw);
+    if (atMost) return employeeCount <= Number(atMost[1]);
+    const atLeast = /^(\d+)名以上$/.exec(raw);
+    if (atLeast) return employeeCount >= Number(atLeast[1]);
+    return true;
+  }
+
   function runSearch(profile) {
     const terms = profile.keyword.length ? profile.keyword.split(/\s+/) : [];
     const matches = subsidyData.items.filter((item) => {
-      if (profile.prefecture && item.targetAreaSearch && item.targetAreaSearch !== "全国" && item.targetAreaSearch !== profile.prefecture) {
-        return false;
-      }
-      if (profile.employees && item.targetNumberOfEmployees && item.targetNumberOfEmployees !== profile.employees) {
-        return false;
-      }
+      if (!prefectureMatches(item, profile.prefecture)) return false;
+      if (!employeesMatches(item, profile.employees)) return false;
       if (profile.acceptingOnly && !isAccepting(item)) return false;
       if (!matchesKeyword(item, terms)) return false;
       return true;
@@ -200,7 +214,7 @@
       orgType: form.querySelector('input[name="orgType"]:checked').value,
       prefecture: prefectureSelect.value,
       city: cityInput.value.trim(),
-      employees: employeesSelect.value,
+      employees: employeesInput.value ? Number(employeesInput.value) : null,
       keyword: keywordInput.value.trim(),
       acceptingOnly: acceptingOnlyInput.checked,
     };

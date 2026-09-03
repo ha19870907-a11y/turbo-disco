@@ -11,17 +11,6 @@ const PREFECTURES = [
   "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県",
 ];
 
-// jGrants の target_number_of_employees フィルタに渡す候補値。
-// APIがこの値を認識しない場合は自動的にフィルタを外して再検索します（app.js参照）。
-const EMPLOYEE_BUCKETS = [
-  { value: "", label: "指定しない" },
-  { value: "5人以下", label: "5人以下" },
-  { value: "6~20人", label: "6〜20人" },
-  { value: "21~50人", label: "21〜50人" },
-  { value: "51~100人", label: "51〜100人" },
-  { value: "101人以上", label: "101人以上" },
-];
-
 // 検索キーワード欄に追加できる目的タグ（クリックでキーワードへ追記するだけの補助機能）。
 const PURPOSE_TAGS = [
   "販路拡大", "設備投資", "IT導入・デジタル化", "創業・起業",
@@ -73,5 +62,5 @@ const REFERENCE_PROGRAMS = [
 ];
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { PREFECTURES, EMPLOYEE_BUCKETS, PURPOSE_TAGS, REFERENCE_PROGRAMS };
+  module.exports = { PREFECTURES, PURPOSE_TAGS, REFERENCE_PROGRAMS };
 }
