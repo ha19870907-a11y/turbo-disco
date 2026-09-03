@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>補助金・助成金マッチングツール</title>
+<meta name="description" content="個人事業主・法人向けに、jGrants（電子申請システム）のデータから条件に合う補助金・助成金を検索できるツールです。" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header class="page-header">
+  <h1>補助金・助成金マッチングツール</h1>
+  <p class="lead">
+    事業の情報を入力すると、<a href="https://www.jgrants-portal.go.jp/" target="_blank" rel="noopener">jGrants（国の補助金電子申請システム）</a>
+    に登録されている補助金の中から、条件に近いものを検索します。
+  </p>
+  <p id="data-info" class="hint">読み込み中...</p>
+</header>
+
+<main>
+  <section class="card" aria-labelledby="profile-heading">
+    <h2 id="profile-heading">事業の情報を入力</h2>
+    <form id="profile-form">
+      <div class="field">
+        <span class="field-label">事業形態</span>
+        <div class="radio-row">
+          <label><input type="radio" name="orgType" value="個人事業主" checked /> 個人事業主</label>
+          <label><input type="radio" name="orgType" value="法人" /> 法人</label>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="prefecture">都道府県</label>
+          <select id="prefecture" name="prefecture">
+            <option value="">全国（指定しない）</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="city">市区町村（任意）</label>
+          <input type="text" id="city" name="city" placeholder="例: 渋谷区" autocomplete="off" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="employees">従業員数</label>
+        <select id="employees" name="employees"></select>
+      </div>
+
+      <div class="field">
+        <label for="keyword">業種・実施したいこと（検索キーワード）</label>
+        <input type="text" id="keyword" name="keyword" placeholder="例: 飲食店 販路開拓" required minlength="2" />
+        <p class="hint">2文字以上で入力してください。下のタグをクリックすると追記できます。</p>
+        <div id="purpose-tags" class="tag-row"></div>
+      </div>
+
+      <div class="field">
+        <label class="checkbox-row">
+          <input type="checkbox" id="acceptingOnly" name="acceptingOnly" checked />
+          現在募集中の制度のみ表示する
+        </label>
+      </div>
+
+      <button type="submit" class="btn-primary">この条件で検索する</button>
+    </form>
+  </section>
+
+  <section class="card" id="results-section" aria-live="polite">
+    <h2>検索結果</h2>
+    <div id="status" class="status"></div>
+    <ul id="results-list" class="results-list"></ul>
+  </section>
+
+  <section class="card" id="reference-section">
+    <h2>全国規模の代表的な制度（参考）</h2>
+    <p class="hint">
+      商工会議所・商工会や中小企業庁などが実施する、全国向けの主な補助金の例です。金額・締切は公募回ごとに変わるため、
+      名称で検索し、必ず実施団体の公式サイト・最新の公募要領で内容をご確認ください。
+    </p>
+    <ul id="reference-list" class="reference-list"></ul>
+  </section>
+
+  <section class="card note-card">
+    <h2>データについて・ご注意</h2>
+    <ul>
+      <li>
+        検索対象データは<a href="https://www.jgrants-portal.go.jp/" target="_blank" rel="noopener">jGrants</a>の公開APIから、
+        GitHub Actionsで1日1回サーバー側で取得し、このサイトに保存したものです（ブラウザからその都度APIを呼び出しているわけ
+        ではないため、最新の公募開始・締切から反映まで最大1日程度のずれが生じることがあります）。
+      </li>
+      <li>
+        複数の検索語でjGrants APIを検索してまとめているため、jGrantsに登録されている制度すべてを網羅しているわけではありません。
+        また、jGrantsには都道府県・市区町村が実施する補助金も一部登録されていますが、すべての自治体・商工会議所の制度を
+        網羅しているわけではありません。特にお住まいの市区町村や地域の商工会議所・商工会が独自に行っている制度は、
+        別途それぞれの公式サイトでの確認をおすすめします。
+      </li>
+      <li>
+        jGrantsは主に経済産業省・中小企業庁系の「補助金」を対象としており、厚生労働省系の「助成金」
+        （雇用調整助成金、キャリアアップ助成金など）は含まれません。
+      </li>
+      <li>この検索結果は申請の可否を保証するものではありません。応募要件・締切・提出書類は必ず公式情報でご確認ください。</li>
+      <li>入力した情報はこの端末のブラウザ内にのみ保存され、外部には送信されません。</li>
+    </ul>
+  </section>
+</main>
+
+<footer class="page-footer">
+  <p>データ提供: <a href="https://www.jgrants-portal.go.jp/" target="_blank" rel="noopener">jGrants（デジタル庁・中小企業庁）</a></p>
+</footer>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
