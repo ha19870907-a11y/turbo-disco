@@ -109,60 +109,135 @@ const SUPPORT_PROGRAMS = [
 // あわせて探すためのキーワード。
 const DECLINE_KEYWORDS = ["売上減少", "セーフティネット", "経営安定", "業況悪化", "事業継続"];
 
-// 「現在のお困りごと・予定」として複数選択できる項目。
-// id は CTA(専門家相談)の優先度判定にも使う。
-const CONCERNS = [
-  { id: "equipment", label: "設備投資をしたい" },
-  { id: "itDx", label: "IT・DX化したい" },
-  { id: "hiring", label: "従業員を採用したい" },
-  { id: "laborCost", label: "人件費・社会保険料を見直したい" },
-  { id: "financing", label: "融資を受けたい" },
-  { id: "taxSaving", label: "節税について相談したい" },
-  { id: "findTaxAccountant", label: "税理士を探している" },
-  { id: "subsidyConsult", label: "補助金申請を専門家に相談したい" },
-  { id: "incorporate", label: "法人化を検討している" },
-  { id: "cashFlow", label: "資金繰りを改善したい" },
+// 従業員数の区分。個人事業主・フリーランスが選びやすいよう「0人」を用意する。
+// min/max は、jGrantsの「N名以下」「N名以上」条件との照合に使う
+// (実際の人数はこの区分の中のどこかにいる、という前提で判定する。app.js参照)。
+const EMPLOYEE_BUCKETS = [
+  { value: "0", label: "0人", min: 0, max: 0 },
+  { value: "1-4", label: "1〜4人", min: 1, max: 4 },
+  { value: "5-9", label: "5〜9人", min: 5, max: 9 },
+  { value: "10-19", label: "10〜19人", min: 10, max: 19 },
+  { value: "20-49", label: "20〜49人", min: 20, max: 49 },
+  { value: "50+", label: "50人以上", min: 50, max: Infinity },
 ];
 
-// 専門家紹介(アフィリエイト)の設定。あとからURLを入力するだけで有効化できる。
-// enabled が false のサービスはCTA自体を表示しない。enabled: true でも
-// url が空のままの場合は、リンクではなく「準備中」の非活性ボタンとして表示する
-// (未設定のリンクへ誤って移動させないため)。
-// priority は同点だった場合の並び順の目安(小さいほど優先)。
+// 年間売上（目安）の区分。単位は万円。「わからない」も選べるようにする。
+// STEP1の事業者プロフィール用で、今年度・前年度の所得（下のrevenue/prevRevenue、
+// 売上減少の判定用）とは別の項目として扱う。
+const REVENUE_BUCKETS = [
+  { value: "", label: "わからない" },
+  { value: "u300", label: "300万円未満", min: 0, max: 300 },
+  { value: "300-500", label: "300〜500万円", min: 300, max: 500 },
+  { value: "500-1000", label: "500〜1,000万円", min: 500, max: 1000 },
+  { value: "1000-3000", label: "1,000〜3,000万円", min: 1000, max: 3000 },
+  { value: "3000-10000", label: "3,000万円〜1億円", min: 3000, max: 10000 },
+  { value: "10000+", label: "1億円以上", min: 10000, max: Infinity },
+];
+
+// 事業分野。STEP1のプロフィール用で、選ぶと検索キーワードにも軽く反映する。
+const INDUSTRIES = [
+  "飲食", "小売", "建設", "製造", "IT・Web", "運送・物流", "美容・理容",
+  "医療・福祉", "教育", "宿泊・観光", "農林水産", "不動産", "士業",
+  "サービス業", "その他",
+];
+
+// 「現在のお困りごと・予定」として複数選択できる項目。
+// id は CTA(専門家相談)の優先度判定にも使う(app.jsのCONCERN_SERVICE_WEIGHTS)。
+const CONCERNS = [
+  { id: "equipment", label: "設備投資したい" },
+  { id: "renovateStore", label: "店舗を改装したい" },
+  { id: "newMachine", label: "新しい機械を導入したい" },
+  { id: "itDx", label: "IT・DX化したい" },
+  { id: "website", label: "ホームページを作りたい" },
+  { id: "ecommerce", label: "ECサイトを作りたい" },
+  { id: "ads", label: "広告・販促をしたい" },
+  { id: "newProduct", label: "新商品を開発したい" },
+  { id: "newBusiness", label: "新規事業を始めたい" },
+  { id: "hiring", label: "従業員を採用したい" },
+  { id: "training", label: "人材育成をしたい" },
+  { id: "payRaise", label: "賃上げをしたい" },
+  { id: "startup", label: "起業・創業したい" },
+  { id: "incorporate", label: "法人化したい" },
+  { id: "financing", label: "融資を受けたい" },
+  { id: "cashFlow", label: "資金繰りを改善したい" },
+  { id: "taxSaving", label: "節税について相談したい" },
+  { id: "findTaxAccountant", label: "税理士を探している" },
+  { id: "laborConsult", label: "社会保険・労務について相談したい" },
+  { id: "subsidyConsult", label: "補助金申請を専門家に相談したい" },
+];
+
+// 専門家紹介(アフィリエイト)の設定。あとからcandidatesの中のurlを入力するだけで
+// 有効化できる。カテゴリーごとに複数の案件(例: 税理士A/B/C)を登録しておき、
+// enabled: true かつ priority が最小のものが実際に表示される、という構造にして
+// あるので、案件の切り替えは enabled/priority を変えるだけで行える。
+// 画面には1カテゴリーにつき有効な案件を1件だけ表示し、広告だらけにならないようにする。
+// candidatesの中にenabledな案件が無いカテゴリーは、CTA自体を表示しない。
+// enabled: true でも url が空のままの場合は、リンクではなく「準備中」の
+// 非活性ボタンとして表示する(未設定のリンクへ誤って移動させないため)。
+// priority(カテゴリー直下)は、複数カテゴリーが同点になった場合の表示順の目安。
 const AFFILIATE_CONFIG = {
   taxAccountant: {
-    enabled: true,
-    name: "税理士無料相談",
-    url: "",
-    description: "税務・節税・補助金について専門家に相談できます。",
+    label: "税理士",
     priority: 1,
+    candidates: [
+      {
+        id: "taxAccountant-1",
+        enabled: true,
+        name: "税理士に無料相談",
+        url: "",
+        description: "税務・節税・事業のお金について相談できます。",
+        priority: 1,
+      },
+    ],
   },
   socialInsurance: {
-    enabled: false,
-    name: "社労士無料相談",
-    url: "",
-    description: "助成金・労務・社会保険について相談できます。",
+    label: "社労士",
     priority: 2,
+    candidates: [
+      {
+        id: "socialInsurance-1",
+        enabled: false,
+        name: "社労士に無料相談",
+        url: "",
+        description: "助成金・社会保険・労務について相談できます。",
+        priority: 1,
+      },
+    ],
   },
   subsidySupport: {
-    enabled: false,
-    name: "補助金専門家に相談",
-    url: "",
-    description: "補助金申請について専門家に相談できます。",
+    label: "補助金専門家",
     priority: 3,
+    candidates: [
+      {
+        id: "subsidySupport-1",
+        enabled: false,
+        name: "補助金専門家に相談",
+        url: "",
+        description: "補助金申請について相談できます。",
+        priority: 1,
+      },
+    ],
   },
   finance: {
-    enabled: false,
-    name: "資金調達を相談",
-    url: "",
-    description: "融資・資金調達について相談できます。",
+    label: "資金調達",
     priority: 4,
+    candidates: [
+      {
+        id: "finance-1",
+        enabled: false,
+        name: "資金調達について相談",
+        url: "",
+        description: "融資・資金繰りについて相談できます。",
+        priority: 1,
+      },
+    ],
   },
 };
 
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     PREFECTURES, PURPOSE_TAGS, REFERENCE_PROGRAMS, SUPPORT_PROGRAMS,
-    DECLINE_KEYWORDS, CONCERNS, AFFILIATE_CONFIG,
+    DECLINE_KEYWORDS, EMPLOYEE_BUCKETS, REVENUE_BUCKETS, INDUSTRIES, CONCERNS,
+    AFFILIATE_CONFIG,
   };
 }

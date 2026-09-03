@@ -5,18 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 <meta http-equiv="Pragma" content="no-cache" />
-<title>補助金・助成金検索｜中小企業支援制度診断ツール</title>
-<meta name="description" content="会社の所在地、従業員数、事業内容などから利用できる可能性のある補助金・助成金・支援制度を検索できる無料ツールです。" />
+<title>補助金・助成金検索｜法人・個人事業主向け無料診断</title>
+<meta name="description" content="法人・個人事業主・フリーランスが利用できる可能性のある補助金・助成金・支援制度を無料で検索できるツールです。" />
 <link rel="stylesheet" href="style.css?v=2" />
 </head>
 <body>
 <header class="page-header">
-  <h1>補助金・助成金マッチングツール</h1>
+  <p class="eyebrow">補助金・助成金マッチングツール</p>
+  <h1>あなたの事業で使える<br />補助金・助成金を探そう</h1>
+  <p class="hero-sub">法人・個人事業主・フリーランス対応</p>
   <p class="lead">
     補助金・助成金だけでなく、融資・税制優遇・専門家相談までまとめて確認できる中小企業支援ツールです。
     事業の情報を入力すると、<a href="https://www.jgrants-portal.go.jp/" target="_blank" rel="noopener">jGrants（国の補助金電子申請システム）</a>
     に登録されている補助金の中から、条件に近いものを検索します。
   </p>
+  <p class="reassurance">個人事業主・フリーランス向けの制度も検索できます。</p>
+  <a href="#profile-form" class="btn-hero">無料で診断する</a>
   <p id="data-info" class="hint">読み込み中...</p>
 </header>
 
@@ -29,6 +33,8 @@
         <div class="radio-row">
           <label><input type="radio" name="orgType" value="個人事業主" checked /> 個人事業主</label>
           <label><input type="radio" name="orgType" value="法人" /> 法人</label>
+          <label><input type="radio" name="orgType" value="フリーランス" /> フリーランス</label>
+          <label><input type="radio" name="orgType" value="その他" /> その他</label>
         </div>
       </div>
 
@@ -45,26 +51,26 @@
         </div>
       </div>
 
-      <div class="field">
-        <label for="employees">従業員数（任意）</label>
-        <input type="number" id="employees" name="employees" min="0" step="1" placeholder="例: 5" />
-        <p class="hint">人数を入力すると、その人数が対象になる制度だけに絞り込みます。</p>
-      </div>
-
       <div class="field-row">
         <div class="field">
-          <label for="revenue" id="revenue-label">今年度の所得（万円・任意）</label>
-          <input type="number" id="revenue" name="revenue" min="0" step="1" placeholder="例: 500" />
+          <label for="employees">従業員数（任意）</label>
+          <select id="employees" name="employees">
+            <option value="">指定しない</option>
+          </select>
+          <p class="hint">個人事業主・フリーランスの方は「0人」を選べます。</p>
         </div>
         <div class="field">
-          <label for="prevRevenue" id="prev-revenue-label">前年度の所得（万円・任意）</label>
-          <input type="number" id="prevRevenue" name="prevRevenue" min="0" step="1" placeholder="例: 700" />
+          <label for="industry">事業分野（任意）</label>
+          <select id="industry" name="industry">
+            <option value="">指定しない</option>
+          </select>
         </div>
       </div>
-      <p class="hint">
-        両方入力すると、前年からの減少率を計算し、売上減少を要件とする資金繰り支援制度（セーフティネット保証など）を
-        あわせて案内します（下の「売上減少に関連する制度」欄・「支援制度（参考）」欄）。金額の絞り込みには使用しません。
-      </p>
+
+      <div class="field">
+        <label for="revenueBucket">年間売上（目安・任意）</label>
+        <select id="revenueBucket" name="revenueBucket"></select>
+      </div>
 
       <div class="field">
         <span class="field-label">気になるテーマ（任意・複数選択可）</span>
@@ -76,6 +82,25 @@
         <div id="concern-list" class="concern-list" role="group" aria-label="お困りごと・予定"></div>
         <p class="hint">選んでいただくと、検索結果とあわせて相談先の案内を出す際の参考にします。</p>
       </div>
+
+      <details class="field-details">
+        <summary>売上が減っているかどうかも調べる（任意・詳しく入力する場合）</summary>
+        <div class="field-row">
+          <div class="field">
+            <label for="revenue" id="revenue-label">今年度の所得（万円）</label>
+            <input type="number" id="revenue" name="revenue" min="0" step="1" placeholder="例: 500" />
+          </div>
+          <div class="field">
+            <label for="prevRevenue" id="prev-revenue-label">前年度の所得（万円）</label>
+            <input type="number" id="prevRevenue" name="prevRevenue" min="0" step="1" placeholder="例: 700" />
+          </div>
+        </div>
+        <p class="hint">
+          両方入力すると、前年からの減少率を計算し、売上減少を要件とする資金繰り支援制度（セーフティネット保証など）を
+          あわせて案内します（下の「売上減少に関連する制度」欄・「支援制度（参考）」欄）。上の「年間売上（目安）」とは
+          別の項目で、金額の絞り込みには使用しません。
+        </p>
+      </details>
 
       <div class="field">
         <label class="checkbox-row">
@@ -95,8 +120,9 @@
   </section>
 
   <section class="card" id="results-section" aria-live="polite">
-    <h2>あなたの会社におすすめの支援制度</h2>
+    <h2>あなたにおすすめの支援制度</h2>
     <div id="status" class="status"></div>
+    <p class="hint">各制度の★は入力条件との一致度を示す簡易判定です。実際の利用可否は公式情報をご確認ください。</p>
     <ul id="results-list" class="results-list"></ul>
   </section>
 
