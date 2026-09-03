@@ -16,10 +16,15 @@
   <p class="hero-sub">法人・個人事業主・フリーランス対応</p>
   <p class="lead">
     補助金・助成金だけでなく、融資・税制優遇・専門家相談までまとめて確認できる中小企業支援ツールです。
-    事業の情報を入力すると、<a href="https://www.jgrants-portal.go.jp/" target="_blank" rel="noopener">jGrants（国の補助金電子申請システム）</a>
-    に登録されている補助金の中から、条件に近いものを検索します。
+    法人・個人事業主・フリーランス・創業予定の方まで、事業の情報を入力すると、
+    <a href="https://www.jgrants-portal.go.jp/" target="_blank" rel="noopener">jGrants（国の補助金電子申請システム）</a>
+    に登録されている補助金・助成金の中から、条件に近い支援制度を検索します。
   </p>
   <p class="reassurance">個人事業主・フリーランス向けの制度も検索できます。</p>
+  <p class="trust-note">
+    このサイトは公的機関等が公開する情報をもとに、利用できる可能性のある支援制度を検索・整理するサービスです。
+    表示される制度が必ず利用できることを保証するものではありません。申請前に必ず各制度の公式情報をご確認ください。
+  </p>
   <a href="#profile-form" class="btn-hero">無料で診断する</a>
   <p id="data-info" class="hint">読み込み中...</p>
 </header>
@@ -34,6 +39,7 @@
           <label><input type="radio" name="orgType" value="個人事業主" checked /> 個人事業主</label>
           <label><input type="radio" name="orgType" value="法人" /> 法人</label>
           <label><input type="radio" name="orgType" value="フリーランス" /> フリーランス</label>
+          <label><input type="radio" name="orgType" value="創業予定" /> 創業予定</label>
           <label><input type="radio" name="orgType" value="その他" /> その他</label>
         </div>
       </div>
@@ -55,7 +61,7 @@
         <div class="field">
           <label for="employees">従業員数（任意）</label>
           <select id="employees" name="employees">
-            <option value="">指定しない</option>
+            <option value="">未回答</option>
           </select>
           <p class="hint">個人事業主・フリーランスの方は「0人」を選べます。</p>
         </div>
@@ -97,7 +103,7 @@
         </div>
         <p class="hint">
           両方入力すると、前年からの減少率を計算し、売上減少を要件とする資金繰り支援制度（セーフティネット保証など）を
-          あわせて案内します（下の「売上減少に関連する制度」欄・「支援制度（参考）」欄）。上の「年間売上（目安）」とは
+          あわせて案内します（下の「売上減少に関連する制度」欄・「こんな支援もあります」欄）。上の「年間売上（目安）」とは
           別の項目で、金額の絞り込みには使用しません。
         </p>
       </details>
@@ -122,8 +128,14 @@
   <section class="card" id="results-section" aria-live="polite">
     <h2>あなたにおすすめの支援制度</h2>
     <div id="status" class="status"></div>
-    <p class="hint">各制度の★は入力条件との一致度を示す簡易判定です。実際の利用可否は公式情報をご確認ください。</p>
+    <p class="hint">おすすめ度は入力情報と制度情報をもとにした参考判定です。実際の申請可否を保証するものではありません。</p>
     <ul id="results-list" class="results-list"></ul>
+  </section>
+
+  <section class="card" id="other-results-section" hidden aria-live="polite">
+    <h2>その他の支援制度</h2>
+    <p class="hint">条件が一部一致する制度です。あわせてご確認ください。</p>
+    <ul id="other-results-list" class="results-list"></ul>
   </section>
 
   <section class="card" id="decline-section" hidden aria-live="polite">
@@ -142,11 +154,12 @@
   </section>
 
   <section class="card" id="support-section">
-    <h2>支援制度（参考）</h2>
+    <h2>こんな支援もあります</h2>
     <p class="hint">
-      補助金・助成金（応募・採択されるとお金がもらえる制度）とは別に、融資・信用保証・経営相談・税制優遇など、
-      jGrantsには基本的に掲載されない「支援制度」の代表例です。金額・利率・要件は制度改定や指定期間によって
-      変わるため、名称で検索し、必ず実施団体の公式サイト・最新情報で内容をご確認ください。
+      補助金・助成金（応募・採択されるとお金がもらえる制度）が見つからない場合でも、融資・信用保証・
+      経営相談・税制優遇など、jGrantsには基本的に掲載されない「支援制度」が使える場合があります。
+      金額・利率・要件は制度改定や指定期間によって変わるため、名称で検索し、必ず実施団体の公式サイト・
+      最新情報で内容をご確認ください。
     </p>
     <ul id="support-list" class="reference-list"></ul>
   </section>
