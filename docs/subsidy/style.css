@@ -108,6 +108,27 @@ main {
   padding: 1.25rem;
 }
 
+.collapsible-section summary {
+  cursor: pointer;
+  list-style: revert;
+}
+
+.collapsible-section summary::marker {
+  color: var(--accent);
+}
+
+.collapsible-section summary h2 {
+  display: inline;
+}
+
+.collapsible-section[open] summary h2 {
+  margin-bottom: 0;
+}
+
+.collapsible-section > *:not(summary) {
+  margin-top: 1rem;
+}
+
 .card h2 {
   margin-top: 0;
   font-size: 1.1rem;

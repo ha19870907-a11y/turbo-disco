@@ -132,6 +132,15 @@
     <ul id="results-list" class="results-list"></ul>
   </section>
 
+  <section class="card" id="consult-section" hidden>
+    <h2>さらに専門家に相談する</h2>
+    <p class="hint">
+      補助金・助成金の活用や、税務・労務・資金調達については、専門家に無料で相談できます。
+      ご入力いただいた内容から、参考になりそうな相談先を表示しています。
+    </p>
+    <div id="consult-list" class="consult-list"></div>
+  </section>
+
   <section class="card" id="other-results-section" hidden aria-live="polite">
     <h2>その他の支援制度</h2>
     <p class="hint">条件が一部一致する制度です。あわせてご確認ください。</p>
@@ -144,17 +153,17 @@
     <ul id="decline-list" class="results-list"></ul>
   </section>
 
-  <section class="card" id="reference-section">
-    <h2>補助金・助成金：全国規模の代表的な制度（参考）</h2>
+  <details class="card collapsible-section" id="reference-section">
+    <summary><h2>補助金・助成金：全国規模の代表的な制度（参考）</h2></summary>
     <p class="hint">
       商工会議所・商工会や中小企業庁などが実施する、全国向けの主な補助金の例です。金額・締切は公募回ごとに変わるため、
       名称で検索し、必ず実施団体の公式サイト・最新の公募要領で内容をご確認ください。
     </p>
     <ul id="reference-list" class="reference-list"></ul>
-  </section>
+  </details>
 
-  <section class="card" id="support-section">
-    <h2>こんな支援もあります</h2>
+  <details class="card collapsible-section" id="support-section">
+    <summary><h2>こんな支援もあります</h2></summary>
     <p class="hint">
       補助金・助成金（応募・採択されるとお金がもらえる制度）が見つからない場合でも、融資・信用保証・
       経営相談・税制優遇など、jGrantsには基本的に掲載されない「支援制度」が使える場合があります。
@@ -162,16 +171,7 @@
       最新情報で内容をご確認ください。
     </p>
     <ul id="support-list" class="reference-list"></ul>
-  </section>
-
-  <section class="card" id="consult-section" hidden>
-    <h2>さらに専門家に相談する</h2>
-    <p class="hint">
-      補助金・助成金の活用や、税務・労務・資金調達については、専門家に無料で相談できます。
-      ご入力いただいた内容から、参考になりそうな相談先を表示しています。
-    </p>
-    <div id="consult-list" class="consult-list"></div>
-  </section>
+  </details>
 
   <section class="card note-card">
     <h2>データについて・ご注意</h2>
