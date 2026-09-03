@@ -1,8 +1,8 @@
 {
-  "fetchedAt": "2026-09-03T11:04:33.399Z",
+  "fetchedAt": "2026-09-03T21:16:02.860Z",
   "source": "jGrants (https://www.jgrants-portal.go.jp/)",
   "note": "複数の検索語でjGrants公開APIを検索し、重複を除いてまとめたスナップショットです。全制度を網羅するものではありません。",
-  "count": 314,
+  "count": 323,
   "items": [
     {
       "id": "a0WJ200000CDY2TMAX",
@@ -190,6 +190,17 @@
       "targetNumberOfEmployees": "従業員数の制約なし",
       "acceptanceStartDatetime": "2026-04-13T01:00Z",
       "acceptanceEndDatetime": "2026-09-11T07:45Z"
+    },
+    {
+      "id": "a0WJ200000CDdNtMAL",
+      "title": "令和８年度障害者施設等物価高騰緊急対策事業",
+      "institutionName": "障害者施設等物価高騰緊急対策事業",
+      "subsidyMaxLimit": 0,
+      "subsidyRate": "補助対象経費と補助基準額を比べて少ない方に10/10を乗じる",
+      "targetAreaSearch": "東京都",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2026-08-06T00:00Z",
+      "acceptanceEndDatetime": "2026-09-11T14:59Z"
     },
     {
       "id": "a0WJ200000CDYlTMAX",
@@ -652,6 +663,17 @@
       "targetNumberOfEmployees": "従業員数の制約なし",
       "acceptanceStartDatetime": "2026-08-31T23:30Z",
       "acceptanceEndDatetime": "2026-09-30T08:15Z"
+    },
+    {
+      "id": "a0WJ200000CDdRHMA1",
+      "title": "【令和８年度】ハイブリッド連節バス導入支援事業（環境配慮型先進トラック・バス導入加速事業）",
+      "institutionName": "令和８年度ハイブリッド連節バス導入支援事業",
+      "subsidyMaxLimit": 0,
+      "subsidyRate": "補助対象となる経費の1/2以下又は1/3以下",
+      "targetAreaSearch": "全国",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2026-07-17T05:00Z",
+      "acceptanceEndDatetime": "2026-09-30T09:00Z"
     },
     {
       "id": "a0WJ200000CDZ2OMAX",
@@ -1534,6 +1556,17 @@
       "acceptanceEndDatetime": "2027-01-29T08:15Z"
     },
     {
+      "id": "a0WJ200000CDdPBMA1",
+      "title": "【令和８年度】ハイブリッド及び天然ガストラック・バス導入支援事業（環境配慮型先進トラック・バス導入加速事業）",
+      "institutionName": "令和８年度ハイブリッド連節バス導入支援事業",
+      "subsidyMaxLimit": 0,
+      "subsidyRate": "補助対象となるハイブリッド及び天然ガス自動車と同クラスの標準的燃費基準自動車との価格の差額の２分の1",
+      "targetAreaSearch": "全国",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2026-07-17T05:00Z",
+      "acceptanceEndDatetime": "2027-01-29T09:00Z"
+    },
+    {
       "id": "a0WJ200000CDZDCMA5",
       "title": "令和8年度_低炭素型ディーゼルトラック普及加速化事業",
       "institutionName": "二酸化炭素排出抑制対策事業費等補助金 環境配慮型先進トラック・バス導入加速事業",
@@ -1718,6 +1751,39 @@
       "targetAreaSearch": "東京都",
       "targetNumberOfEmployees": "従業員数の制約なし",
       "acceptanceStartDatetime": "2026-03-31T15:00Z",
+      "acceptanceEndDatetime": "2027-02-26T14:59Z"
+    },
+    {
+      "id": "a0WJ200000CDYa0MAH",
+      "title": "令和８年度サテライトオフィス勤務導入奨励金",
+      "institutionName": "令和８年度サテライトオフィス勤務導入奨励金",
+      "subsidyMaxLimit": 100000,
+      "subsidyRate": null,
+      "targetAreaSearch": "東京都",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2026-04-28T05:00Z",
+      "acceptanceEndDatetime": "2027-02-26T14:59Z"
+    },
+    {
+      "id": "a0WJ200000CDYa5MAH",
+      "title": "令和８年度ワーケーション勤務導入奨励金",
+      "institutionName": "令和８年度ワーケーション勤務導入奨励金",
+      "subsidyMaxLimit": 100000,
+      "subsidyRate": null,
+      "targetAreaSearch": "東京都",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2026-04-28T05:00Z",
+      "acceptanceEndDatetime": "2027-02-26T14:59Z"
+    },
+    {
+      "id": "a0WJ200000CDYaAMAX",
+      "title": "令和８年度テレワーク定着強化奨励金",
+      "institutionName": "令和８年度テレワーク定着強化奨励金",
+      "subsidyMaxLimit": 400000,
+      "subsidyRate": null,
+      "targetAreaSearch": "東京都",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2026-05-29T00:00Z",
       "acceptanceEndDatetime": "2027-02-26T14:59Z"
     },
     {
@@ -1928,6 +1994,17 @@
       "targetNumberOfEmployees": "300名以下",
       "acceptanceStartDatetime": "2026-04-01T00:55Z",
       "acceptanceEndDatetime": "2027-03-31T00:55Z"
+    },
+    {
+      "id": "a0WJ200000CDXFjMAP",
+      "title": "地上基幹放送等に関する耐災害性強化支援事業（令和８年度公募）",
+      "institutionName": "地上基幹放送等に関する耐災害性強化支援事業",
+      "subsidyMaxLimit": 0,
+      "subsidyRate": "地方公共団体等　１／２、地上基幹放送事業者等　１／３、受信障害対策用中継局に係る事業を実施する場合において、条件不利地域かつ財政力指数０．５以下の市町村　２／３",
+      "targetAreaSearch": "全国",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2026-01-30T05:00Z",
+      "acceptanceEndDatetime": "2027-03-31T05:00Z"
     },
     {
       "id": "a0WJ200000CDYffMAH",
@@ -2640,6 +2717,28 @@
       "subsidyMaxLimit": 100000000,
       "subsidyRate": "・企業立地促進奨励金に該当する企業：新規雇用従業員1人につき50万円  ・賃貸借型企業立地奨励金に該当する企業：新規雇用従業員1人につき30万円",
       "targetAreaSearch": "愛媛県",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2026-03-31T15:00Z",
+      "acceptanceEndDatetime": "2027-03-31T14:59Z"
+    },
+    {
+      "id": "a0WJ200000CDXFfMAP",
+      "title": "京都市企業立地促進制度補助金［市内初進出支援制度］",
+      "institutionName": "京都市企業立地促進制度",
+      "subsidyMaxLimit": 70000000,
+      "subsidyRate": null,
+      "targetAreaSearch": "全国",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2025-03-31T15:00Z",
+      "acceptanceEndDatetime": "2027-03-31T14:59Z"
+    },
+    {
+      "id": "a0WJ200000CDY1zMAH",
+      "title": "【長野県茅野市】雇用促進奨励金",
+      "institutionName": "【長野県茅野市】雇用促進奨励金",
+      "subsidyMaxLimit": 0,
+      "subsidyRate": null,
+      "targetAreaSearch": "長野県",
       "targetNumberOfEmployees": "従業員数の制約なし",
       "acceptanceStartDatetime": "2026-03-31T15:00Z",
       "acceptanceEndDatetime": "2027-03-31T14:59Z"
