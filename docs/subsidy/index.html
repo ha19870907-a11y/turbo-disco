@@ -43,8 +43,9 @@
       </div>
 
       <div class="field">
-        <label for="employees">従業員数</label>
-        <select id="employees" name="employees"></select>
+        <label for="employees">従業員数（任意）</label>
+        <input type="number" id="employees" name="employees" min="0" step="1" placeholder="例: 5" />
+        <p class="hint">人数を入力すると、その人数が対象になる制度だけに絞り込みます。</p>
       </div>
 
       <div class="field">
