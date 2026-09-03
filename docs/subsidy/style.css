@@ -31,19 +31,59 @@ body {
 }
 
 .page-header {
-  padding: 2rem 1.25rem 1rem;
+  padding: 2rem 1.25rem 1.25rem;
   max-width: 720px;
   margin: 0 auto;
 }
 
+.eyebrow {
+  margin: 0 0 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+}
+
 .page-header h1 {
   margin: 0 0 0.5rem;
-  font-size: 1.5rem;
+  font-size: 1.6rem;
+  line-height: 1.35;
+}
+
+.hero-sub {
+  margin: 0 0 0.9rem;
+  font-weight: 600;
+  color: var(--text);
 }
 
 .lead {
   color: var(--muted);
-  margin: 0;
+  margin: 0 0 0.6rem;
+}
+
+.reassurance {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.btn-hero {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: #fff;
+  text-decoration: none;
+  border-radius: 10px;
+  padding: 0.9rem 1.8rem;
+  min-height: 52px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.btn-hero:hover {
+  background: var(--accent-dark);
 }
 
 main {
@@ -82,6 +122,23 @@ main {
   min-width: 200px;
 }
 
+.field-details {
+  margin-bottom: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.7rem 0.9rem;
+}
+
+.field-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0.2rem 0;
+}
+
+.field-details[open] summary {
+  margin-bottom: 0.6rem;
+}
+
 .field-label {
   display: block;
   font-weight: 600;
@@ -96,7 +153,8 @@ label {
 
 .radio-row {
   display: flex;
-  gap: 1.25rem;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.25rem;
 }
 
 .radio-row label,
@@ -105,6 +163,7 @@ label {
   display: flex;
   align-items: center;
   gap: 0.35rem;
+  white-space: nowrap;
 }
 
 input[type="text"],
@@ -216,6 +275,31 @@ select {
 
 .result-toggle:hover {
   background: #f0f3fc;
+}
+
+.result-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.match-stars {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--star-color);
+  letter-spacing: 0.02em;
+}
+
+.badge-individual {
+  display: inline-block;
+  background: var(--cta-bg);
+  color: var(--accent);
+  border: 1px solid var(--cta-border);
+  border-radius: 999px;
+  padding: 0.1rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 600;
 }
 
 .result-title {

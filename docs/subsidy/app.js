@@ -4,7 +4,9 @@
 
   const form = document.getElementById("profile-form");
   const prefectureSelect = document.getElementById("prefecture");
-  const employeesInput = document.getElementById("employees");
+  const employeesSelect = document.getElementById("employees");
+  const industrySelect = document.getElementById("industry");
+  const revenueBucketSelect = document.getElementById("revenueBucket");
   const revenueInput = document.getElementById("revenue");
   const revenueLabelEl = document.getElementById("revenue-label");
   const prevRevenueInput = document.getElementById("prevRevenue");
@@ -43,6 +45,24 @@
       opt.value = pref;
       opt.textContent = pref;
       prefectureSelect.appendChild(opt);
+    }
+    for (const bucket of EMPLOYEE_BUCKETS) {
+      const opt = document.createElement("option");
+      opt.value = bucket.value;
+      opt.textContent = bucket.label;
+      employeesSelect.appendChild(opt);
+    }
+    for (const industry of INDUSTRIES) {
+      const opt = document.createElement("option");
+      opt.value = industry;
+      opt.textContent = industry;
+      industrySelect.appendChild(opt);
+    }
+    for (const bucket of REVENUE_BUCKETS) {
+      const opt = document.createElement("option");
+      opt.value = bucket.value;
+      opt.textContent = bucket.label;
+      revenueBucketSelect.appendChild(opt);
     }
     for (const radio of form.querySelectorAll('input[name="orgType"]')) {
       radio.addEventListener("change", updateRevenueLabel);
@@ -119,7 +139,9 @@
       }
       if (profile.prefecture) prefectureSelect.value = profile.prefecture;
       if (profile.city) cityInput.value = profile.city;
-      if (profile.employees) employeesInput.value = profile.employees;
+      if (profile.employeesBucket) employeesSelect.value = profile.employeesBucket;
+      if (profile.industry) industrySelect.value = profile.industry;
+      if (profile.revenueBucket) revenueBucketSelect.value = profile.revenueBucket;
       if (profile.revenue) revenueInput.value = profile.revenue;
       if (profile.prevRevenue) prevRevenueInput.value = profile.prevRevenue;
       if (Array.isArray(profile.themes)) {
@@ -211,30 +233,41 @@
     return areas.includes("全国") || areas.includes(prefecture);
   }
 
+  // 従業員数は「1〜4人」のような区分でしか分からないため、実際の人数は
+  // その区分のどこかにいる、という前提で判定する(区分の一部でも条件に
+  // 当てはまる可能性があれば表示する = 取りこぼしを避ける方向に倒す)。
   // targetNumberOfEmployees は "20名以下" "300名以下" "901名以上"
-  // "従業員数の制約なし" のような形式。数値として比較する。
-  function employeesMatches(item, employeeCount) {
-    if (!employeeCount) return true;
+  // "従業員数の制約なし" のような形式。
+  function employeesMatches(item, employeesBucketValue) {
+    if (!employeesBucketValue) return true;
+    const bucket = EMPLOYEE_BUCKETS.find((b) => b.value === employeesBucketValue);
+    if (!bucket) return true;
     const raw = item.targetNumberOfEmployees;
     if (!raw || raw.includes("制約なし")) return true;
     const atMost = /^(\d+)名以下$/.exec(raw);
-    if (atMost) return employeeCount <= Number(atMost[1]);
+    if (atMost) return bucket.min <= Number(atMost[1]);
     const atLeast = /^(\d+)名以上$/.exec(raw);
-    if (atLeast) return employeeCount >= Number(atLeast[1]);
+    if (atLeast) return bucket.max >= Number(atLeast[1]);
     return true;
   }
 
+  function buildSearchTerms(profile) {
+    const themeTerms = profile.themes.flatMap((t) => t.split(/[\s・]+/).filter(Boolean));
+    const industryTerms = profile.industry ? profile.industry.split(/[\s・]+/).filter(Boolean) : [];
+    return [...themeTerms, ...industryTerms];
+  }
+
   function runSearch(profile) {
-    const terms = profile.themes.flatMap((t) => t.split(/[\s・]+/).filter(Boolean));
+    const terms = buildSearchTerms(profile);
     const matches = subsidyData.items.filter((item) => {
       if (!prefectureMatches(item, profile.prefecture)) return false;
-      if (!employeesMatches(item, profile.employees)) return false;
+      if (!employeesMatches(item, profile.employeesBucket)) return false;
       if (profile.acceptingOnly && !isAccepting(item)) return false;
       if (!matchesKeyword(item, terms)) return false;
       return true;
     });
     const ctas = selectCtas(profile);
-    renderResults(matches, ctas[0]);
+    renderResults(matches, profile, ctas[0], terms);
     renderDeclineSection(profile, ctas[0]);
     renderDiagnosis(profile, matches);
     renderConsultSection(ctas);
@@ -243,17 +276,29 @@
   // ---- 専門家相談CTA ----
 
   // お困りごと・テーマ・事業形態などから、関連しそうな専門家サービスの優先度を計算する。
+  // (仕様のカテゴリー対応表: 設備投資/店舗改装/機械導入/IT・DX/HP/EC/広告/新商品→補助金専門家、
+  //  採用/育成/賃上げ/労務→社労士、融資/資金繰り→資金調達、節税/税理士探し/法人化/創業→税理士)
   const CONCERN_SERVICE_WEIGHTS = {
-    equipment: { subsidySupport: 2, taxAccountant: 1 },
+    equipment: { subsidySupport: 2 },
+    renovateStore: { subsidySupport: 2 },
+    newMachine: { subsidySupport: 2 },
     itDx: { subsidySupport: 2 },
+    website: { subsidySupport: 1 },
+    ecommerce: { subsidySupport: 1 },
+    ads: { subsidySupport: 1 },
+    newProduct: { subsidySupport: 2 },
+    newBusiness: { subsidySupport: 2, taxAccountant: 1 },
     hiring: { socialInsurance: 2 },
-    laborCost: { socialInsurance: 2, taxAccountant: 1 },
+    training: { socialInsurance: 2 },
+    payRaise: { socialInsurance: 2 },
+    startup: { taxAccountant: 2, subsidySupport: 1 },
+    incorporate: { taxAccountant: 3 },
     financing: { finance: 3 },
+    cashFlow: { finance: 2, taxAccountant: 1 },
     taxSaving: { taxAccountant: 3 },
     findTaxAccountant: { taxAccountant: 3 },
+    laborConsult: { socialInsurance: 3 },
     subsidyConsult: { subsidySupport: 3 },
-    incorporate: { taxAccountant: 2 },
-    cashFlow: { finance: 2, taxAccountant: 1 },
   };
 
   const THEME_SERVICE_WEIGHTS = {
@@ -267,7 +312,20 @@
     "研究開発": { subsidySupport: 1 },
   };
 
-  // 有効(enabled)なサービスを優先度順に最大3件返す。
+  // カテゴリー内で有効(enabled)な案件のうち、優先順位(priority)が最も高い
+  // (数字が小さい)ものを1件だけ選ぶ。案件を複数登録しておいて、この
+  // enabled/priorityを切り替えるだけで表示する案件を差し替えられる。
+  function resolveCandidate(categoryKey) {
+    const category = AFFILIATE_CONFIG[categoryKey];
+    if (!category) return null;
+    const candidate = category.candidates
+      .filter((c) => c.enabled)
+      .sort((a, b) => a.priority - b.priority)[0];
+    if (!candidate) return null;
+    return { service: categoryKey, category: category.label, categoryPriority: category.priority, config: candidate };
+  }
+
+  // 有効なカテゴリーを優先度順に最大3件返す。
   // ①ユーザーの入力内容との関連性(お困りごと・テーマ) ②法人/個人事業主 ③従業員数
   // ④テーマ ⑤その他の条件、の順でスコアを積み上げてから並べる。
   function selectCtas(profile) {
@@ -283,8 +341,9 @@
       if (!weights) continue;
       for (const service of Object.keys(weights)) scores[service] += weights[service];
     }
-    if (profile.orgType === "法人") scores.taxAccountant += 1;
-    if (profile.employees && profile.employees > 0) scores.socialInsurance += 1;
+    // 法人・個人事業主のどちらも、税務相談のニーズは高いと考えて優先する
+    if (profile.orgType === "法人" || profile.orgType === "個人事業主") scores.taxAccountant += 1;
+    if (profile.employeesBucket && profile.employeesBucket !== "0") scores.socialInsurance += 1;
     const decline = computeDeclinePercent(profile.revenue, profile.prevRevenue);
     if (decline !== null && decline > 0) {
       scores.finance += 2;
@@ -292,20 +351,24 @@
     }
 
     return Object.keys(scores)
-      .map((service) => ({ service, score: scores[service], config: AFFILIATE_CONFIG[service] }))
-      .filter((entry) => entry.config && entry.config.enabled)
-      .sort((a, b) => b.score - a.score || a.config.priority - b.config.priority)
-      .slice(0, 3);
+      .map((key) => ({ key, score: scores[key], resolved: resolveCandidate(key) }))
+      .filter((entry) => entry.resolved)
+      .sort((a, b) => b.score - a.score || a.resolved.categoryPriority - b.resolved.categoryPriority)
+      .slice(0, 3)
+      .map((entry) => entry.resolved);
   }
 
   const AFFILIATE_CLICK_STORAGE_KEY = "subsidyToolAffiliateClicks";
 
   // アフィリエイトCTAがクリックされたことを記録する。
-  // ・localStorageに(サービス名・クリック日時)を積み上げて、クリック回数を把握できるようにする
+  // ・localStorageに(サービス名・カテゴリー・クリック日時)を積み上げて、
+  //   クリック回数を把握できるようにする
   // ・window.gtag / window.dataLayer が存在すれば(Google Analytics/GA4導入後)そちらにも送る
   // 外部サービスは何も契約・導入していないため、現時点では計測は端末内のみに閉じている。
-  function trackAffiliateClick(serviceName) {
-    const entry = { service: serviceName, timestamp: new Date().toISOString() };
+  // 将来コンバージョン・成約数・報酬額を管理する場合は、このクリックログに
+  // 対応する形でstorageのスキーマを拡張していく想定。
+  function trackAffiliateClick(serviceName, category) {
+    const entry = { service: serviceName, category: category || null, timestamp: new Date().toISOString() };
     try {
       const raw = localStorage.getItem(AFFILIATE_CLICK_STORAGE_KEY);
       const clicks = raw ? JSON.parse(raw) : [];
@@ -316,15 +379,15 @@
     }
     console.log("[affiliate click]", entry);
     if (typeof window.gtag === "function") {
-      window.gtag("event", "affiliate_click", { service_name: serviceName });
+      window.gtag("event", "affiliate_click", { service_name: serviceName, category });
     } else if (Array.isArray(window.dataLayer)) {
-      window.dataLayer.push({ event: "affiliate_click", service_name: serviceName });
+      window.dataLayer.push({ event: "affiliate_click", service_name: serviceName, category });
     }
   }
   window.trackAffiliateClick = trackAffiliateClick;
 
   function buildCtaButton(entry, label) {
-    const { service, config } = entry;
+    const { service, category, config } = entry;
     const active = Boolean(config.url && config.url.trim());
     if (active) {
       const a = document.createElement("a");
@@ -332,8 +395,8 @@
       a.href = config.url;
       a.target = "_blank";
       a.rel = "noopener sponsored";
-      a.textContent = label || `${config.name}を無料で相談する`;
-      a.addEventListener("click", () => trackAffiliateClick(service));
+      a.textContent = label || "無料で相談する";
+      a.addEventListener("click", () => trackAffiliateClick(service, category));
       return a;
     }
     const span = document.createElement("span");
@@ -361,13 +424,9 @@
     wrap.className = "card-cta";
     const q = document.createElement("p");
     q.className = "card-cta-question";
-    q.textContent = "この制度、あなたの会社は対象になる？";
-    const t = document.createElement("p");
-    t.className = "card-cta-text";
-    t.textContent = "補助金・助成金の活用について、専門家に無料相談できます。";
+    q.textContent = "自分の事業がこの制度の対象になるか、専門家に確認できます。";
     wrap.appendChild(q);
-    wrap.appendChild(t);
-    wrap.appendChild(buildCtaButton(entry, `${entry.config.name}をする`));
+    wrap.appendChild(buildCtaButton(entry, "自分の事業が対象になるか確認する"));
     return wrap;
   }
 
@@ -409,7 +468,7 @@
     if (decline !== null && decline > 0) finance += 1;
 
     let tax = 3;
-    if (profile.orgType === "法人") tax += 1;
+    if (profile.orgType === "法人" || profile.orgType === "個人事業主") tax += 1;
     if (
       profile.concerns.includes("taxSaving") ||
       profile.concerns.includes("findTaxAccountant") ||
@@ -472,16 +531,53 @@
     });
     declineListEl.innerHTML = "";
     for (const item of matches) {
-      declineListEl.appendChild(buildResultItem(item, topCta));
+      declineListEl.appendChild(buildResultItem(item, profile, DECLINE_KEYWORDS, topCta));
     }
   }
 
-  function buildResultItem(item, topCta) {
+  // 入力条件との一致度を簡易的に3段階(★3〜★5)で評価する。
+  // すでに都道府県・従業員数・募集中フラグ・キーワードの絞り込みを通過した
+  // 制度だけが対象なので、ここでは「一致度が高いと考えられる根拠」の数を
+  // 数えているだけで、0〜2の低評価は付けない(絞り込みを通過している時点で
+  // 無関係ではないため)。あくまで参考の簡易判定であり、対象条件との一致・
+  // 利用可否を保証するものではない。
+  function computeMatchStars(item, profile, terms) {
+    let points = 0;
+    if (profile.prefecture) {
+      const areas = (item.targetAreaSearch || "").split("/").map((s) => s.trim());
+      if (areas.includes(profile.prefecture)) points += 1;
+    }
+    if (terms.length > 0) points += 1;
+    if (
+      profile.employeesBucket &&
+      item.targetNumberOfEmployees &&
+      !item.targetNumberOfEmployees.includes("制約なし")
+    ) {
+      points += 1;
+    }
+    if (points >= 2) return 5;
+    if (points === 1) return 4;
+    return 3;
+  }
+
+  function matchStarsLabel(stars) {
+    if (stars >= 5) return "対象条件との一致度が高い";
+    if (stars === 4) return "条件が一部一致";
+    return "追加確認が必要";
+  }
+
+  function buildResultItem(item, profile, terms, topCta) {
     const accepting = isAccepting(item);
+    const stars = computeMatchStars(item, profile, terms);
+    const showIndividualBadge = profile.orgType === "個人事業主" || profile.orgType === "フリーランス";
     const li = document.createElement("li");
     li.className = "result-item";
     li.innerHTML = `
       <button type="button" class="result-toggle" aria-expanded="false">
+        <span class="result-badges">
+          <span class="match-stars" aria-label="一致度 5段階中${stars}、${matchStarsLabel(stars)}">${starString(stars)} ${escapeHtml(matchStarsLabel(stars))}</span>
+          ${showIndividualBadge ? '<span class="badge-individual">個人事業主向け</span>' : ""}
+        </span>
         <span class="result-title">${escapeHtml(item.title || "(名称未取得)")}</span>
         <span class="result-meta">
           ${item.targetAreaSearch ? `対象地域: ${escapeHtml(item.targetAreaSearch)} ／ ` : ""}
@@ -494,11 +590,10 @@
           ${item.institutionName ? `<dt>実施団体</dt><dd>${escapeHtml(item.institutionName)}</dd>` : ""}
           ${item.subsidyMaxLimit ? `<dt>補助上限額</dt><dd>${escapeHtml(String(item.subsidyMaxLimit))}円</dd>` : ""}
           ${item.subsidyRate ? `<dt>補助率</dt><dd>${escapeHtml(item.subsidyRate)}</dd>` : ""}
-          <dt>募集開始</dt><dd>${escapeHtml(formatDate(item.acceptanceStartDatetime))}</dd>
-          <dt>募集終了</dt><dd>${escapeHtml(formatDate(item.acceptanceEndDatetime))}</dd>
+          <dt>募集期間</dt><dd>${escapeHtml(formatDate(item.acceptanceStartDatetime))} 〜 ${escapeHtml(formatDate(item.acceptanceEndDatetime))}</dd>
           ${item.targetNumberOfEmployees ? `<dt>対象従業員数</dt><dd>${escapeHtml(item.targetNumberOfEmployees)}</dd>` : ""}
         </dl>
-        <p><a href="https://www.jgrants-portal.go.jp/subsidy/${encodeURIComponent(item.id)}" target="_blank" rel="noopener">jGrantsで詳細・公募要領を見る →</a></p>
+        <p><a href="https://www.jgrants-portal.go.jp/subsidy/${encodeURIComponent(item.id)}" target="_blank" rel="noopener">公式サイト（jGrants）で詳細を見る →</a></p>
       </div>
     `;
     const toggle = li.querySelector(".result-toggle");
@@ -517,7 +612,7 @@
     return li;
   }
 
-  function renderResults(items, topCta) {
+  function renderResults(items, profile, topCta, terms) {
     resultsListEl.innerHTML = "";
     if (!items.length) {
       statusEl.textContent = "条件に合う制度が見つかりませんでした。テーマの選択を変えるか、都道府県・従業員数の指定を外してみてください。";
@@ -525,7 +620,7 @@
     }
     statusEl.textContent = `${items.length}件の制度が見つかりました。`;
     for (const item of items) {
-      resultsListEl.appendChild(buildResultItem(item, topCta));
+      resultsListEl.appendChild(buildResultItem(item, profile, terms, topCta));
     }
   }
 
@@ -541,7 +636,9 @@
       orgType: form.querySelector('input[name="orgType"]:checked').value,
       prefecture: prefectureSelect.value,
       city: cityInput.value.trim(),
-      employees: employeesInput.value ? Number(employeesInput.value) : null,
+      employeesBucket: employeesSelect.value,
+      industry: industrySelect.value,
+      revenueBucket: revenueBucketSelect.value,
       revenue: revenueInput.value ? Number(revenueInput.value) : null,
       prevRevenue: prevRevenueInput.value ? Number(prevRevenueInput.value) : null,
       themes: Array.from(selectedThemes),
