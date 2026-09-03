@@ -118,10 +118,14 @@
     return new Date(item.acceptanceEndDatetime).getTime() >= Date.now();
   }
 
+  // "IT導入・デジタル化" のような複合語タグは、その表記のまま制度名に
+  // 含まれることは少ないため、「・」区切りも分解したうえで、いずれか1語でも
+  // 含まれていればヒットとする(すべての語を要求するAND条件だと、タグを
+  // 押しただけでほぼ0件になってしまう)。
   function matchesKeyword(item, terms) {
     if (!terms.length) return true;
     const haystack = `${item.title} ${item.institutionName || ""}`.toLowerCase();
-    return terms.every((t) => haystack.includes(t.toLowerCase()));
+    return terms.some((t) => haystack.includes(t.toLowerCase()));
   }
 
   // targetAreaSearch は "東京都" のような単一の値だけでなく、
@@ -149,7 +153,9 @@
   }
 
   function runSearch(profile) {
-    const terms = profile.keyword.length ? profile.keyword.split(/\s+/) : [];
+    const terms = profile.keyword.length
+      ? profile.keyword.split(/[\s・]+/).filter(Boolean)
+      : [];
     const matches = subsidyData.items.filter((item) => {
       if (!prefectureMatches(item, profile.prefecture)) return false;
       if (!employeesMatches(item, profile.employees)) return false;
