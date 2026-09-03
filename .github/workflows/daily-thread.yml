@@ -22,19 +22,8 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Determine time slot
-        id: slot
-        run: |
-          case "${{ github.event.schedule }}" in
-            "0 23 * * *") echo "slot=0" >> "$GITHUB_OUTPUT" ;;  # 8:00 JST
-            "0 4 * * *") echo "slot=1" >> "$GITHUB_OUTPUT" ;;   # 13:00 JST
-            "0 11 * * *") echo "slot=2" >> "$GITHUB_OUTPUT" ;;  # 20:00 JST
-            *) echo "slot=0" >> "$GITHUB_OUTPUT" ;;             # 手動実行時など
-          esac
-
       - name: Post daily Threads content
         env:
           THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
-          SLOT: ${{ steps.slot.outputs.slot }}
         run: node scripts/post-daily-thread.js
