@@ -13,7 +13,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { PURPOSE_TAGS } = require("../docs/subsidy/data.js");
+const { PURPOSE_TAGS, DECLINE_KEYWORDS } = require("../docs/subsidy/data.js");
 
 const API_BASE = "https://api.jgrants-portal.go.jp/exp/v1/public/subsidies";
 const OUTPUT_PATH = path.join(__dirname, "..", "docs", "subsidy", "data", "subsidies.json");
@@ -24,6 +24,7 @@ const SEARCH_TERMS = Array.from(
   new Set([
     "補助金", "助成金", "中小企業", "小規模事業者", "個人事業主",
     ...PURPOSE_TAGS,
+    ...DECLINE_KEYWORDS,
   ])
 );
 
