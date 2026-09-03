@@ -7,6 +7,8 @@
   const employeesInput = document.getElementById("employees");
   const revenueInput = document.getElementById("revenue");
   const revenueLabelEl = document.getElementById("revenue-label");
+  const prevRevenueInput = document.getElementById("prevRevenue");
+  const prevRevenueLabelEl = document.getElementById("prev-revenue-label");
   const cityInput = document.getElementById("city");
   const acceptingOnlyInput = document.getElementById("acceptingOnly");
   const purposeTagsEl = document.getElementById("purpose-tags");
@@ -14,13 +16,19 @@
   const resultsListEl = document.getElementById("results-list");
   const referenceListEl = document.getElementById("reference-list");
   const dataInfoEl = document.getElementById("data-info");
+  const declineSectionEl = document.getElementById("decline-section");
+  const declineNoteEl = document.getElementById("decline-note");
+  const declineListEl = document.getElementById("decline-list");
+  const declineReferenceListEl = document.getElementById("decline-reference-list");
 
   let subsidyData = { fetchedAt: null, count: 0, items: [] };
   const selectedThemes = new Set();
 
   function updateRevenueLabel() {
     const orgType = form.querySelector('input[name="orgType"]:checked').value;
-    revenueLabelEl.textContent = orgType === "法人" ? "年商（万円・任意）" : "所得（万円・任意）";
+    const unit = orgType === "法人" ? "年商" : "所得";
+    revenueLabelEl.textContent = `今年度の${unit}（万円・任意）`;
+    prevRevenueLabelEl.textContent = `前年度の${unit}（万円・任意）`;
   }
 
   function initOptions() {
@@ -54,15 +62,22 @@
       purposeTagsEl.appendChild(btn);
     }
     for (const program of REFERENCE_PROGRAMS) {
-      const li = document.createElement("li");
-      li.className = "reference-item";
-      li.innerHTML = `
-        <strong>${escapeHtml(program.name)}</strong>
-        <span class="ref-meta">対象: ${escapeHtml(program.for)} ／ 実施: ${escapeHtml(program.org)}</span>
-        <span class="ref-note">${escapeHtml(program.note)}</span>
-      `;
-      referenceListEl.appendChild(li);
+      referenceListEl.appendChild(buildReferenceItem(program));
     }
+    for (const program of DECLINE_REFERENCE_PROGRAMS) {
+      declineReferenceListEl.appendChild(buildReferenceItem(program));
+    }
+  }
+
+  function buildReferenceItem(program) {
+    const li = document.createElement("li");
+    li.className = "reference-item";
+    li.innerHTML = `
+      <strong>${escapeHtml(program.name)}</strong>
+      <span class="ref-meta">対象: ${escapeHtml(program.for)} ／ 実施: ${escapeHtml(program.org)}</span>
+      <span class="ref-note">${escapeHtml(program.note)}</span>
+    `;
+    return li;
   }
 
   function escapeHtml(str) {
@@ -86,6 +101,7 @@
       if (profile.city) cityInput.value = profile.city;
       if (profile.employees) employeesInput.value = profile.employees;
       if (profile.revenue) revenueInput.value = profile.revenue;
+      if (profile.prevRevenue) prevRevenueInput.value = profile.prevRevenue;
       if (Array.isArray(profile.themes)) {
         for (const btn of purposeTagsEl.querySelectorAll(".tag-btn")) {
           if (profile.themes.includes(btn.textContent)) {
@@ -190,6 +206,77 @@
       return true;
     });
     renderResults(matches);
+    renderDeclineSection(profile);
+  }
+
+  // (前年度の年商/所得 - 今年度の年商/所得) / 前年度 * 100。減少していれば正の値。
+  function computeDeclinePercent(current, prev) {
+    if (!prev || prev <= 0 || current == null) return null;
+    return ((prev - current) / prev) * 100;
+  }
+
+  function renderDeclineSection(profile) {
+    const decline = computeDeclinePercent(profile.revenue, profile.prevRevenue);
+    if (decline === null || decline <= 0) {
+      declineSectionEl.hidden = true;
+      return;
+    }
+    declineSectionEl.hidden = false;
+    const unit = profile.orgType === "法人" ? "年商" : "所得";
+    declineNoteEl.textContent =
+      `前年度から${unit}が約${Math.round(decline)}%減少しています。売上減少を要件とする資金繰り支援制度` +
+      `（セーフティネット保証など）の対象になる場合があります。対象業種・減少率などの具体的な要件は` +
+      `制度・時期によって異なるため、下の参考制度や公式情報で必ずご確認ください。`;
+
+    const matches = subsidyData.items.filter((item) => {
+      if (!prefectureMatches(item, profile.prefecture)) return false;
+      if (profile.acceptingOnly && !isAccepting(item)) return false;
+      return matchesKeyword(item, DECLINE_KEYWORDS);
+    });
+    declineListEl.innerHTML = "";
+    for (const item of matches) {
+      declineListEl.appendChild(buildResultItem(item));
+    }
+  }
+
+  function buildResultItem(item) {
+    const accepting = isAccepting(item);
+    const li = document.createElement("li");
+    li.className = "result-item";
+    li.innerHTML = `
+      <button type="button" class="result-toggle" aria-expanded="false">
+        <span class="result-title">${escapeHtml(item.title || "(名称未取得)")}</span>
+        <span class="result-meta">
+          ${item.targetAreaSearch ? `対象地域: ${escapeHtml(item.targetAreaSearch)} ／ ` : ""}
+          募集終了: ${escapeHtml(formatDate(item.acceptanceEndDatetime))}
+          ${accepting ? "" : " ／ 募集終了済み"}
+        </span>
+      </button>
+      <div class="result-detail" hidden>
+        <dl class="detail-list">
+          ${item.institutionName ? `<dt>実施団体</dt><dd>${escapeHtml(item.institutionName)}</dd>` : ""}
+          ${item.subsidyMaxLimit ? `<dt>補助上限額</dt><dd>${escapeHtml(String(item.subsidyMaxLimit))}円</dd>` : ""}
+          ${item.subsidyRate ? `<dt>補助率</dt><dd>${escapeHtml(item.subsidyRate)}</dd>` : ""}
+          <dt>募集開始</dt><dd>${escapeHtml(formatDate(item.acceptanceStartDatetime))}</dd>
+          <dt>募集終了</dt><dd>${escapeHtml(formatDate(item.acceptanceEndDatetime))}</dd>
+          ${item.targetNumberOfEmployees ? `<dt>対象従業員数</dt><dd>${escapeHtml(item.targetNumberOfEmployees)}</dd>` : ""}
+        </dl>
+        <p><a href="https://www.jgrants-portal.go.jp/subsidy/${encodeURIComponent(item.id)}" target="_blank" rel="noopener">jGrantsで詳細・公募要領を見る →</a></p>
+      </div>
+    `;
+    const toggle = li.querySelector(".result-toggle");
+    const detailEl = li.querySelector(".result-detail");
+    toggle.addEventListener("click", () => {
+      const hidden = detailEl.hasAttribute("hidden");
+      if (hidden) {
+        detailEl.removeAttribute("hidden");
+        toggle.setAttribute("aria-expanded", "true");
+      } else {
+        detailEl.setAttribute("hidden", "");
+        toggle.setAttribute("aria-expanded", "false");
+      }
+    });
+    return li;
   }
 
   function renderResults(items) {
@@ -200,43 +287,7 @@
     }
     statusEl.textContent = `${items.length}件の制度が見つかりました。`;
     for (const item of items) {
-      const accepting = isAccepting(item);
-      const li = document.createElement("li");
-      li.className = "result-item";
-      li.innerHTML = `
-        <button type="button" class="result-toggle" aria-expanded="false">
-          <span class="result-title">${escapeHtml(item.title || "(名称未取得)")}</span>
-          <span class="result-meta">
-            ${item.targetAreaSearch ? `対象地域: ${escapeHtml(item.targetAreaSearch)} ／ ` : ""}
-            募集終了: ${escapeHtml(formatDate(item.acceptanceEndDatetime))}
-            ${accepting ? "" : " ／ 募集終了済み"}
-          </span>
-        </button>
-        <div class="result-detail" hidden>
-          <dl class="detail-list">
-            ${item.institutionName ? `<dt>実施団体</dt><dd>${escapeHtml(item.institutionName)}</dd>` : ""}
-            ${item.subsidyMaxLimit ? `<dt>補助上限額</dt><dd>${escapeHtml(String(item.subsidyMaxLimit))}円</dd>` : ""}
-            ${item.subsidyRate ? `<dt>補助率</dt><dd>${escapeHtml(item.subsidyRate)}</dd>` : ""}
-            <dt>募集開始</dt><dd>${escapeHtml(formatDate(item.acceptanceStartDatetime))}</dd>
-            <dt>募集終了</dt><dd>${escapeHtml(formatDate(item.acceptanceEndDatetime))}</dd>
-            ${item.targetNumberOfEmployees ? `<dt>対象従業員数</dt><dd>${escapeHtml(item.targetNumberOfEmployees)}</dd>` : ""}
-          </dl>
-          <p><a href="https://www.jgrants-portal.go.jp/subsidy/${encodeURIComponent(item.id)}" target="_blank" rel="noopener">jGrantsで詳細・公募要領を見る →</a></p>
-        </div>
-      `;
-      const toggle = li.querySelector(".result-toggle");
-      const detailEl = li.querySelector(".result-detail");
-      toggle.addEventListener("click", () => {
-        const hidden = detailEl.hasAttribute("hidden");
-        if (hidden) {
-          detailEl.removeAttribute("hidden");
-          toggle.setAttribute("aria-expanded", "true");
-        } else {
-          detailEl.setAttribute("hidden", "");
-          toggle.setAttribute("aria-expanded", "false");
-        }
-      });
-      resultsListEl.appendChild(li);
+      resultsListEl.appendChild(buildResultItem(item));
     }
   }
 
@@ -254,6 +305,7 @@
       city: cityInput.value.trim(),
       employees: employeesInput.value ? Number(employeesInput.value) : null,
       revenue: revenueInput.value ? Number(revenueInput.value) : null,
+      prevRevenue: prevRevenueInput.value ? Number(prevRevenueInput.value) : null,
       themes: Array.from(selectedThemes),
       acceptingOnly: acceptingOnlyInput.checked,
     };

@@ -44,18 +44,26 @@
         </div>
       </div>
 
+      <div class="field">
+        <label for="employees">従業員数（任意）</label>
+        <input type="number" id="employees" name="employees" min="0" step="1" placeholder="例: 5" />
+        <p class="hint">人数を入力すると、その人数が対象になる制度だけに絞り込みます。</p>
+      </div>
+
       <div class="field-row">
         <div class="field">
-          <label for="employees">従業員数（任意）</label>
-          <input type="number" id="employees" name="employees" min="0" step="1" placeholder="例: 5" />
-          <p class="hint">人数を入力すると、その人数が対象になる制度だけに絞り込みます。</p>
+          <label for="revenue" id="revenue-label">今年度の所得（万円・任意）</label>
+          <input type="number" id="revenue" name="revenue" min="0" step="1" placeholder="例: 500" />
         </div>
         <div class="field">
-          <label for="revenue" id="revenue-label">所得（万円・任意）</label>
-          <input type="number" id="revenue" name="revenue" min="0" step="1" placeholder="例: 500" />
-          <p class="hint" id="revenue-hint">現在この項目は絞り込みには使用していません（記録用です）。</p>
+          <label for="prevRevenue" id="prev-revenue-label">前年度の所得（万円・任意）</label>
+          <input type="number" id="prevRevenue" name="prevRevenue" min="0" step="1" placeholder="例: 700" />
         </div>
       </div>
+      <p class="hint">
+        両方入力すると、前年からの減少率を計算し、売上減少を要件とする資金繰り支援制度（セーフティネット保証など）を
+        あわせて案内します（下の「売上減少に関連する制度」欄）。金額の絞り込みには使用しません。
+      </p>
 
       <div class="field">
         <span class="field-label">気になるテーマ（任意・複数選択可）</span>
@@ -77,6 +85,13 @@
     <h2>検索結果</h2>
     <div id="status" class="status"></div>
     <ul id="results-list" class="results-list"></ul>
+  </section>
+
+  <section class="card" id="decline-section" hidden aria-live="polite">
+    <h2>売上減少に関連する制度（参考）</h2>
+    <p id="decline-note" class="hint"></p>
+    <ul id="decline-list" class="results-list"></ul>
+    <ul id="decline-reference-list" class="reference-list"></ul>
   </section>
 
   <section class="card" id="reference-section">
