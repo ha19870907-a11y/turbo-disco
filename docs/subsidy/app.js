@@ -5,7 +5,8 @@
   const form = document.getElementById("profile-form");
   const prefectureSelect = document.getElementById("prefecture");
   const employeesInput = document.getElementById("employees");
-  const keywordInput = document.getElementById("keyword");
+  const revenueInput = document.getElementById("revenue");
+  const revenueLabelEl = document.getElementById("revenue-label");
   const cityInput = document.getElementById("city");
   const acceptingOnlyInput = document.getElementById("acceptingOnly");
   const purposeTagsEl = document.getElementById("purpose-tags");
@@ -15,6 +16,12 @@
   const dataInfoEl = document.getElementById("data-info");
 
   let subsidyData = { fetchedAt: null, count: 0, items: [] };
+  const selectedThemes = new Set();
+
+  function updateRevenueLabel() {
+    const orgType = form.querySelector('input[name="orgType"]:checked').value;
+    revenueLabelEl.textContent = orgType === "法人" ? "年商（万円・任意）" : "所得（万円・任意）";
+  }
 
   function initOptions() {
     for (const pref of PREFECTURES) {
@@ -23,15 +30,26 @@
       opt.textContent = pref;
       prefectureSelect.appendChild(opt);
     }
+    for (const radio of form.querySelectorAll('input[name="orgType"]')) {
+      radio.addEventListener("change", updateRevenueLabel);
+    }
+    updateRevenueLabel();
     for (const tag of PURPOSE_TAGS) {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "tag-btn";
       btn.textContent = tag;
+      btn.setAttribute("aria-pressed", "false");
       btn.addEventListener("click", () => {
-        const current = keywordInput.value.trim();
-        keywordInput.value = current ? `${current} ${tag}` : tag;
-        keywordInput.focus();
+        if (selectedThemes.has(tag)) {
+          selectedThemes.delete(tag);
+          btn.classList.remove("active");
+          btn.setAttribute("aria-pressed", "false");
+        } else {
+          selectedThemes.add(tag);
+          btn.classList.add("active");
+          btn.setAttribute("aria-pressed", "true");
+        }
       });
       purposeTagsEl.appendChild(btn);
     }
@@ -67,8 +85,18 @@
       if (profile.prefecture) prefectureSelect.value = profile.prefecture;
       if (profile.city) cityInput.value = profile.city;
       if (profile.employees) employeesInput.value = profile.employees;
-      if (profile.keyword) keywordInput.value = profile.keyword;
+      if (profile.revenue) revenueInput.value = profile.revenue;
+      if (Array.isArray(profile.themes)) {
+        for (const btn of purposeTagsEl.querySelectorAll(".tag-btn")) {
+          if (profile.themes.includes(btn.textContent)) {
+            selectedThemes.add(btn.textContent);
+            btn.classList.add("active");
+            btn.setAttribute("aria-pressed", "true");
+          }
+        }
+      }
       if (typeof profile.acceptingOnly === "boolean") acceptingOnlyInput.checked = profile.acceptingOnly;
+      updateRevenueLabel();
     } catch (e) {
       // 壊れた保存データは無視する
     }
@@ -153,9 +181,7 @@
   }
 
   function runSearch(profile) {
-    const terms = profile.keyword.length
-      ? profile.keyword.split(/[\s・]+/).filter(Boolean)
-      : [];
+    const terms = profile.themes.flatMap((t) => t.split(/[\s・]+/).filter(Boolean));
     const matches = subsidyData.items.filter((item) => {
       if (!prefectureMatches(item, profile.prefecture)) return false;
       if (!employeesMatches(item, profile.employees)) return false;
@@ -169,7 +195,7 @@
   function renderResults(items) {
     resultsListEl.innerHTML = "";
     if (!items.length) {
-      statusEl.textContent = "条件に合う制度が見つかりませんでした。キーワードを変えるか、都道府県・従業員数の指定を外してみてください。";
+      statusEl.textContent = "条件に合う制度が見つかりませんでした。テーマの選択を変えるか、都道府県・従業員数の指定を外してみてください。";
       return;
     }
     statusEl.textContent = `${items.length}件の制度が見つかりました。`;
@@ -216,20 +242,21 @@
 
   function handleSubmit(ev) {
     ev.preventDefault();
-    const profile = {
+    const profile = currentProfile();
+    saveProfile(profile);
+    runSearch(profile);
+  }
+
+  function currentProfile() {
+    return {
       orgType: form.querySelector('input[name="orgType"]:checked').value,
       prefecture: prefectureSelect.value,
       city: cityInput.value.trim(),
       employees: employeesInput.value ? Number(employeesInput.value) : null,
-      keyword: keywordInput.value.trim(),
+      revenue: revenueInput.value ? Number(revenueInput.value) : null,
+      themes: Array.from(selectedThemes),
       acceptingOnly: acceptingOnlyInput.checked,
     };
-    if (profile.keyword.length < 2) {
-      statusEl.textContent = "検索キーワードを2文字以上入力してください。";
-      return;
-    }
-    saveProfile(profile);
-    runSearch(profile);
   }
 
   async function init() {
@@ -237,6 +264,7 @@
     loadProfile();
     form.addEventListener("submit", handleSubmit);
     await loadSubsidyData();
+    if (subsidyData.items.length) runSearch(currentProfile());
   }
 
   init();

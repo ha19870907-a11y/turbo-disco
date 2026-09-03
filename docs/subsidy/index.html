@@ -44,17 +44,22 @@
         </div>
       </div>
 
-      <div class="field">
-        <label for="employees">従業員数（任意）</label>
-        <input type="number" id="employees" name="employees" min="0" step="1" placeholder="例: 5" />
-        <p class="hint">人数を入力すると、その人数が対象になる制度だけに絞り込みます。</p>
+      <div class="field-row">
+        <div class="field">
+          <label for="employees">従業員数（任意）</label>
+          <input type="number" id="employees" name="employees" min="0" step="1" placeholder="例: 5" />
+          <p class="hint">人数を入力すると、その人数が対象になる制度だけに絞り込みます。</p>
+        </div>
+        <div class="field">
+          <label for="revenue" id="revenue-label">所得（万円・任意）</label>
+          <input type="number" id="revenue" name="revenue" min="0" step="1" placeholder="例: 500" />
+          <p class="hint" id="revenue-hint">現在この項目は絞り込みには使用していません（記録用です）。</p>
+        </div>
       </div>
 
       <div class="field">
-        <label for="keyword">業種・実施したいこと（検索キーワード）</label>
-        <input type="text" id="keyword" name="keyword" placeholder="例: 飲食店 販路開拓" required minlength="2" />
-        <p class="hint">2文字以上で入力してください。下のタグをクリックすると追記できます。</p>
-        <div id="purpose-tags" class="tag-row"></div>
+        <span class="field-label">気になるテーマ（任意・複数選択可）</span>
+        <div id="purpose-tags" class="tag-row" role="group" aria-label="テーマで絞り込む"></div>
       </div>
 
       <div class="field">
