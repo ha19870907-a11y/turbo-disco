@@ -136,9 +136,9 @@ const REVENUE_BUCKETS = [
 
 // 事業分野。STEP1のプロフィール用で、選ぶと検索キーワードにも軽く反映する。
 const INDUSTRIES = [
-  "飲食", "小売", "建設", "製造", "IT・Web", "運送・物流", "美容・理容",
-  "医療・福祉", "教育", "宿泊・観光", "農林水産", "不動産", "士業",
-  "サービス業", "その他",
+  "飲食", "小売", "美容・サロン", "建設", "製造", "IT・Web", "運送・物流",
+  "医療・福祉", "教育", "宿泊・観光", "農業", "不動産", "士業・専門サービス",
+  "その他",
 ];
 
 // 「現在のお困りごと・予定」として複数選択できる項目。
@@ -146,21 +146,21 @@ const INDUSTRIES = [
 const CONCERNS = [
   { id: "equipment", label: "設備投資したい" },
   { id: "renovateStore", label: "店舗を改装したい" },
-  { id: "newMachine", label: "新しい機械を導入したい" },
-  { id: "itDx", label: "IT・DX化したい" },
+  { id: "newMachine", label: "機械を導入したい" },
+  { id: "itDx", label: "IT・DXを進めたい" },
   { id: "website", label: "ホームページを作りたい" },
   { id: "ecommerce", label: "ECサイトを作りたい" },
   { id: "ads", label: "広告・販促をしたい" },
   { id: "newProduct", label: "新商品を開発したい" },
   { id: "newBusiness", label: "新規事業を始めたい" },
   { id: "hiring", label: "従業員を採用したい" },
-  { id: "training", label: "人材育成をしたい" },
+  { id: "training", label: "従業員を教育したい" },
   { id: "payRaise", label: "賃上げをしたい" },
-  { id: "startup", label: "起業・創業したい" },
+  { id: "startup", label: "創業したい" },
   { id: "incorporate", label: "法人化したい" },
   { id: "financing", label: "融資を受けたい" },
   { id: "cashFlow", label: "資金繰りを改善したい" },
-  { id: "taxSaving", label: "節税について相談したい" },
+  { id: "taxSaving", label: "税金について相談したい" },
   { id: "findTaxAccountant", label: "税理士を探している" },
   { id: "laborConsult", label: "社会保険・労務について相談したい" },
   { id: "subsidyConsult", label: "補助金申請を専門家に相談したい" },

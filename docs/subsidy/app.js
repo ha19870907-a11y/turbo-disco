@@ -17,6 +17,8 @@
   const concernListEl = document.getElementById("concern-list");
   const statusEl = document.getElementById("status");
   const resultsListEl = document.getElementById("results-list");
+  const otherResultsSectionEl = document.getElementById("other-results-section");
+  const otherResultsListEl = document.getElementById("other-results-list");
   const referenceListEl = document.getElementById("reference-list");
   const supportListEl = document.getElementById("support-list");
   const dataInfoEl = document.getElementById("data-info");
@@ -342,7 +344,7 @@
       for (const service of Object.keys(weights)) scores[service] += weights[service];
     }
     // 法人・個人事業主のどちらも、税務相談のニーズは高いと考えて優先する
-    if (profile.orgType === "法人" || profile.orgType === "個人事業主") scores.taxAccountant += 1;
+    if (["法人","個人事業主","創業予定"].includes(profile.orgType)) scores.taxAccountant += 1;
     if (profile.employeesBucket && profile.employeesBucket !== "0") scores.socialInsurance += 1;
     const decline = computeDeclinePercent(profile.revenue, profile.prevRevenue);
     if (decline !== null && decline > 0) {
@@ -468,7 +470,7 @@
     if (decline !== null && decline > 0) finance += 1;
 
     let tax = 3;
-    if (profile.orgType === "法人" || profile.orgType === "個人事業主") tax += 1;
+    if (["法人","個人事業主","創業予定"].includes(profile.orgType)) tax += 1;
     if (
       profile.concerns.includes("taxSaving") ||
       profile.concerns.includes("findTaxAccountant") ||
@@ -522,7 +524,7 @@
     declineNoteEl.textContent =
       `前年度から${unit}が約${Math.round(decline)}%減少しています。売上減少を要件とする資金繰り支援制度` +
       `（セーフティネット保証など）の対象になる場合があります。対象業種・減少率などの具体的な要件は` +
-      `制度・時期によって異なるため、下の「支援制度（参考）」欄や公式情報で必ずご確認ください。`;
+      `制度・時期によって異なるため、下の「こんな支援もあります」欄や公式情報で必ずご確認ください。`;
 
     const matches = subsidyData.items.filter((item) => {
       if (!prefectureMatches(item, profile.prefecture)) return false;
@@ -535,28 +537,48 @@
     }
   }
 
-  // 入力条件との一致度を簡易的に3段階(★3〜★5)で評価する。
+  // 入力条件との一致度を判定するための根拠(シグナル)を洗い出す。
   // すでに都道府県・従業員数・募集中フラグ・キーワードの絞り込みを通過した
-  // 制度だけが対象なので、ここでは「一致度が高いと考えられる根拠」の数を
-  // 数えているだけで、0〜2の低評価は付けない(絞り込みを通過している時点で
+  // 制度だけが対象なので、ここでは「一致度が高いと考えられる根拠」があるかどうかを
+  // 実際のデータで確認しているだけで、根拠のでっち上げはしない
+  // (法人/個人事業主の対象一致・売上規模の一致は、jGrantsのデータに構造化された
+  // 形で含まれていないため判定していない)。
+  function computeMatchSignals(item, profile, terms) {
+    const haystack = `${item.title} ${item.institutionName || ""}`.toLowerCase();
+    const industryTerms = profile.industry ? profile.industry.split(/[\s・]+/).filter(Boolean) : [];
+    const themeTerms = profile.themes.flatMap((t) => t.split(/[\s・]+/).filter(Boolean));
+
+    const areas = (item.targetAreaSearch || "").split("/").map((s) => s.trim());
+    return {
+      area: Boolean(profile.prefecture) && areas.includes(profile.prefecture),
+      employees:
+        Boolean(profile.employeesBucket) &&
+        Boolean(item.targetNumberOfEmployees) &&
+        !item.targetNumberOfEmployees.includes("制約なし"),
+      industry: industryTerms.length > 0 && industryTerms.some((t) => haystack.includes(t.toLowerCase())),
+      purpose: themeTerms.length > 0 && themeTerms.some((t) => haystack.includes(t.toLowerCase())),
+      // 「募集中のみ表示する」がONの間は、表示されている制度は全部募集中なので
+      // このシグナルでは差がつかない(常にfalseにする)。OFFのときだけ、募集中で
+      // あること自体を一致度のプラス材料として数える。
+      accepting: !profile.acceptingOnly && isAccepting(item),
+    };
+  }
+
+  const MATCH_REASON_LABELS = {
+    area: "対象地域が入力した都道府県と一致",
+    employees: "従業員数の条件に該当",
+    industry: "選んだ業種に関連する制度",
+    purpose: "選んだテーマ・お困りごとに関連する制度",
+    accepting: "現在募集中",
+  };
+
+  // 一致度(★3〜★5、0〜2の低評価は付けない。絞り込みを通過している時点で
   // 無関係ではないため)。あくまで参考の簡易判定であり、対象条件との一致・
   // 利用可否を保証するものではない。
-  function computeMatchStars(item, profile, terms) {
-    let points = 0;
-    if (profile.prefecture) {
-      const areas = (item.targetAreaSearch || "").split("/").map((s) => s.trim());
-      if (areas.includes(profile.prefecture)) points += 1;
-    }
-    if (terms.length > 0) points += 1;
-    if (
-      profile.employeesBucket &&
-      item.targetNumberOfEmployees &&
-      !item.targetNumberOfEmployees.includes("制約なし")
-    ) {
-      points += 1;
-    }
-    if (points >= 2) return 5;
-    if (points === 1) return 4;
+  function computeMatchStars(signals) {
+    const points = Object.values(signals).filter(Boolean).length;
+    if (points >= 3) return 5;
+    if (points >= 1) return 4;
     return 3;
   }
 
@@ -568,7 +590,11 @@
 
   function buildResultItem(item, profile, terms, topCta) {
     const accepting = isAccepting(item);
-    const stars = computeMatchStars(item, profile, terms);
+    const signals = computeMatchSignals(item, profile, terms);
+    const stars = computeMatchStars(signals);
+    const reasons = Object.keys(signals)
+      .filter((key) => signals[key])
+      .map((key) => MATCH_REASON_LABELS[key]);
     const showIndividualBadge = profile.orgType === "個人事業主" || profile.orgType === "フリーランス";
     const li = document.createElement("li");
     li.className = "result-item";
@@ -584,6 +610,7 @@
           募集終了: ${escapeHtml(formatDate(item.acceptanceEndDatetime))}
           ${accepting ? "" : " ／ 募集終了済み"}
         </span>
+        ${reasons.length ? `<span class="result-reason">なぜおすすめ: ${escapeHtml(reasons.join("・"))}</span>` : ""}
       </button>
       <div class="result-detail" hidden>
         <dl class="detail-list">
@@ -612,15 +639,46 @@
     return li;
   }
 
+  // 検索結果を「A: あなたにおすすめの支援制度」(★4以上)と
+  // 「B: その他の支援制度」(★3)に分けて表示する。補助金が1件もない場合でも
+  // 「こんな支援もあります」(support-section)は常に表示されるため、
+  // 「補助金が無かった=支援が無い」という状態にはならない。
   function renderResults(items, profile, topCta, terms) {
     resultsListEl.innerHTML = "";
+    otherResultsListEl.innerHTML = "";
+
     if (!items.length) {
-      statusEl.textContent = "条件に合う制度が見つかりませんでした。テーマの選択を変えるか、都道府県・従業員数の指定を外してみてください。";
+      statusEl.textContent = "条件に合う制度が見つかりませんでした。テーマの選択を変えるか、都道府県・従業員数の指定を外してみてください。下の「こんな支援もあります」もご確認ください。";
+      otherResultsSectionEl.hidden = true;
       return;
     }
-    statusEl.textContent = `${items.length}件の制度が見つかりました。`;
-    for (const item of items) {
-      resultsListEl.appendChild(buildResultItem(item, profile, terms, topCta));
+
+    const scored = items.map((item) => {
+      const signals = computeMatchSignals(item, profile, terms);
+      return { item, stars: computeMatchStars(signals) };
+    });
+    const recommended = scored.filter((s) => s.stars >= 4);
+    const others = scored.filter((s) => s.stars === 3);
+
+    statusEl.textContent = `${items.length}件の制度が見つかりました（おすすめ ${recommended.length}件 / その他 ${others.length}件）。`;
+
+    if (recommended.length) {
+      for (const { item } of recommended) {
+        resultsListEl.appendChild(buildResultItem(item, profile, terms, topCta));
+      }
+    } else {
+      const li = document.createElement("li");
+      li.className = "hint";
+      li.textContent = "都道府県・従業員数・事業分野・テーマなどを入力すると、条件に合う制度がここに表示されやすくなります。下の「その他の支援制度」もあわせてご確認ください。";
+      resultsListEl.appendChild(li);
+    }
+    if (others.length) {
+      otherResultsSectionEl.hidden = false;
+      for (const { item } of others) {
+        otherResultsListEl.appendChild(buildResultItem(item, profile, terms, topCta));
+      }
+    } else {
+      otherResultsSectionEl.hidden = true;
     }
   }
 

@@ -62,9 +62,15 @@ body {
 }
 
 .reassurance {
-  margin: 0 0 1rem;
+  margin: 0 0 0.6rem;
   font-size: 0.9rem;
   color: var(--text);
+}
+
+.trust-note {
+  margin: 0 0 1rem;
+  font-size: 0.8rem;
+  color: var(--muted);
 }
 
 .btn-hero {
@@ -309,6 +315,11 @@ select {
 .result-meta {
   font-size: 0.82rem;
   color: var(--muted);
+}
+
+.result-reason {
+  font-size: 0.8rem;
+  color: var(--accent-dark);
 }
 
 .result-detail {
