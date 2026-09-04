@@ -141,6 +141,28 @@ const INDUSTRIES = [
   "その他",
 ];
 
+// 事業分野ごとの関連キーワード（同義語・関連語）。jGrantsの制度名には
+// 「小売」「美容・サロン」のような業種名そのものが含まれることは少ないため、
+// 言い換え・関連語もあわせて判定に使う。ここに無い業種は業種名そのものだけで
+// 判定する。「その他」はキーワードを持たず、業種による絞り込みを行わない
+// （app.jsのindustryMatches参照）。
+const INDUSTRY_KEYWORDS = {
+  "飲食": ["飲食", "レストラン", "食堂", "外食"],
+  "小売": ["小売", "店舗", "商店街", "商店"],
+  "美容・サロン": ["美容", "サロン", "理容", "エステ"],
+  "建設": ["建設", "工事", "建築", "土木"],
+  "製造": ["製造", "ものづくり", "工場", "生産設備"],
+  "IT・Web": ["情報通信", "デジタル化", "ソフトウェア", "システム開発"],
+  "運送・物流": ["運送", "物流", "運輸", "配送"],
+  "医療・福祉": ["医療", "福祉", "介護", "病院"],
+  "教育": ["教育", "人材育成", "研修"],
+  "宿泊・観光": ["宿泊", "観光", "旅館", "ホテル"],
+  "農業": ["農業", "農林", "農産", "農家"],
+  "不動産": ["不動産", "賃貸住宅", "住宅"],
+  "士業・専門サービス": ["士業", "専門サービス"],
+  "その他": [],
+};
+
 // 「現在のお困りごと・予定」として複数選択できる項目。
 // id は CTA(専門家相談)の優先度判定にも使う(app.jsのCONCERN_SERVICE_WEIGHTS)。
 const CONCERNS = [
@@ -237,7 +259,7 @@ const AFFILIATE_CONFIG = {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     PREFECTURES, PURPOSE_TAGS, REFERENCE_PROGRAMS, SUPPORT_PROGRAMS,
-    DECLINE_KEYWORDS, EMPLOYEE_BUCKETS, REVENUE_BUCKETS, INDUSTRIES, CONCERNS,
-    AFFILIATE_CONFIG,
+    DECLINE_KEYWORDS, EMPLOYEE_BUCKETS, REVENUE_BUCKETS, INDUSTRIES,
+    INDUSTRY_KEYWORDS, CONCERNS, AFFILIATE_CONFIG,
   };
 }
