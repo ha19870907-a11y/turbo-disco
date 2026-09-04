@@ -132,7 +132,7 @@
 
   function loadProfile() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = sessionStorage.getItem(STORAGE_KEY);
       if (!raw) return;
       const profile = JSON.parse(raw);
       if (profile.orgType) {
@@ -172,7 +172,7 @@
 
   function saveProfile(profile) {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
     } catch (e) {
       // ストレージが使えない環境では何もしない
     }
