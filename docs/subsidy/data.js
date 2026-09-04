@@ -188,7 +188,7 @@ const CONCERNS = [
   { id: "subsidyConsult", label: "補助金申請を専門家に相談したい" },
 ];
 
-// 専門家紹介(アフィリエイト)の設定。あとからcandidatesの中のurlを入力するだけで
+// 専門家紹介の設定。あとからcandidatesの中のurlを入力するだけで
 // 有効化できる。カテゴリーごとに複数の案件(例: 税理士A/B/C)を登録しておき、
 // enabled: true かつ priority が最小のものが実際に表示される、という構造にして
 // あるので、案件の切り替えは enabled/priority を変えるだけで行える。

@@ -384,7 +384,7 @@
 
   const AFFILIATE_CLICK_STORAGE_KEY = "subsidyToolAffiliateClicks";
 
-  // アフィリエイトCTAがクリックされたことを記録する。
+  // 専門家紹介CTAがクリックされたことを記録する。
   // ・localStorageに(サービス名・カテゴリー・クリック日時)を積み上げて、
   //   クリック回数を把握できるようにする
   // ・window.gtag / window.dataLayer が存在すれば(Google Analytics/GA4導入後)そちらにも送る
@@ -430,7 +430,7 @@
   }
 
   // 専門家紹介カードには、通常のコンテンツ（検索結果・記事）と区別できるよう
-  // 「広告」バッジを明示する（外部サービスへの紹介・アフィリエイトリンクであることが
+  // 「広告」バッジを明示する（外部サービスへの紹介リンクであることが
   // ひと目で分かるようにするため。詳細はadvertising.htmlで説明している）。
   function buildAdBadge() {
     const span = document.createElement("span");
