@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>おすすめ判定について｜補助金・助成金マッチングツール</title>
+<meta name="description" content="検索結果の「おすすめ度」がどのように表示されているか、実際の判定の仕組みを説明しています。" />
+<link rel="canonical" href="https://ha19870907-a11y.github.io/turbo-disco/subsidy/how-it-works.html" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="補助金・助成金マッチングツール" />
+<meta property="og:title" content="おすすめ判定について" />
+<meta property="og:description" content="検索結果の「おすすめ度」がどのように表示されているか、実際の判定の仕組みを説明しています。" />
+<meta property="og:url" content="https://ha19870907-a11y.github.io/turbo-disco/subsidy/how-it-works.html" />
+<meta name="twitter:card" content="summary" />
+<link rel="stylesheet" href="style.css?v=4" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "TOP", "item": "https://ha19870907-a11y.github.io/turbo-disco/subsidy/" },
+    { "@type": "ListItem", "position": 2, "name": "おすすめ判定について", "item": "https://ha19870907-a11y.github.io/turbo-disco/subsidy/how-it-works.html" }
+  ]
+}
+</script>
+</head>
+<body>
+<nav class="site-nav" aria-label="サイト内ナビゲーション">
+  <a href="index.html" class="site-nav-logo">補助金・助成金マッチングツール</a>
+  <div class="site-nav-links">
+    <a href="index.html">補助金を探す</a>
+    <a href="articles.html">お役立ち記事</a>
+  </div>
+</nav>
+<nav class="breadcrumb" aria-label="パンくずリスト">
+  <a href="index.html">TOP</a><span>&gt;</span><span aria-current="page">おすすめ判定について</span>
+</nav>
+
+<header class="page-header">
+  <p class="eyebrow">おすすめ判定について</p>
+  <h1>おすすめ判定について</h1>
+</header>
+
+<main>
+  <section class="card static-page" aria-labelledby="how-it-works-heading">
+    <h2 id="how-it-works-heading">おすすめ判定について</h2>
+    <p>
+      当サイトでは、入力された事業情報と各制度の公開情報を照合し、利用条件との一致度を参考にして制度を表示しています。
+      おすすめ度は、補助金・助成金の利用可能性を保証するものではありません。
+    </p>
+    <p>
+      例えば、地域、事業形態、対象者、募集状況、制度の対象となる事業内容など、確認できる情報をもとに参考判定を行っています。
+      表示された制度であっても、実際の申請要件を満たさない場合があります。申請を検討する場合は、必ず各制度の公式ページや
+      公募要領等をご確認ください。
+    </p>
+
+    <h2>絞り込みと「おすすめ度」の2段階</h2>
+    <p>
+      検索結果は、大きく分けて2つの段階で処理しています。
+    </p>
+    <ol>
+      <li>
+        <strong>絞り込み（表示するかどうか）</strong>：入力した都道府県・従業員数・事業分野・「気になるテーマ」・
+        募集中フラグをもとに、各制度の対象地域・対象従業員数・制度名などの公開情報と照らし合わせ、明らかに条件から
+        外れる制度を除外しています。都道府県・従業員数については、データの表記のゆれによって本来対象になり得る制度が
+        誤って除外されないよう、条件に幅を持たせた判定にしています。
+      </li>
+      <li>
+        <strong>おすすめ度（★3〜★5の参考表示）</strong>：絞り込みを通過した制度について、入力条件との一致度を
+        参考情報として星の数で表示しています。
+      </li>
+    </ol>
+
+    <h2>おすすめ度で確認している項目</h2>
+    <p>
+      現在の実装では、以下の5つの項目について、入力内容と制度の公開情報が一致しているかを確認し、一致した項目の数に
+      応じて★3（追加確認が必要）・★4（条件が一部一致）・★5（対象条件との一致度が高い）の3段階で表示しています。
+      絞り込みを通過している制度を対象としているため、★2以下の低い評価は表示していません。
+    </p>
+    <ul>
+      <li><strong>対象地域</strong>：入力した都道府県が、制度の対象地域に含まれているか。</li>
+      <li><strong>従業員数</strong>：入力した従業員数区分に対して、制度側に従業員数に関する条件が設定されているか（「制約なし」ではないか）。</li>
+      <li><strong>事業分野</strong>：選んだ業種に関連する語句が、制度名等に含まれているか。</li>
+      <li><strong>テーマ・お困りごと</strong>：選んだ「気になるテーマ」に関連する語句が、制度名等に含まれているか。</li>
+      <li><strong>募集状況</strong>：「現在募集中の制度のみ表示する」をオフにしている場合、現在募集中であるかどうか。</li>
+    </ul>
+
+    <h2>判定に使っていない項目</h2>
+    <p>
+      次の情報は、jGrantsの公開データに構造化された形で含まれていないため、おすすめ度の判定には使用していません。
+    </p>
+    <ul>
+      <li>法人・個人事業主・フリーランスなど、事業形態が制度の対象要件に一致するかどうか</li>
+      <li>入力した売上規模・年商・所得が、制度の対象要件に一致するかどうか</li>
+      <li>制度ごとの詳しい審査基準・採択基準</li>
+    </ul>
+    <p>
+      そのため、おすすめ度が高く表示された制度であっても、事業形態や売上規模の要件を満たさない場合があります。
+      表示された制度の対象者欄は、必ず制度の公式ページ・公募要領でご確認ください。
+    </p>
+
+    <h2>「あなたの会社の支援制度診断」について</h2>
+    <p>
+      検索結果の上部に表示される「あなたの会社の支援制度診断」（補助金・助成金・融資・税制の★評価）は、上記の
+      おすすめ度とは別の、さらに簡易的な参考指標です。検索でヒットした制度の件数や、入力した事業形態・お困りごとの
+      内容から機械的に算出しており、この画面にも「簡易的な参考判定であり、制度の利用を保証するものではありません」
+      と注記しています。
+    </p>
+
+    <h2>あわせてご確認ください</h2>
+    <ul>
+      <li><a href="about-service.html">このサイトについて</a></li>
+      <li><a href="terms.html">利用規約</a></li>
+    </ul>
+
+    <div class="article-cta">
+      <p class="card-cta-question">条件を入力して、対象になりそうな補助金・助成金を探してみましょう</p>
+      <a class="btn-hero" href="index.html#profile-form">無料で補助金を探す</a>
+    </div>
+  </section>
+</main>
+
+<footer class="page-footer">
+  <div class="footer-links">
+    <a href="index.html">補助金を探す</a>
+    <a href="articles.html">お役立ち記事</a>
+    <a href="about-service.html">このサイトについて</a>
+    <a href="about.html">運営者情報</a>
+    <a href="contact.html">お問い合わせ</a>
+    <a href="privacy.html">プライバシーポリシー</a>
+    <a href="terms.html">利用規約</a>
+    <a href="advertising.html">広告について</a>
+    <a href="changelog.html">更新履歴</a>
+  </div>
+  <p>データ提供: <a href="https://www.jgrants-portal.go.jp/" target="_blank" rel="noopener">jGrants（デジタル庁・中小企業庁）</a></p>
+</footer>
+</body>
+</html>
