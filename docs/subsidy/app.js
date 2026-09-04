@@ -235,6 +235,26 @@
     return areas.includes("全国") || areas.includes(prefecture);
   }
 
+  // 事業分野は、選んだ業種の関連キーワード(INDUSTRY_KEYWORDS)がタイトルに
+  // 含まれていれば一致とみなす。含まれていなくても、他の特定業種の
+  // キーワードにも一致しない(=業種を問わない一般的な制度と考えられる)場合は
+  // 除外しない。逆に、選んだ業種とは別の業種のキーワードにはっきり一致する
+  // 場合だけ「他業種向け」として除外する(選択した業種名がタイトルに無いだけで
+  // 0件になってしまう、という過剰な絞り込みを避けつつ、他業種の制度が
+  // 大量に紛れ込むのも防ぐため)。「その他」を選んだ場合は絞り込みを行わない。
+  function industryMatches(item, industry) {
+    if (!industry || industry === "その他") return true;
+    const haystack = `${item.title} ${item.institutionName || ""}`.toLowerCase();
+    const selectedKeywords = (INDUSTRY_KEYWORDS[industry] || [industry]).map((k) => k.toLowerCase());
+    if (selectedKeywords.some((k) => haystack.includes(k))) return true;
+    for (const other of INDUSTRIES) {
+      if (other === industry || other === "その他") continue;
+      const otherKeywords = (INDUSTRY_KEYWORDS[other] || [other]).map((k) => k.toLowerCase());
+      if (otherKeywords.some((k) => haystack.includes(k))) return false;
+    }
+    return true;
+  }
+
   // 従業員数は「1〜4人」のような区分でしか分からないため、実際の人数は
   // その区分のどこかにいる、という前提で判定する(区分の一部でも条件に
   // 当てはまる可能性があれば表示する = 取りこぼしを避ける方向に倒す)。
@@ -266,6 +286,7 @@
       if (!prefectureMatches(item, profile.prefecture)) return false;
       if (!employeesMatches(item, profile.employeesBucket)) return false;
       if (profile.acceptingOnly && !isAccepting(item)) return false;
+      if (!industryMatches(item, profile.industry)) return false;
       if (!matchesKeyword(item, terms)) return false;
       return true;
     });
@@ -546,7 +567,10 @@
   // 形で含まれていないため判定していない)。
   function computeMatchSignals(item, profile, terms) {
     const haystack = `${item.title} ${item.institutionName || ""}`.toLowerCase();
-    const industryTerms = profile.industry ? profile.industry.split(/[\s・]+/).filter(Boolean) : [];
+    const industryTerms =
+      profile.industry && profile.industry !== "その他"
+        ? INDUSTRY_KEYWORDS[profile.industry] || [profile.industry]
+        : [];
     const themeTerms = profile.themes.flatMap((t) => t.split(/[\s・]+/).filter(Boolean));
 
     const areas = (item.targetAreaSearch || "").split("/").map((s) => s.trim());
@@ -640,6 +664,38 @@
     return li;
   }
 
+  // 「その他の支援制度」は絞り込み条件が少ないと件数が非常に多くなりやすい
+  // (都道府県・従業員数・業種などを指定しないと300件近くになることもある)。
+  // 一度に全件表示すると画面が長くなりすぎるため、最初はOTHER_RESULTS_PAGE_SIZE件
+  // だけ表示し、「さらに表示」ボタンで追加分を出す(データを隠すのではなく、
+  // 最初に表示する量を絞るだけ)。
+  const OTHER_RESULTS_PAGE_SIZE = 20;
+
+  function renderExpandableResultList(listEl, items, profile, terms, topCta, pageSize) {
+    listEl.innerHTML = "";
+    let shown = 0;
+    function renderMore() {
+      const existingMoreItem = listEl.querySelector(".show-more-item");
+      if (existingMoreItem) existingMoreItem.remove();
+      for (const item of items.slice(shown, shown + pageSize)) {
+        listEl.appendChild(buildResultItem(item, profile, terms, topCta));
+      }
+      shown = Math.min(shown + pageSize, items.length);
+      if (shown < items.length) {
+        const li = document.createElement("li");
+        li.className = "hint show-more-item";
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "tag-btn";
+        btn.textContent = `さらに${items.length - shown}件を表示`;
+        btn.addEventListener("click", renderMore);
+        li.appendChild(btn);
+        listEl.appendChild(li);
+      }
+    }
+    renderMore();
+  }
+
   // 検索結果を「A: あなたにおすすめの支援制度」(★4以上)と
   // 「B: その他の支援制度」(★3)に分けて表示する。補助金が1件もない場合でも
   // 「こんな支援もあります」(support-section)は常に表示されるため、
@@ -664,9 +720,14 @@
     statusEl.textContent = `${items.length}件の制度が見つかりました（おすすめ ${recommended.length}件 / その他 ${others.length}件）。`;
 
     if (recommended.length) {
-      for (const { item } of recommended) {
-        resultsListEl.appendChild(buildResultItem(item, profile, terms, topCta));
-      }
+      renderExpandableResultList(
+        resultsListEl,
+        recommended.map((s) => s.item),
+        profile,
+        terms,
+        topCta,
+        OTHER_RESULTS_PAGE_SIZE,
+      );
     } else {
       const li = document.createElement("li");
       li.className = "hint";
@@ -675,9 +736,14 @@
     }
     if (others.length) {
       otherResultsSectionEl.hidden = false;
-      for (const { item } of others) {
-        otherResultsListEl.appendChild(buildResultItem(item, profile, terms, topCta));
-      }
+      renderExpandableResultList(
+        otherResultsListEl,
+        others.map((s) => s.item),
+        profile,
+        terms,
+        topCta,
+        OTHER_RESULTS_PAGE_SIZE,
+      );
     } else {
       otherResultsSectionEl.hidden = true;
     }
