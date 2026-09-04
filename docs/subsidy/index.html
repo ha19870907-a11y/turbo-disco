@@ -5,9 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 <meta http-equiv="Pragma" content="no-cache" />
-<title>補助金・助成金検索｜法人・個人事業主向け無料診断</title>
-<meta name="description" content="法人・個人事業主・フリーランスが利用できる可能性のある補助金・助成金・支援制度を無料で検索できるツールです。" />
-<link rel="stylesheet" href="style.css?v=3" />
+<title>補助金・助成金を無料で探す｜法人・個人事業主・フリーランス対応</title>
+<meta name="description" content="事業形態・地域・従業員数・売上規模などの条件から、法人・個人事業主・フリーランス・創業予定の方が利用できる可能性のある補助金・助成金・公的支援制度を無料で検索できます。" />
+<link rel="canonical" href="https://ha19870907-a11y.github.io/turbo-disco/subsidy/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="補助金・助成金マッチングツール" />
+<meta property="og:title" content="補助金・助成金を無料で探す｜法人・個人事業主・フリーランス対応" />
+<meta property="og:description" content="事業形態・地域・従業員数・売上規模などの条件から、利用できる可能性のある補助金・助成金・公的支援制度を無料で検索できます。" />
+<meta property="og:url" content="https://ha19870907-a11y.github.io/turbo-disco/subsidy/" />
+<meta name="twitter:card" content="summary" />
+<link rel="stylesheet" href="style.css?v=4" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "補助金・助成金マッチングツール",
+  "url": "https://ha19870907-a11y.github.io/turbo-disco/subsidy/",
+  "description": "事業形態・地域・従業員数・売上規模などの条件から、利用できる可能性のある補助金・助成金・公的支援制度を無料で検索できるサービスです。"
+}
+</script>
 </head>
 <body>
 <nav class="site-nav" aria-label="サイト内ナビゲーション">
@@ -19,20 +35,24 @@
 </nav>
 <header class="page-header">
   <p class="eyebrow">補助金・助成金マッチングツール</p>
-  <h1>あなたの事業で使える<br />補助金・助成金を探そう</h1>
-  <p class="hero-sub">法人・個人事業主・フリーランス対応</p>
+  <h1>あなたの事業に使える<br />補助金・助成金を無料で探す</h1>
+  <p class="hero-sub">法人・個人事業主・フリーランス・創業予定の方に対応</p>
   <p class="lead">
-    補助金・助成金だけでなく、融資・税制優遇・専門家相談までまとめて確認できる中小企業支援ツールです。
-    法人・個人事業主・フリーランス・創業予定の方まで、事業の情報を入力すると、
+    事業形態・地域・従業員数・売上規模などの条件から、
     <a href="https://www.jgrants-portal.go.jp/" target="_blank" rel="noopener">jGrants（国の補助金電子申請システム）</a>
-    に登録されている補助金・助成金の中から、条件に近い支援制度を検索します。
+    に登録されている、現在利用できる可能性のある補助金・助成金や公的な支援制度を検索できます。
   </p>
-  <p class="reassurance">個人事業主・フリーランス向けの制度も検索できます。</p>
+  <ul class="pain-points">
+    <li>「自分の会社で使える制度が分からない」</li>
+    <li>「補助金を調べる時間がない」</li>
+    <li>「どんな支援制度があるのか知りたい」</li>
+  </ul>
+  <p class="reassurance">という方のための無料検索ツールです。個人事業主・フリーランス向けの制度も検索できます。</p>
+  <a href="#profile-form" class="btn-hero">無料で補助金を探す</a>
   <p class="trust-note">
-    このサイトは公的機関等が公開する情報をもとに、利用できる可能性のある支援制度を検索・整理するサービスです。
-    表示される制度が必ず利用できることを保証するものではありません。申請前に必ず各制度の公式情報をご確認ください。
+    ※本サービスは簡易的な情報検索・参考判定を行うものであり、補助金等の採択・交付を保証するものではありません。
+    申請前には必ず各制度の公式情報をご確認ください。詳しくは<a href="about-service.html">このサイトについて</a>をご覧ください。
   </p>
-  <a href="#profile-form" class="btn-hero">無料で診断する</a>
   <p id="data-info" class="hint">読み込み中...</p>
 </header>
 
@@ -140,10 +160,25 @@
   </section>
 
   <section class="card" id="consult-section" hidden>
-    <h2>さらに専門家に相談する</h2>
+    <h2>補助金について専門家に相談したい方へ</h2>
     <p class="hint">
-      補助金・助成金の活用や、税務・労務・資金調達については、専門家に無料で相談できます。
-      ご入力いただいた内容から、参考になりそうな相談先を表示しています。
+      補助金・助成金の申請や、税務・労務・資金調達について専門家への相談を希望する方には、外部の相談サービスをご案内しています。
+      検索結果だけでは判断が難しい場合や、
+    </p>
+    <ul class="consult-reasons">
+      <li>自社が対象になるか詳しく確認したい</li>
+      <li>申請方法について相談したい</li>
+      <li>補助金以外の資金調達方法も検討したい</li>
+      <li>税務・労務について専門家に相談したい</li>
+    </ul>
+    <p class="hint">
+      といった場合にご利用いただけます。ご入力いただいた内容から、参考になりそうな相談先を表示しています。
+      相談は任意です。利用しなくても、補助金・助成金の検索機能はすべてご利用いただけます。
+    </p>
+    <p class="ad-disclosure hint">
+      <span class="ad-badge">広告</span>
+      以下は外部の専門家紹介サービスへのリンクです。リンク先を利用した場合、当サイトが紹介料等を受け取ることがあります。
+      詳しくは<a href="advertising.html">広告・アフィリエイトについて</a>をご覧ください。
     </p>
     <div id="consult-list" class="consult-list"></div>
   </section>
@@ -200,8 +235,9 @@
       </li>
       <li>この検索結果は申請の可否を保証するものではありません。応募要件・締切・提出書類は必ず公式情報でご確認ください。</li>
       <li>掲載している情報は最新の情報と異なる場合があります。申請条件・募集期間・対象経費などは必ず公式情報をご確認ください。</li>
-      <li>専門家への相談・紹介については、各サービス提供会社の条件が適用されます。当ツールが相談内容や結果を保証するものではありません。</li>
+      <li>専門家への相談・紹介については、各サービス提供会社の条件が適用されます。当ツールが相談内容や結果を保証するものではありません（専門家紹介リンクには「広告」表示を付けています。詳しくは<a href="advertising.html">広告・アフィリエイトについて</a>）。</li>
       <li>入力した情報はこの端末のブラウザ内にのみ保存され、外部には送信されません。専門家紹介のボタンをクリックした場合のみ、その先の紹介サービスのサイトへ移動します（クリックしただけで氏名・連絡先等が自動的に送信されることはありません）。</li>
+      <li>当サイトは行政機関ではありません。掲載制度の申請代行や採択保証は行っておらず、公的機関等が公開する情報をもとにした民間の情報提供サービスです。詳しくは<a href="about-service.html">このサイトについて</a>をご覧ください。</li>
     </ul>
   </section>
 </main>
@@ -209,14 +245,17 @@
 <footer class="page-footer">
   <div class="footer-links">
     <a href="articles.html">お役立ち記事</a>
+    <a href="about-service.html">このサイトについて</a>
     <a href="about.html">運営者情報</a>
     <a href="contact.html">お問い合わせ</a>
     <a href="privacy.html">プライバシーポリシー</a>
+    <a href="terms.html">利用規約</a>
+    <a href="advertising.html">広告・アフィリエイトについて</a>
   </div>
   <p>データ提供: <a href="https://www.jgrants-portal.go.jp/" target="_blank" rel="noopener">jGrants（デジタル庁・中小企業庁）</a></p>
 </footer>
 
 <script src="data.js?v=2"></script>
-<script src="app.js?v=2"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>
