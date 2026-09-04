@@ -254,9 +254,10 @@
   }
 
   function buildSearchTerms(profile) {
-    const themeTerms = profile.themes.flatMap((t) => t.split(/[\s・]+/).filter(Boolean));
-    const industryTerms = profile.industry ? profile.industry.split(/[\s・]+/).filter(Boolean) : [];
-    return [...themeTerms, ...industryTerms];
+    // 事業分野（業種）は「なぜおすすめか」の判定材料（computeMatchSignals）として使うのみで、
+    // ここでの必須絞り込み（matchesKeyword）には含めない。業種名がタイトルに一致しないだけで
+    // 検索結果が0件になってしまう（過剰な絞り込み）のを防ぐため。
+    return profile.themes.flatMap((t) => t.split(/[\s・]+/).filter(Boolean));
   }
 
   function runSearch(profile) {
