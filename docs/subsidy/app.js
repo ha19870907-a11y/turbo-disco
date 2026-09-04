@@ -429,14 +429,28 @@
     return span;
   }
 
+  // 専門家紹介カードには、通常のコンテンツ（検索結果・記事）と区別できるよう
+  // 「広告」バッジを明示する（外部サービスへの紹介・アフィリエイトリンクであることが
+  // ひと目で分かるようにするため。詳細はadvertising.htmlで説明している）。
+  function buildAdBadge() {
+    const span = document.createElement("span");
+    span.className = "ad-badge";
+    span.textContent = "広告";
+    return span;
+  }
+
   function buildCtaCard(entry) {
     const div = document.createElement("div");
     div.className = "cta-card";
+    const labelRow = document.createElement("div");
+    labelRow.className = "cta-card-label";
+    labelRow.appendChild(buildAdBadge());
     const strong = document.createElement("strong");
     strong.textContent = entry.config.name;
+    labelRow.appendChild(strong);
     const p = document.createElement("p");
     p.textContent = entry.config.description;
-    div.appendChild(strong);
+    div.appendChild(labelRow);
     div.appendChild(p);
     div.appendChild(buildCtaButton(entry));
     return div;
@@ -448,7 +462,8 @@
     wrap.className = "card-cta";
     const q = document.createElement("p");
     q.className = "card-cta-question";
-    q.textContent = "自分の事業がこの制度の対象になるか、専門家に確認できます。";
+    q.appendChild(buildAdBadge());
+    q.appendChild(document.createTextNode(" 自分の事業がこの制度の対象になるか、専門家に確認できます。"));
     wrap.appendChild(q);
     wrap.appendChild(buildCtaButton(entry, "自分の事業が対象になるか確認する"));
     return wrap;
