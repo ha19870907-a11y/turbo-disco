@@ -160,6 +160,17 @@ const els = {
   canvas: document.getElementById("render-canvas"),
 };
 
+// 数値入力欄の値をパースする。`Number(value) || fallback` だと、ユーザーが
+// 有効な範囲外の値として0を入力した場合に「未入力」と区別できず、後続の
+// クランプ処理より先にfallback（既定値）へ置き換わってしまう（例:
+// 最小値30・既定値100の欄に0を入力すると、本来は30にクランプされるべき
+// ところ100に戻ってしまう）。空欄・非数値のときだけfallbackを使う。
+function numOr(value, fallback) {
+  if (typeof value === "string" && value.trim() === "") return fallback;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 function getTemplate() {
   const checked = document.querySelector('input[name="template"]:checked');
   return checked ? checked.value : "standard";
@@ -171,12 +182,12 @@ function getSettings() {
     return {
       template,
       theme: NEON_THEMES[els.opNeonColor.value] || NEON_THEMES.pink,
-      photoDuration: Math.min(Math.max(Number(els.opPhotoDuration.value) || 1, 0.4), 3),
-      photoDisplayScale: Math.min(Math.max(Number(els.opPhotoDisplayScale.value) || 100, 30), 100),
+      photoDuration: Math.min(Math.max(numOr(els.opPhotoDuration.value, 1), 0.4), 3),
+      photoDisplayScale: Math.min(Math.max(numOr(els.opPhotoDisplayScale.value, 100), 30), 100),
       transitionType: els.opTransitionType.value || "flash",
-      transitionDuration: Math.min(Math.max(Number(els.opTransitionDuration.value) || 0.3, 0.15), 1),
+      transitionDuration: Math.min(Math.max(numOr(els.opTransitionDuration.value, 0.3), 0.15), 1),
       captionStyle: els.opCaptionStyle.value || "simple",
-      captionFontSize: Math.min(Math.max(Number(els.opCaptionFontSize.value) || 32, 16), 64),
+      captionFontSize: Math.min(Math.max(numOr(els.opCaptionFontSize.value, 32), 16), 64),
       captionFade: els.opCaptionFade.value || "fade",
       groomName: (els.opGroomName.value || "GROOM").trim().toUpperCase(),
       groomSub1: els.opGroomSub1.value.trim(),
@@ -214,12 +225,12 @@ function getSettings() {
     dateText: els.dateText.value.trim(),
     endMessage: els.endMessage.value.trim() || "Thank You",
     theme: THEMES[els.themeSelect.value] || THEMES.pink,
-    photoDuration: Math.min(Math.max(Number(els.photoDuration.value) || 4, 1.5), 10),
-    photoDisplayScale: Math.min(Math.max(Number(els.photoDisplayScale.value) || 100, 30), 100),
+    photoDuration: Math.min(Math.max(numOr(els.photoDuration.value, 4), 1.5), 10),
+    photoDisplayScale: Math.min(Math.max(numOr(els.photoDisplayScale.value, 100), 30), 100),
     transitionType: els.transitionType.value || "crossfade",
-    transitionDuration: Math.min(Math.max(Number(els.transitionDuration.value) || 0.8, 0.3), 2),
+    transitionDuration: Math.min(Math.max(numOr(els.transitionDuration.value, 0.8), 0.3), 2),
     captionStyle: els.captionStyle.value || "simple",
-    captionFontSize: Math.min(Math.max(Number(els.captionFontSize.value) || 32, 16), 64),
+    captionFontSize: Math.min(Math.max(numOr(els.captionFontSize.value, 32), 16), 64),
     captionFade: els.captionFade.value || "fade",
     photos: standardGroup.photos,
   };
@@ -368,7 +379,7 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange, endrollGr
         clipInput.title = `動画本編の長さ: 約${photo.naturalDuration.toFixed(1)}秒`;
         clipInput.addEventListener("input", () => {
           const maxAllowed = Math.min(photo.naturalDuration, MAX_VIDEO_CLIP_SECONDS);
-          photo.clipSeconds = Math.min(Math.max(Number(clipInput.value) || 1, 0.5), maxAllowed);
+          photo.clipSeconds = Math.min(Math.max(numOr(clipInput.value, 1), 0.5), maxAllowed);
           onChange();
         });
         clipLabel.appendChild(clipInput);
@@ -396,7 +407,7 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange, endrollGr
           if (durInput.value.trim() === "") {
             photo.duration = null;
           } else {
-            photo.duration = Math.min(Math.max(Number(durInput.value) || 0.2, 0.2), 20);
+            photo.duration = Math.min(Math.max(numOr(durInput.value, 0.2), 0.2), 20);
           }
           onChange();
         });
@@ -468,7 +479,7 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange, endrollGr
         if (fontSizeInput.value.trim() === "") {
           photo.captionFontSize = null;
         } else {
-          photo.captionFontSize = Math.min(Math.max(Number(fontSizeInput.value) || 16, 16), 64);
+          photo.captionFontSize = Math.min(Math.max(numOr(fontSizeInput.value, 16), 16), 64);
         }
         onChange();
       });
@@ -522,7 +533,7 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange, endrollGr
         if (sizeInput.value.trim() === "") {
           photo.displayScale = null;
         } else {
-          photo.displayScale = Math.min(Math.max(Number(sizeInput.value) || 30, 30), 100);
+          photo.displayScale = Math.min(Math.max(numOr(sizeInput.value, 30), 30), 100);
         }
         onChange();
       });
@@ -1138,31 +1149,6 @@ function computeOpeningTimeline(settings) {
   return finalizeTimeline(segments, settings.transitionDuration, duckIndices);
 }
 
-// 改行(\n)は保持しつつ、1行が長すぎる場合は指定幅に収まるよう自動で折り返す。
-// 日本語は単語区切りが無いため文字単位で判定する（英数字混在でも実用上問題ない）。
-function wrapText(ctx, text, maxWidth) {
-  const paragraphs = String(text).split("\n");
-  const result = [];
-  paragraphs.forEach((para) => {
-    if (para === "") {
-      result.push("");
-      return;
-    }
-    let line = "";
-    for (const ch of para) {
-      const test = line + ch;
-      if (line !== "" && ctx.measureText(test).width > maxWidth) {
-        result.push(line);
-        line = ch;
-      } else {
-        line = test;
-      }
-    }
-    if (line) result.push(line);
-  });
-  return result;
-}
-
 const ENDROLL_MAX_TEXT_WIDTH = CANVAS_W - 200;
 const ENDROLL_MAX_ENTRIES_PER_PAGE = 4; // 1ページに入れる来賓の人数
 const ENDROLL_NAME_GAP = 36;
@@ -1280,9 +1266,14 @@ function endRollPhotoSlideDurations(photos, speed) {
   return (photos || []).map((p) => (p.duration != null ? p.duration : ENDROLL_PHOTO_DEFAULT_SLIDE_SEC * speed));
 }
 
+// 1ページに大量の背景写真（最大でMAX_PHOTOS枚、1枚あたり最大20秒）を割り当てると
+// 表示秒数の合計が際限なく伸びてしまうため、1ページあたりの上限として設ける
+// （動画全体が意図せず極端に長くなり、書き出しに失敗・長時間化するのを防ぐ）。
+const ENDROLL_PAGE_MAX_DURATION_SEC = 120;
+
 // ページの表示時間を、タイピング演出が最後まで打ち終わって少し余韻が残るのに
 // 十分な長さと、背景写真のスライドショーに必要な長さ（各写真の表示秒数の合計）の
-// 両方を満たすように算出する。
+// 両方を満たすように算出する（ただし際限なく伸びないよう上限を設ける）。
 function computeEndRollPageDuration(page, settings) {
   const speed = settings.endrollSpeed;
   const schedule = computeEndRollTypingSchedule(page.entries, speed);
@@ -1291,7 +1282,7 @@ function computeEndRollPageDuration(page, settings) {
   const groupReadTime = page.group ? 0.6 * speed : 0;
   const typingBasedDuration = Math.min(Math.max(typingEnd + groupReadTime + ENDROLL_TYPE_FINAL_HOLD * speed, 3), 20);
   const slidesDuration = endRollPhotoSlideDurations(page.photos, speed).reduce((sum, d) => sum + d, 0);
-  return Math.max(typingBasedDuration, slidesDuration);
+  return Math.min(Math.max(typingBasedDuration, slidesDuration), ENDROLL_PAGE_MAX_DURATION_SEC);
 }
 
 function computeEndRollTimeline(settings) {
@@ -2020,10 +2011,15 @@ function endRollPhotoImg(photo) {
   return photo.kind === "video" ? photo.videoEl : photo.img;
 }
 
-// ページに動画を使う場合、初回だけ再生を開始する（写真と混在させても壊れないように）。
-function ensureEndRollVideoPlaying(photo) {
-  if (photo.kind !== "video" || photo._bgStarted) return;
-  photo._bgStarted = true;
+// ページに動画を使う場合、そのページ（セグメント）で初めて描画されたときだけ
+// 先頭から再生を開始する。同じ動画が複数のページ（例: 人数が多く「つづき」
+// ページに分かれたグループの背景に、専用の動画が1本だけ指定されている場合）で
+// 使い回されることがあるため、「このページで開始済みか」をセグメント単位で
+// 記録し、ページが変わるたびに先頭から再生し直す（同じページ内の再描画では
+// 再生を続けたいので、seg（セグメントオブジェクト自体）を識別に使う）。
+function ensureEndRollVideoPlaying(photo, seg) {
+  if (photo.kind !== "video" || photo._bgStartedForSeg === seg) return;
+  photo._bgStartedForSeg = seg;
   try {
     photo.videoEl.currentTime = 0;
   } catch (err) {
@@ -2140,10 +2136,10 @@ function drawContainPhoto(ctx, img, frameX, frameY, frameW, frameH) {
 // 背景用の写真を1枚、指定した不透明度で描画する。写真が見切れないよう、まず
 // 拡大＆ぼかした同じ写真でページ全体を埋め、その上に写真全体（縦横比そのまま）を
 // 重ねて表示する。
-function drawEndRollPhotoLayer(ctx, photo, alpha) {
+function drawEndRollPhotoLayer(ctx, photo, alpha, seg) {
   ctx.save();
   ctx.globalAlpha = alpha;
-  ensureEndRollVideoPlaying(photo);
+  ensureEndRollVideoPlaying(photo, seg);
   const img = endRollPhotoImg(photo);
   ctx.save();
   ctx.filter = "blur(24px)";
@@ -2158,10 +2154,10 @@ const ENDROLL_PHOTO_CROSSFADE_SEC = 0.6; // 背景写真が複数ある場合の
 // ページに紐づく背景写真（1枚〜複数枚）を描画する。複数枚ある場合は、ページの
 // 表示時間を均等に分けて1枚ずつ順番に表示し、切り替わり時はクロスフェードする
 // （1ページしかないグループに複数枚設定した場合の簡易スライドショー）。
-function drawEndRollPhotoBackground(ctx, photos, localT, speed) {
+function drawEndRollPhotoBackground(ctx, photos, localT, speed, seg) {
   if (photos.length === 0) return;
   if (photos.length === 1) {
-    drawEndRollPhotoLayer(ctx, photos[0], 1);
+    drawEndRollPhotoLayer(ctx, photos[0], 1, seg);
     return;
   }
   const slideDurs = endRollPhotoSlideDurations(photos, speed);
@@ -2173,12 +2169,12 @@ function drawEndRollPhotoBackground(ctx, photos, localT, speed) {
   }
   const slideDur = slideDurs[idx];
   const elapsedInSlide = localT - slideStart;
-  drawEndRollPhotoLayer(ctx, photos[idx], 1);
+  drawEndRollPhotoLayer(ctx, photos[idx], 1, seg);
   if (idx < photos.length - 1) {
     const fade = Math.min(ENDROLL_PHOTO_CROSSFADE_SEC, slideDur * 0.4);
     if (fade > 0 && elapsedInSlide > slideDur - fade) {
       const alpha = (elapsedInSlide - (slideDur - fade)) / fade;
-      drawEndRollPhotoLayer(ctx, photos[idx + 1], alpha);
+      drawEndRollPhotoLayer(ctx, photos[idx + 1], alpha, seg);
     }
   }
 }
@@ -2194,7 +2190,7 @@ function drawEndRollPage(ctx, seg, localT, settings) {
   const hasPhotoBg = photos.length > 0;
 
   if (hasPhotoBg) {
-    drawEndRollPhotoBackground(ctx, photos, localT, settings.endrollSpeed);
+    drawEndRollPhotoBackground(ctx, photos, localT, settings.endrollSpeed, seg);
     ctx.fillStyle = "rgba(0,0,0,0.45)";
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
   } else {
@@ -2452,11 +2448,15 @@ async function detectBeats(file) {
 
 // 選んだ曲を順番に、動画の長さを満たすまで繰り返し並べたスケジュールを作る。
 // 曲の切り替わり・ループのつなぎ目にはAUDIO_CROSSFADE_SEC分の重なりを持たせる。
+// ループ回数の上限は、極端に短いBGMファイルが選ばれた場合の無限ループ防止用の
+// 安全弁（曲の長さがほぼ0の場合はループ内のbreakで即座に抜ける）であり、
+// 動画自体が長い場合にBGMが最後まで敷き詰められなくなることがないよう、
+// 現実的にありえる動画の長さに対して十分大きい値にしてある。
 function buildAudioSchedule(infos, totalDuration) {
   const schedule = [];
   let t = 0;
   let i = 0;
-  while (t < totalDuration && schedule.length < 500) {
+  while (t < totalDuration && schedule.length < 20000) {
     const info = infos[i % infos.length];
     const crossfade = Math.min(AUDIO_CROSSFADE_SEC, info.duration / 2);
     schedule.push({ url: info.url, duration: info.duration, crossfade, start: t });
@@ -2651,7 +2651,7 @@ async function renderVideo({ audioFiles, beatSyncCutDuration, onProgress } = {})
       seg.photos.forEach((photo) => {
         if (photo.kind !== "video") return;
         photo.videoEl.pause();
-        photo._bgStarted = false;
+        photo._bgStartedForSeg = null;
         try {
           photo.videoEl.currentTime = 0;
         } catch (err) {
