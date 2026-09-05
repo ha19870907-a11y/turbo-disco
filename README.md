@@ -1,11 +1,12 @@
 # turbo-disco
 
-このリポジトリには独立した3つのツールがあります。
+このリポジトリには独立した複数のツールがあります。
 
 - **[結婚式ムービー作成ツール](#結婚式ムービー作成ツール)**（`docs/wedding/`）
 - **[競艇予想ツール](#競艇予想ツール)**（`docs/` / `server.js` + `public/` + `src/`）
 - **[支援制度ナビ（補助金・助成金マッチングツール）](#支援制度ナビ補助金助成金マッチングツール)**（`docs/subsidy/`）
 - **[Threads自動投稿ツール](#threads自動投稿ツール)**（`scripts/post-thread.js`）
+- **[YouTube→mp3変換ツール（個人利用専用）](#youtubemp3変換ツール個人利用専用)**（`scripts/youtube-to-mp3.js`）
 
 ## Threads自動投稿ツール
 
@@ -452,3 +453,29 @@ fixtures/               サンプルデータ表示モード用の実データ�
   通常のコンテンツと区別できるよう「広告」バッジ（`.ad-badge`）を表示します。「さらに専門家に
   相談する」セクションにも、広告であることを明記した注記（`.ad-disclosure`）と
   `advertising.html` へのリンクを設置しています。
+
+## YouTube→mp3変換ツール（個人利用専用）
+
+指定したYouTube動画の音声だけを抽出し、mp3ファイルとして保存するCLIツールです
+（`scripts/youtube-to-mp3.js`）。ローカルのNode.js環境でのみ動作し、公開ページはありません。
+
+**あくまで個人の私的利用の範囲での使用を想定しています。** 著作権のある動画のダウンロードは
+YouTubeの利用規約に抵触する可能性があるため、自分がアップロードした動画や、権利者が
+ダウンロードを許可している動画など、私的利用が認められる範囲でのみ使用してください。
+ダウンロードしたファイルを他人に配布したり、SNS等で公開したりしないでください。
+
+### 使い方
+
+```bash
+npm install
+npm run convert:mp3 -- "https://www.youtube.com/watch?v=xxxxxxxxxxx"
+```
+
+- 第2引数で出力先ディレクトリを指定できます（省略時はリポジトリ直下の `downloads/` に保存されます）。
+  ```bash
+  npm run convert:mp3 -- "https://www.youtube.com/watch?v=xxxxxxxxxxx" ~/Music
+  ```
+- 内部的には `@distube/ytdl-core` で音声ストリームを取得し、`fluent-ffmpeg`（`ffmpeg-static`が
+  同梱するffmpegバイナリを使用）でmp3（192kbps）に変換します。追加のffmpegインストールは不要です。
+- ファイル名は動画タイトルから、ファイル名に使えない記号を除いたものになります。
+- `downloads/` フォルダは `.gitignore` の対象で、リポジトリにはコミットされません。
