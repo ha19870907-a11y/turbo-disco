@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-09-05T21:14:49.343Z",
+  "fetchedAt": "2026-09-06T21:15:02.932Z",
   "source": "jGrants (https://www.jgrants-portal.go.jp/)",
   "note": "複数の検索語でjGrants公開APIを検索し、重複を除いてまとめたスナップショットです。全制度を網羅するものではありません。",
   "count": 322,
@@ -1325,17 +1325,6 @@
       "acceptanceEndDatetime": "2026-12-28T08:00Z"
     },
     {
-      "id": "a0WJ200000CDVkeMAH",
-      "title": "【経済産業省】ものづくり・商業・サービス生産性向上促進補助金（20次締切）",
-      "institutionName": "ものづくり補助金",
-      "subsidyMaxLimit": 35000000,
-      "subsidyRate": "1/2 もしくは 2/3",
-      "targetAreaSearch": "全国",
-      "targetNumberOfEmployees": "従業員数の制約なし",
-      "acceptanceStartDatetime": "2025-10-27T08:00Z",
-      "acceptanceEndDatetime": "2026-12-28T08:00Z"
-    },
-    {
       "id": "a0W2x000007CStOEAW",
       "title": "農林水産物認証取得支援事業（水産認証取得支援事業）補助金",
       "institutionName": "農林水産物認証取得支援事業（水産認証取得支援事業）補助金",
@@ -1344,6 +1333,17 @@
       "targetAreaSearch": "東京都",
       "targetNumberOfEmployees": "従業員数の制約なし",
       "acceptanceStartDatetime": "2022-04-01T01:00Z",
+      "acceptanceEndDatetime": "2026-12-28T08:00Z"
+    },
+    {
+      "id": "a0WJ200000CDVkeMAH",
+      "title": "【経済産業省】ものづくり・商業・サービス生産性向上促進補助金（20次締切）",
+      "institutionName": "ものづくり補助金",
+      "subsidyMaxLimit": 35000000,
+      "subsidyRate": "1/2 もしくは 2/3",
+      "targetAreaSearch": "全国",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2025-10-27T08:00Z",
       "acceptanceEndDatetime": "2026-12-28T08:00Z"
     },
     {
