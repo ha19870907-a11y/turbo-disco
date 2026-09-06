@@ -53,8 +53,6 @@ const ENDROLL_SPEED_MAP = { slow: 1.35, normal: 1, fast: 0.75 };
 const state = {
   bgmFiles: [], // { id, file }
   nextBgmId: 1,
-  guestMessages: [], // { id, name, message }（エンドロール用）
-  nextGuestMessageId: 1,
 };
 
 const els = {
@@ -76,6 +74,38 @@ const els = {
   endrollDropzone: document.getElementById("endroll-dropzone"),
   endrollFileInput: document.getElementById("endroll-file-input"),
   endrollPhotoGrid: document.getElementById("endroll-photo-grid"),
+
+  profileSection: document.getElementById("profile-section"),
+  profilePhotosSection: document.getElementById("profile-photos-section"),
+  profileEntriesSection: document.getElementById("profile-entries-section"),
+  profileDropzone: document.getElementById("profile-dropzone"),
+  profileFileInput: document.getElementById("profile-file-input"),
+  profilePhotoGrid: document.getElementById("profile-photo-grid"),
+  profileTitle1: document.getElementById("profile-title1"),
+  profileTitle2: document.getElementById("profile-title2"),
+  profileDateText: document.getElementById("profile-date-text"),
+  profileTheme: document.getElementById("profile-theme"),
+  profileHeaderLine1: document.getElementById("profile-header-line1"),
+  profileHeaderLine2: document.getElementById("profile-header-line2"),
+  profileSpeed: document.getElementById("profile-speed"),
+  profileEntryList: document.getElementById("profile-entry-list"),
+  addProfileEntryBtn: document.getElementById("add-profile-entry-btn"),
+
+  thanksSection: document.getElementById("thanks-section"),
+  thanksPhotosSection: document.getElementById("thanks-photos-section"),
+  thanksEntriesSection: document.getElementById("thanks-entries-section"),
+  thanksDropzone: document.getElementById("thanks-dropzone"),
+  thanksFileInput: document.getElementById("thanks-file-input"),
+  thanksPhotoGrid: document.getElementById("thanks-photo-grid"),
+  thanksTitle1: document.getElementById("thanks-title1"),
+  thanksTitle2: document.getElementById("thanks-title2"),
+  thanksDateText: document.getElementById("thanks-date-text"),
+  thanksTheme: document.getElementById("thanks-theme"),
+  thanksHeaderLine1: document.getElementById("thanks-header-line1"),
+  thanksHeaderLine2: document.getElementById("thanks-header-line2"),
+  thanksSpeed: document.getElementById("thanks-speed"),
+  thanksEntryList: document.getElementById("thanks-entry-list"),
+  addThanksEntryBtn: document.getElementById("add-thanks-entry-btn"),
 
   dropzone: document.getElementById("dropzone"),
   fileInput: document.getElementById("file-input"),
@@ -176,6 +206,30 @@ function getTemplate() {
   return checked ? checked.value : "standard";
 }
 
+// エンドロール／2人のプロフィール／親への感謝ムービーは、いずれも「本のページを
+// めくる」同じ演出エンジン（buildEndRollPages/computeEndRollTimeline/drawEndRollPage
+// など）を使い回す。この3テンプレートで共通の設定オブジェクトの形を1か所にまとめ、
+// 各テンプレート固有の入力欄・データだけを引数で渡す（フィールド名は歴史的経緯で
+// endroll*のままだが、内部実装の詳細でありどのテンプレートでも同じ意味で使われる）。
+function buildRollSettings({ template, titleEl1, titleEl2, dateEl, themeEl, headerLine1El, headerLine1Fallback, headerLine2El, speedEl, entries, photos }) {
+  const speedMultiplier = ENDROLL_SPEED_MAP[speedEl.value] || ENDROLL_SPEED_MAP.normal;
+  return {
+    template,
+    title1: titleEl1.value.trim(),
+    title2: titleEl2.value.trim(),
+    dateText: dateEl.value.trim(),
+    theme: THEMES[themeEl.value] || THEMES.pink,
+    endrollThemeKey: themeEl.value || "pink",
+    transitionType: "pageflip",
+    transitionDuration: Math.min(Math.max(0.9 * speedMultiplier, 0.5), 1.3),
+    endrollHeaderLine1: headerLine1El.value.trim() || headerLine1Fallback,
+    endrollHeaderLine2: headerLine2El.value.trim(),
+    endrollSpeed: speedMultiplier,
+    guestMessages: entries,
+    endrollPhotos: photos,
+  };
+}
+
 function getSettings() {
   const template = getTemplate();
   if (template === "opening") {
@@ -201,22 +255,49 @@ function getSettings() {
     };
   }
   if (template === "endroll") {
-    const endrollSpeedMultiplier = ENDROLL_SPEED_MAP[els.endrollSpeed.value] || ENDROLL_SPEED_MAP.normal;
-    return {
+    return buildRollSettings({
       template,
-      title1: els.endrollTitle1.value.trim(),
-      title2: els.endrollTitle2.value.trim(),
-      dateText: els.endrollDateText.value.trim(),
-      theme: THEMES[els.endrollTheme.value] || THEMES.pink,
-      endrollThemeKey: els.endrollTheme.value || "pink",
-      transitionType: "pageflip",
-      transitionDuration: Math.min(Math.max(0.9 * endrollSpeedMultiplier, 0.5), 1.3),
-      endrollHeaderLine1: els.endrollHeaderLine1.value.trim() || "Thank You",
-      endrollHeaderLine2: els.endrollHeaderLine2.value.trim(),
-      endrollSpeed: endrollSpeedMultiplier,
-      guestMessages: state.guestMessages,
-      endrollPhotos: endrollGroup.photos,
-    };
+      titleEl1: els.endrollTitle1,
+      titleEl2: els.endrollTitle2,
+      dateEl: els.endrollDateText,
+      themeEl: els.endrollTheme,
+      headerLine1El: els.endrollHeaderLine1,
+      headerLine1Fallback: "Thank You",
+      headerLine2El: els.endrollHeaderLine2,
+      speedEl: els.endrollSpeed,
+      entries: guestMessageManager.entries,
+      photos: endrollGroup.photos,
+    });
+  }
+  if (template === "profile") {
+    return buildRollSettings({
+      template,
+      titleEl1: els.profileTitle1,
+      titleEl2: els.profileTitle2,
+      dateEl: els.profileDateText,
+      themeEl: els.profileTheme,
+      headerLine1El: els.profileHeaderLine1,
+      headerLine1Fallback: "Profile",
+      headerLine2El: els.profileHeaderLine2,
+      speedEl: els.profileSpeed,
+      entries: profileEntryManager.entries,
+      photos: profileGroup.photos,
+    });
+  }
+  if (template === "thanks") {
+    return buildRollSettings({
+      template,
+      titleEl1: els.thanksTitle1,
+      titleEl2: els.thanksTitle2,
+      dateEl: els.thanksDateText,
+      themeEl: els.thanksTheme,
+      headerLine1El: els.thanksHeaderLine1,
+      headerLine1Fallback: "Thank You",
+      headerLine2El: els.thanksHeaderLine2,
+      speedEl: els.thanksSpeed,
+      entries: thanksEntryManager.entries,
+      photos: thanksGroup.photos,
+    });
   }
   return {
     template,
@@ -428,10 +509,11 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange, endrollGr
       item.appendChild(captionInput);
 
       if (endrollGroupField) {
-        // この写真を、来賓メッセージの特定の「グループ」ページの背景専用にしたい場合の指定欄。
-        // 来賓メッセージのグループ欄と同じ名前を入れると、そのグループのページ（つづきページも
-        // 含む）すべての背景にこの写真が使われる。空欄の写真は、専用の写真が無いグループに
-        // これまで通り順番に割り当てられる。
+        // この写真を、下の項目一覧の特定の「グループ」ページの背景専用にしたい場合の指定欄。
+        // 項目一覧のグループ欄と同じ名前を入れると、そのグループのページ（つづきページも
+        // 含む）すべての背景にこの写真が使われる（エンドロール／2人のプロフィール／
+        // 親への感謝ムービーのいずれでも同じ仕組みを使う）。空欄の写真は、専用の写真が
+        // 無いグループにこれまで通り順番に割り当てられる。
         const bgGroupLabel = document.createElement("label");
         bgGroupLabel.className = "photo-field-label";
         bgGroupLabel.textContent = "背景にするグループ";
@@ -442,7 +524,7 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange, endrollGr
         bgGroupInput.maxLength = MAX_GUEST_GROUP_LENGTH;
         bgGroupInput.value = photo.endrollGroup || "";
         bgGroupInput.draggable = false;
-        bgGroupInput.title = "来賓メッセージの「グループ」欄と同じ名前を入れると、そのグループのページの背景にこの写真が使われます";
+        bgGroupInput.title = "下の項目一覧の「グループ」欄と同じ名前を入れると、そのグループのページの背景にこの写真が使われます";
         bgGroupInput.addEventListener("input", () => {
           photo.endrollGroup = bgGroupInput.value;
           onChange();
@@ -772,6 +854,20 @@ const endrollGroup = createPhotoGroup({
   onChange: () => updateDurationEstimate(),
   endrollGroupField: true,
 });
+const profileGroup = createPhotoGroup({
+  gridEl: els.profilePhotoGrid,
+  dropzoneEl: els.profileDropzone,
+  fileInputEl: els.profileFileInput,
+  onChange: () => updateDurationEstimate(),
+  endrollGroupField: true,
+});
+const thanksGroup = createPhotoGroup({
+  gridEl: els.thanksPhotoGrid,
+  dropzoneEl: els.thanksDropzone,
+  fileInputEl: els.thanksFileInput,
+  onChange: () => updateDurationEstimate(),
+  endrollGroupField: true,
+});
 
 document.querySelectorAll('input[name="template"]').forEach((radio) => {
   radio.addEventListener("change", updateTemplateVisibility);
@@ -782,6 +878,8 @@ function updateTemplateVisibility() {
   const isStandard = template === "standard";
   const isOpening = template === "opening";
   const isEndroll = template === "endroll";
+  const isProfile = template === "profile";
+  const isThanks = template === "thanks";
   els.standardPhotosSection.classList.toggle("hidden", !isStandard);
   els.standardSettingsSection.classList.toggle("hidden", !isStandard);
   els.openingSection.classList.toggle("hidden", !isOpening);
@@ -789,6 +887,12 @@ function updateTemplateVisibility() {
   els.endrollSection.classList.toggle("hidden", !isEndroll);
   els.endrollPhotosSection.classList.toggle("hidden", !isEndroll);
   els.endrollMessagesSection.classList.toggle("hidden", !isEndroll);
+  els.profileSection.classList.toggle("hidden", !isProfile);
+  els.profilePhotosSection.classList.toggle("hidden", !isProfile);
+  els.profileEntriesSection.classList.toggle("hidden", !isProfile);
+  els.thanksSection.classList.toggle("hidden", !isThanks);
+  els.thanksPhotosSection.classList.toggle("hidden", !isThanks);
+  els.thanksEntriesSection.classList.toggle("hidden", !isThanks);
   updateDurationEstimate();
 }
 
@@ -808,9 +912,19 @@ function updateTemplateVisibility() {
   els.endrollDateText,
   els.endrollHeaderLine1,
   els.endrollHeaderLine2,
+  els.profileTitle1,
+  els.profileTitle2,
+  els.profileDateText,
+  els.profileHeaderLine1,
+  els.profileHeaderLine2,
+  els.thanksTitle1,
+  els.thanksTitle2,
+  els.thanksDateText,
+  els.thanksHeaderLine1,
+  els.thanksHeaderLine2,
 ].forEach((el) => el.addEventListener("input", updateDurationEstimate));
 
-[els.endrollSpeed].forEach((el) => el.addEventListener("change", updateDurationEstimate));
+[els.endrollSpeed, els.profileSpeed, els.thanksSpeed].forEach((el) => el.addEventListener("change", updateDurationEstimate));
 
 // --- BGM（複数曲）の追加・並べ替え ---
 
@@ -873,116 +987,191 @@ function updateAddBgmButtonState() {
   els.addBgmBtn.disabled = state.bgmFiles.length === 0;
 }
 
-// --- エンドロール用: 来賓へのメッセージ一覧（名前＋メッセージ） ---
+// --- 「本のページをめくる」演出3テンプレート共通: 項目一覧
+// （エンドロールの「お名前＋メッセージ」、2人のプロフィールの「質問＋回答」、
+// 親への感謝ムービーの「見出し＋メッセージ」は、どれも「グループ・1行目・
+// 2行目」という同じデータ形なので、1つの汎用コンポーネントを使い回す） ---
 
-function renderGuestMessageList() {
-  els.guestMessageList.innerHTML = "";
-  state.guestMessages.forEach((entry, index) => {
-    const row = document.createElement("div");
-    row.className = "guest-row";
-    row.draggable = true;
-    row.dataset.id = String(entry.id);
+function createEntryListManager({
+  listEl,
+  addBtnEl,
+  maxEntries,
+  entryNoun,
+  groupPlaceholder,
+  groupTitle,
+  namePlaceholder,
+  nameMaxLength,
+  messagePlaceholder,
+  messageMaxLength,
+  onChange,
+}) {
+  const manager = { entries: [], nextId: 1 };
 
-    const top = document.createElement("div");
-    top.className = "guest-row-top";
+  function render() {
+    listEl.innerHTML = "";
+    manager.entries.forEach((entry, index) => {
+      const row = document.createElement("div");
+      row.className = "guest-row";
+      row.draggable = true;
+      row.dataset.id = String(entry.id);
 
-    const badge = document.createElement("span");
-    badge.className = "guest-order";
-    badge.textContent = String(index + 1);
-    top.appendChild(badge);
+      const top = document.createElement("div");
+      top.className = "guest-row-top";
 
-    // グループ名（任意）。同じグループ名の行が連続していると、エンドロールに
-    // その名前の見出しがまとめて1回だけ表示される（並び順はドラッグで調整）。
-    const groupInput = document.createElement("input");
-    groupInput.type = "text";
-    groupInput.className = "guest-group-input";
-    groupInput.placeholder = "グループ（任意）";
-    groupInput.maxLength = MAX_GUEST_GROUP_LENGTH;
-    groupInput.value = entry.group || "";
-    groupInput.draggable = false;
-    groupInput.title = "例: 新郎友人、新婦友人、ご親族など。同じグループ名の行はまとめて見出しが表示されます";
-    groupInput.addEventListener("input", () => {
-      entry.group = groupInput.value;
-      updateDurationEstimate();
+      const badge = document.createElement("span");
+      badge.className = "guest-order";
+      badge.textContent = String(index + 1);
+      top.appendChild(badge);
+
+      // グループ名（任意）。同じグループ名の行が連続していると、
+      // その名前の見出しがまとめて1回だけ表示される（並び順はドラッグで調整）。
+      const groupInput = document.createElement("input");
+      groupInput.type = "text";
+      groupInput.className = "guest-group-input";
+      groupInput.placeholder = groupPlaceholder;
+      groupInput.maxLength = MAX_GUEST_GROUP_LENGTH;
+      groupInput.value = entry.group || "";
+      groupInput.draggable = false;
+      groupInput.title = groupTitle;
+      groupInput.addEventListener("input", () => {
+        entry.group = groupInput.value;
+        onChange();
+      });
+      top.appendChild(groupInput);
+
+      const nameInput = document.createElement("input");
+      nameInput.type = "text";
+      nameInput.className = "guest-name-input";
+      nameInput.placeholder = namePlaceholder;
+      nameInput.maxLength = nameMaxLength;
+      nameInput.value = entry.name || "";
+      nameInput.draggable = false;
+      nameInput.addEventListener("input", () => {
+        entry.name = nameInput.value;
+        onChange();
+      });
+      top.appendChild(nameInput);
+
+      const removeBtn = document.createElement("button");
+      removeBtn.className = "guest-remove";
+      removeBtn.type = "button";
+      removeBtn.textContent = "×";
+      removeBtn.addEventListener("click", () => {
+        manager.entries = manager.entries.filter((g) => g.id !== entry.id);
+        render();
+        onChange();
+      });
+      top.appendChild(removeBtn);
+
+      row.appendChild(top);
+
+      const messageInput = document.createElement("textarea");
+      messageInput.className = "guest-message-input";
+      messageInput.placeholder = messagePlaceholder;
+      messageInput.maxLength = messageMaxLength;
+      messageInput.rows = 2;
+      messageInput.value = entry.message || "";
+      messageInput.draggable = false;
+      messageInput.addEventListener("input", () => {
+        entry.message = messageInput.value;
+        onChange();
+      });
+      row.appendChild(messageInput);
+
+      row.addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("text/plain", String(entry.id));
+        e.dataTransfer.effectAllowed = "move";
+      });
+      row.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        row.classList.add("drag-over");
+      });
+      row.addEventListener("dragleave", () => row.classList.remove("drag-over"));
+      row.addEventListener("drop", (e) => {
+        e.preventDefault();
+        row.classList.remove("drag-over");
+        const draggedId = Number(e.dataTransfer.getData("text/plain"));
+        if (draggedId === entry.id) return;
+        const fromIndex = manager.entries.findIndex((g) => g.id === draggedId);
+        const toIndex = manager.entries.findIndex((g) => g.id === entry.id);
+        if (fromIndex < 0 || toIndex < 0) return;
+        const [moved] = manager.entries.splice(fromIndex, 1);
+        manager.entries.splice(toIndex, 0, moved);
+        render();
+      });
+
+      listEl.appendChild(row);
     });
-    top.appendChild(groupInput);
-
-    const nameInput = document.createElement("input");
-    nameInput.type = "text";
-    nameInput.className = "guest-name-input";
-    nameInput.placeholder = "お名前";
-    nameInput.maxLength = MAX_GUEST_NAME_LENGTH;
-    nameInput.value = entry.name || "";
-    nameInput.draggable = false;
-    nameInput.addEventListener("input", () => {
-      entry.name = nameInput.value;
-      updateDurationEstimate();
-    });
-    top.appendChild(nameInput);
-
-    const removeBtn = document.createElement("button");
-    removeBtn.className = "guest-remove";
-    removeBtn.type = "button";
-    removeBtn.textContent = "×";
-    removeBtn.addEventListener("click", () => {
-      state.guestMessages = state.guestMessages.filter((g) => g.id !== entry.id);
-      renderGuestMessageList();
-      updateDurationEstimate();
-    });
-    top.appendChild(removeBtn);
-
-    row.appendChild(top);
-
-    const messageInput = document.createElement("textarea");
-    messageInput.className = "guest-message-input";
-    messageInput.placeholder = "メッセージ（任意）";
-    messageInput.maxLength = MAX_GUEST_MESSAGE_LENGTH;
-    messageInput.rows = 2;
-    messageInput.value = entry.message || "";
-    messageInput.draggable = false;
-    messageInput.addEventListener("input", () => {
-      entry.message = messageInput.value;
-      updateDurationEstimate();
-    });
-    row.appendChild(messageInput);
-
-    row.addEventListener("dragstart", (e) => {
-      e.dataTransfer.setData("text/plain", String(entry.id));
-      e.dataTransfer.effectAllowed = "move";
-    });
-    row.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      row.classList.add("drag-over");
-    });
-    row.addEventListener("dragleave", () => row.classList.remove("drag-over"));
-    row.addEventListener("drop", (e) => {
-      e.preventDefault();
-      row.classList.remove("drag-over");
-      const draggedId = Number(e.dataTransfer.getData("text/plain"));
-      if (draggedId === entry.id) return;
-      const fromIndex = state.guestMessages.findIndex((g) => g.id === draggedId);
-      const toIndex = state.guestMessages.findIndex((g) => g.id === entry.id);
-      if (fromIndex < 0 || toIndex < 0) return;
-      const [moved] = state.guestMessages.splice(fromIndex, 1);
-      state.guestMessages.splice(toIndex, 0, moved);
-      renderGuestMessageList();
-    });
-
-    els.guestMessageList.appendChild(row);
-  });
-}
-
-function addGuestMessage() {
-  if (state.guestMessages.length >= MAX_GUEST_MESSAGES) {
-    alert(`メッセージは最大${MAX_GUEST_MESSAGES}件まで追加できます`);
-    return;
   }
-  state.guestMessages.push({ id: state.nextGuestMessageId++, name: "", group: "", message: "" });
-  renderGuestMessageList();
-  updateDurationEstimate();
+
+  function addEntry() {
+    if (manager.entries.length >= maxEntries) {
+      alert(`${entryNoun}は最大${maxEntries}件まで追加できます`);
+      return;
+    }
+    manager.entries.push({ id: manager.nextId++, name: "", group: "", message: "" });
+    render();
+    onChange();
+  }
+
+  // 下書き復元用: 保存されていた項目一覧で現在の内容をすべて置き換える。
+  function restoreItems(saved) {
+    manager.entries = (saved || []).map((e) => ({
+      id: manager.nextId++,
+      name: e.name || "",
+      group: e.group || "",
+      message: e.message || "",
+    }));
+    render();
+  }
+
+  addBtnEl.addEventListener("click", addEntry);
+  manager.render = render;
+  manager.restoreItems = restoreItems;
+  return manager;
 }
 
-els.addGuestMessageBtn.addEventListener("click", addGuestMessage);
+const guestMessageManager = createEntryListManager({
+  listEl: els.guestMessageList,
+  addBtnEl: els.addGuestMessageBtn,
+  maxEntries: MAX_GUEST_MESSAGES,
+  entryNoun: "メッセージ",
+  groupPlaceholder: "グループ（任意）",
+  groupTitle: "例: 新郎友人、新婦友人、ご親族など。同じグループ名の行はまとめて見出しが表示されます",
+  namePlaceholder: "お名前",
+  nameMaxLength: MAX_GUEST_NAME_LENGTH,
+  messagePlaceholder: "メッセージ（任意）",
+  messageMaxLength: MAX_GUEST_MESSAGE_LENGTH,
+  onChange: () => updateDurationEstimate(),
+});
+
+const profileEntryManager = createEntryListManager({
+  listEl: els.profileEntryList,
+  addBtnEl: els.addProfileEntryBtn,
+  maxEntries: MAX_GUEST_MESSAGES,
+  entryNoun: "プロフィール項目",
+  groupPlaceholder: "グループ（任意）",
+  groupTitle: "例: 新郎、新婦など。同じグループ名の行はまとめて見出しが表示されます",
+  namePlaceholder: "質問",
+  nameMaxLength: MAX_GUEST_NAME_LENGTH,
+  messagePlaceholder: "回答（任意）",
+  messageMaxLength: MAX_GUEST_MESSAGE_LENGTH,
+  onChange: () => updateDurationEstimate(),
+});
+
+const thanksEntryManager = createEntryListManager({
+  listEl: els.thanksEntryList,
+  addBtnEl: els.addThanksEntryBtn,
+  maxEntries: MAX_GUEST_MESSAGES,
+  entryNoun: "メッセージ",
+  groupPlaceholder: "グループ（任意）",
+  groupTitle: "例: 新郎から、新婦から など。同じグループ名の行はまとめて見出しが表示されます",
+  namePlaceholder: "見出し（任意）",
+  nameMaxLength: MAX_GUEST_NAME_LENGTH,
+  messagePlaceholder: "メッセージ（任意）",
+  messageMaxLength: MAX_GUEST_MESSAGE_LENGTH,
+  onChange: () => updateDurationEstimate(),
+});
 
 function addBgmFiles(fileList) {
   const incoming = Array.from(fileList).filter((f) => looksLikeType(f, "audio/", AUDIO_EXTENSIONS));
@@ -1312,9 +1501,14 @@ function computeEndRollTimeline(settings) {
   return finalizeTimeline(segments, settings.transitionDuration);
 }
 
+// 「本のページをめくる」演出を共有する3テンプレート（エンドロール／2人のプロフィール／
+// 親への感謝ムービー）。settings.templateがこのいずれかであれば、同じcomputeEndRollTimeline
+// 等の関数で処理する。
+const ROLL_TEMPLATES = ["endroll", "profile", "thanks"];
+
 function computeTimeline(settings) {
   if (settings.template === "opening") return computeOpeningTimeline(settings);
-  if (settings.template === "endroll") return computeEndRollTimeline(settings);
+  if (ROLL_TEMPLATES.includes(settings.template)) return computeEndRollTimeline(settings);
   return computeStandardTimeline(settings);
 }
 
@@ -1322,21 +1516,24 @@ function countPhotos(settings) {
   if (settings.template === "opening") {
     return settings.groomPhotos.length + settings.bridePhotos.length + settings.togetherPhotos.length;
   }
-  if (settings.template === "endroll") {
+  if (ROLL_TEMPLATES.includes(settings.template)) {
     return settings.guestMessages.length;
   }
   return settings.photos.length;
 }
+
+// ROLL_TEMPLATES各テンプレートの、項目数を表す言葉（想定の動画の長さの表示用）。
+const ROLL_ENTRY_NOUNS = { endroll: "来賓メッセージ", profile: "プロフィール項目", thanks: "メッセージ" };
 
 function updateDurationEstimate() {
   const settings = getSettings();
   const { total } = computeTimeline(settings);
   const mins = Math.floor(total / 60);
   const secs = Math.round(total % 60);
-  const countLabel =
-    settings.template === "endroll"
-      ? `来賓メッセージ ${countPhotos(settings)}件・ページの写真 ${settings.endrollPhotos.length}枚`
-      : `写真・動画 ${countPhotos(settings)}点`;
+  const rollNoun = ROLL_ENTRY_NOUNS[settings.template];
+  const countLabel = rollNoun
+    ? `${rollNoun} ${countPhotos(settings)}件・ページの写真 ${settings.endrollPhotos.length}枚`
+    : `写真・動画 ${countPhotos(settings)}点`;
   els.durationEstimate.textContent = `${countLabel} / 想定の動画の長さ: 約${mins > 0 ? mins + "分" : ""}${secs}秒`;
 }
 
@@ -2801,6 +2998,20 @@ function collectDraftData() {
       endrollHeaderLine1: els.endrollHeaderLine1.value,
       endrollHeaderLine2: els.endrollHeaderLine2.value,
       endrollSpeed: els.endrollSpeed.value,
+      profileTitle1: els.profileTitle1.value,
+      profileTitle2: els.profileTitle2.value,
+      profileDateText: els.profileDateText.value,
+      profileTheme: els.profileTheme.value,
+      profileHeaderLine1: els.profileHeaderLine1.value,
+      profileHeaderLine2: els.profileHeaderLine2.value,
+      profileSpeed: els.profileSpeed.value,
+      thanksTitle1: els.thanksTitle1.value,
+      thanksTitle2: els.thanksTitle2.value,
+      thanksDateText: els.thanksDateText.value,
+      thanksTheme: els.thanksTheme.value,
+      thanksHeaderLine1: els.thanksHeaderLine1.value,
+      thanksHeaderLine2: els.thanksHeaderLine2.value,
+      thanksSpeed: els.thanksSpeed.value,
     },
     groups: {
       standard: collectGroupDraftItems(standardGroup),
@@ -2808,13 +3019,17 @@ function collectDraftData() {
       bride: collectGroupDraftItems(brideGroup),
       together: collectGroupDraftItems(togetherGroup),
       endroll: collectGroupDraftItems(endrollGroup),
+      profile: collectGroupDraftItems(profileGroup),
+      thanks: collectGroupDraftItems(thanksGroup),
     },
     bgmFiles: state.bgmFiles.map((t) => ({
       blob: t.file,
       fileName: t.file.name,
       fileType: t.file.type,
     })),
-    guestMessages: state.guestMessages.map((g) => ({ name: g.name, group: g.group, message: g.message })),
+    guestMessages: guestMessageManager.entries.map((g) => ({ name: g.name, group: g.group, message: g.message })),
+    profileEntries: profileEntryManager.entries.map((g) => ({ name: g.name, group: g.group, message: g.message })),
+    thanksEntries: thanksEntryManager.entries.map((g) => ({ name: g.name, group: g.group, message: g.message })),
   };
 }
 
@@ -2855,8 +3070,22 @@ async function restoreDraftData(data) {
   els.endrollHeaderLine1.value = f.endrollHeaderLine1 || "";
   els.endrollHeaderLine2.value = f.endrollHeaderLine2 || "";
   els.endrollSpeed.value = f.endrollSpeed || "normal";
+  els.profileTitle1.value = f.profileTitle1 || "";
+  els.profileTitle2.value = f.profileTitle2 || "";
+  els.profileDateText.value = f.profileDateText || "";
+  els.profileTheme.value = f.profileTheme || "pink";
+  els.profileHeaderLine1.value = f.profileHeaderLine1 || "";
+  els.profileHeaderLine2.value = f.profileHeaderLine2 || "";
+  els.profileSpeed.value = f.profileSpeed || "normal";
+  els.thanksTitle1.value = f.thanksTitle1 || "";
+  els.thanksTitle2.value = f.thanksTitle2 || "";
+  els.thanksDateText.value = f.thanksDateText || "";
+  els.thanksTheme.value = f.thanksTheme || "pink";
+  els.thanksHeaderLine1.value = f.thanksHeaderLine1 || "";
+  els.thanksHeaderLine2.value = f.thanksHeaderLine2 || "";
+  els.thanksSpeed.value = f.thanksSpeed || "normal";
 
-  const templateValue = ["opening", "endroll"].includes(data.template) ? data.template : "standard";
+  const templateValue = ["opening", "endroll", "profile", "thanks"].includes(data.template) ? data.template : "standard";
   const templateRadio = document.querySelector(`input[name="template"][value="${templateValue}"]`);
   if (templateRadio) templateRadio.checked = true;
   updateTemplateVisibility();
@@ -2866,6 +3095,8 @@ async function restoreDraftData(data) {
   await brideGroup.restoreItems((data.groups && data.groups.bride) || []);
   await togetherGroup.restoreItems((data.groups && data.groups.together) || []);
   await endrollGroup.restoreItems((data.groups && data.groups.endroll) || []);
+  await profileGroup.restoreItems((data.groups && data.groups.profile) || []);
+  await thanksGroup.restoreItems((data.groups && data.groups.thanks) || []);
 
   state.bgmFiles = (data.bgmFiles || []).map((b) => ({
     id: state.nextBgmId++,
@@ -2874,13 +3105,9 @@ async function restoreDraftData(data) {
   renderBgmList();
   updateAddBgmButtonState();
 
-  state.guestMessages = (data.guestMessages || []).map((g) => ({
-    id: state.nextGuestMessageId++,
-    name: g.name || "",
-    group: g.group || "",
-    message: g.message || "",
-  }));
-  renderGuestMessageList();
+  guestMessageManager.restoreItems(data.guestMessages || []);
+  profileEntryManager.restoreItems(data.profileEntries || []);
+  thanksEntryManager.restoreItems(data.thanksEntries || []);
 
   updateDurationEstimate();
 }
@@ -2917,14 +3144,16 @@ function updateShareButton(blob, filename, btnEl, hintEl) {
   };
 }
 
+const ROLL_EMPTY_ALERT = {
+  endroll: "来賓へのメッセージを1件以上追加してください",
+  profile: "プロフィール項目を1件以上追加してください",
+  thanks: "メッセージを1件以上追加してください",
+};
+
 els.createBtn.addEventListener("click", async () => {
   const initialSettings = getSettings();
   if (countPhotos(initialSettings) === 0) {
-    alert(
-      initialSettings.template === "endroll"
-        ? "来賓へのメッセージを1件以上追加してください"
-        : "写真・動画を1つ以上追加してください"
-    );
+    alert(ROLL_EMPTY_ALERT[initialSettings.template] || "写真・動画を1つ以上追加してください");
     return;
   }
   els.createBtn.disabled = true;

@@ -20,7 +20,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
 
-  <link rel="stylesheet" href="style.css?v=34" />
+  <link rel="stylesheet" href="style.css?v=35" />
 </head>
 <body>
   <header class="app-header">
@@ -43,6 +43,14 @@
         <label class="template-option">
           <input type="radio" name="template" value="endroll" />
           <span><strong>エンドロール</strong><br />本のページをめくるように、来賓の方々へのメッセージが1ページずつ流れるムービー</span>
+        </label>
+        <label class="template-option">
+          <input type="radio" name="template" value="profile" />
+          <span><strong>2人のプロフィール</strong><br />本のページをめくるように、お二人のプロフィールを紹介するムービー（5分以内目安）</span>
+        </label>
+        <label class="template-option">
+          <input type="radio" name="template" value="thanks" />
+          <span><strong>親への感謝ムービー</strong><br />本のページをめくるように、ご両親へのメッセージを届けるムービー（5分以内目安）</span>
         </label>
       </div>
     </section>
@@ -335,6 +343,176 @@
       <button id="add-guest-message-btn" class="ghost-btn" type="button">＋ メッセージを追加</button>
     </section>
 
+    <!-- 2人のプロフィール: 設定 -->
+    <section class="panel hidden" id="profile-section">
+      <h2><span class="step-badge">2</span>プロフィールムービーの設定</h2>
+      <div class="form-grid">
+        <label>新郎・新婦の名前
+          <input id="profile-title1" type="text" placeholder="例: 太郎" />
+        </label>
+        <label>（連名にする場合）
+          <input id="profile-title2" type="text" placeholder="例: 花子" />
+        </label>
+        <label>日付・会場など（任意）
+          <input id="profile-date-text" type="text" placeholder="例: 2026.10.10" />
+        </label>
+        <label>紙の色味
+          <select id="profile-theme">
+            <option value="pink">ピンク×ゴールド</option>
+            <option value="navy">ネイビー×ゴールド</option>
+            <option value="green">グリーン×アイボリー</option>
+          </select>
+        </label>
+        <label>見出し1行目
+          <input id="profile-header-line1" type="text" placeholder="Profile" />
+        </label>
+        <label>見出し2行目（任意）
+          <input id="profile-header-line2" type="text" placeholder="例: 私たちのプロフィール" />
+        </label>
+        <label>ページを開いておく時間
+          <select id="profile-speed">
+            <option value="slow">遅い（じっくり読める）</option>
+            <option value="normal" selected>標準</option>
+            <option value="fast">速い</option>
+          </select>
+        </label>
+      </div>
+      <p class="hint">
+        エンドロールと同じ、本のページをめくるような演出のプロフィールムービーです。
+        最初にお二人の名前のタイトルカードが表示された後、見出しのページに続けて、
+        質問と回答が1ページずつ表示されます。質問と回答は1つずつ順番にタイピング
+        されるように表示されます（タイピングの速さは「ページを開いておく時間」の
+        設定に合わせて変わります）。5分以内に収めたい場合は、次の「プロフィール項目
+        を追加」で20〜30項目程度を目安にしてください（項目の文章量によって変わります）。
+      </p>
+    </section>
+
+    <!-- 2人のプロフィール: ページの写真 -->
+    <section class="panel hidden" id="profile-photos-section">
+      <h2><span class="step-badge">3</span>ページに使う写真を追加（任意）</h2>
+      <div id="profile-dropzone" class="dropzone">
+        <p>ここに写真をドラッグ＆ドロップ<br />またはクリックして選択</p>
+        <input id="profile-file-input" type="file" accept="image/*,video/*" multiple hidden />
+      </div>
+      <p class="hint">
+        追加すると、グループ（見出し）ごとのページで、写真がページ全体の背景として
+        表示されます（写真全体が見切れないよう縦横比を保って表示し、余る部分は同じ写真を
+        ぼかして埋めます）。各写真の「背景にするグループ」欄に、プロフィール項目の
+        「グループ」欄と同じ名前（例: 新郎）を入れておくと、そのグループのページ
+        （つづきページも含む）にその写真が使われます。同じグループ名の写真を複数枚
+        追加すると、そのグループのページ数に応じて均等に振り分けられ、1ページに
+        複数枚割り当たった場合はそのページの中で順番に切り替わるスライドショーに
+        なります。各写真の「表示秒数」欄で、スライドショーになったときのその写真
+        1枚分の表示時間を個別に調整できます（空欄の場合は「ページを開いておく時間」の
+        設定に応じた既定の長さになります）。空欄のままの写真は、専用の写真が無い
+        グループの最初のページに順番に自動で割り当てられます。追加しない場合は紙の
+        質感の背景のページになります。ここでのキャプション・詳細設定（文字サイズ・
+        エフェクト・表示サイズ）はページには使用されません。
+      </p>
+      <div id="profile-photo-grid" class="photo-grid"></div>
+    </section>
+
+    <!-- 2人のプロフィール: 項目 -->
+    <section class="panel hidden" id="profile-entries-section">
+      <h2><span class="step-badge">4</span>プロフィール項目を追加</h2>
+      <p class="hint">
+        質問と回答を1組ずつ入力してください（回答は任意）。「グループ」欄に
+        「新郎」「新婦」などと直接入力すると、同じグループ名の行は（並び順に関係なく）
+        まとめられ、そのグループ名が見出しとして表示されます。ページの順番は、
+        グループ名が最初に登場した行の順序になります。1ページには最大4項目まで入り、
+        5項目目以降は自動で「（つづき）」ページに分かれます。グループ欄が空欄の行は、
+        同じく空欄の行同士でまとめて見出しなしのページになります。
+      </p>
+      <div id="profile-entry-list" class="guest-message-list"></div>
+      <button id="add-profile-entry-btn" class="ghost-btn" type="button">＋ プロフィール項目を追加</button>
+    </section>
+
+    <!-- 親への感謝ムービー: 設定 -->
+    <section class="panel hidden" id="thanks-section">
+      <h2><span class="step-badge">2</span>感謝ムービーの設定</h2>
+      <div class="form-grid">
+        <label>新郎・新婦の名前
+          <input id="thanks-title1" type="text" placeholder="例: 太郎" />
+        </label>
+        <label>（連名にする場合）
+          <input id="thanks-title2" type="text" placeholder="例: 花子" />
+        </label>
+        <label>日付・会場など（任意）
+          <input id="thanks-date-text" type="text" placeholder="例: 2026.10.10" />
+        </label>
+        <label>紙の色味
+          <select id="thanks-theme">
+            <option value="pink">ピンク×ゴールド</option>
+            <option value="navy">ネイビー×ゴールド</option>
+            <option value="green">グリーン×アイボリー</option>
+          </select>
+        </label>
+        <label>見出し1行目
+          <input id="thanks-header-line1" type="text" placeholder="Thank You" />
+        </label>
+        <label>見出し2行目（任意）
+          <input id="thanks-header-line2" type="text" placeholder="例: 育ててくれてありがとう" />
+        </label>
+        <label>ページを開いておく時間
+          <select id="thanks-speed">
+            <option value="slow">遅い（じっくり読める）</option>
+            <option value="normal" selected>標準</option>
+            <option value="fast">速い</option>
+          </select>
+        </label>
+      </div>
+      <p class="hint">
+        エンドロールと同じ、本のページをめくるような演出の感謝ムービーです。
+        最初にお二人の名前のタイトルカードが表示された後、見出しのページに続けて、
+        ご両親へのメッセージが1ページずつ表示されます。見出しとメッセージは1つずつ
+        順番にタイピングされるように表示されます（タイピングの速さは「ページを
+        開いておく時間」の設定に合わせて変わります）。5分以内に収めたい場合は、
+        次の「メッセージを追加」で20〜30件程度を目安にしてください（メッセージの
+        文章量によって変わります）。
+      </p>
+    </section>
+
+    <!-- 親への感謝ムービー: ページの写真 -->
+    <section class="panel hidden" id="thanks-photos-section">
+      <h2><span class="step-badge">3</span>ページに使う写真を追加（任意）</h2>
+      <div id="thanks-dropzone" class="dropzone">
+        <p>ここに写真をドラッグ＆ドロップ<br />またはクリックして選択</p>
+        <input id="thanks-file-input" type="file" accept="image/*,video/*" multiple hidden />
+      </div>
+      <p class="hint">
+        追加すると、グループ（見出し）ごとのページで、写真がページ全体の背景として
+        表示されます（写真全体が見切れないよう縦横比を保って表示し、余る部分は同じ写真を
+        ぼかして埋めます）。各写真の「背景にするグループ」欄に、メッセージの
+        「グループ」欄と同じ名前（例: 新郎から）を入れておくと、そのグループのページ
+        （つづきページも含む）にその写真が使われます。同じグループ名の写真を複数枚
+        追加すると、そのグループのページ数に応じて均等に振り分けられ、1ページに
+        複数枚割り当たった場合はそのページの中で順番に切り替わるスライドショーに
+        なります。各写真の「表示秒数」欄で、スライドショーになったときのその写真
+        1枚分の表示時間を個別に調整できます（空欄の場合は「ページを開いておく時間」の
+        設定に応じた既定の長さになります）。空欄のままの写真は、専用の写真が無い
+        グループの最初のページに順番に自動で割り当てられます。追加しない場合は紙の
+        質感の背景のページになります。ここでのキャプション・詳細設定（文字サイズ・
+        エフェクト・表示サイズ）はページには使用されません。
+      </p>
+      <div id="thanks-photo-grid" class="photo-grid"></div>
+    </section>
+
+    <!-- 親への感謝ムービー: メッセージ -->
+    <section class="panel hidden" id="thanks-entries-section">
+      <h2><span class="step-badge">4</span>メッセージを追加</h2>
+      <p class="hint">
+        見出しとメッセージを入力してください（どちらも任意）。「グループ」欄に
+        「新郎から」「新婦から」などと直接入力すると、同じグループ名の行は
+        （並び順に関係なく）まとめられ、そのグループ名が見出しとして表示されます。
+        ページの順番は、グループ名が最初に登場した行の順序になります。1ページには
+        最大4件まで入り、5件目以降は自動で「（つづき）」ページに分かれます。
+        グループ欄が空欄の行は、同じく空欄の行同士でまとめて見出しなしのページに
+        なります。
+      </p>
+      <div id="thanks-entry-list" class="guest-message-list"></div>
+      <button id="add-thanks-entry-btn" class="ghost-btn" type="button">＋ メッセージを追加</button>
+    </section>
+
     <section class="panel panel-cta">
       <h2><span class="step-icon">🎬</span>ムービーを作成</h2>
       <p id="duration-estimate" class="hint"></p>
@@ -435,6 +613,6 @@
     </p>
   </footer>
 
-  <script src="app.js?v=34"></script>
+  <script src="app.js?v=35"></script>
 </body>
 </html>
