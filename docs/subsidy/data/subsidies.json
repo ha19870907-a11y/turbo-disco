@@ -1,8 +1,8 @@
 {
-  "fetchedAt": "2026-09-06T21:15:02.932Z",
+  "fetchedAt": "2026-09-07T21:16:07.664Z",
   "source": "jGrants (https://www.jgrants-portal.go.jp/)",
   "note": "複数の検索語でjGrants公開APIを検索し、重複を除いてまとめたスナップショットです。全制度を網羅するものではありません。",
-  "count": 322,
+  "count": 321,
   "items": [
     {
       "id": "a0WJ200000CDY2TMAX",
@@ -14,50 +14,6 @@
       "targetNumberOfEmployees": "従業員数の制約なし",
       "acceptanceStartDatetime": "2026-03-23T01:00Z",
       "acceptanceEndDatetime": "2026-06-21T08:00Z"
-    },
-    {
-      "id": "a0WJ200000CDd5cMAD",
-      "title": "2026年度第2回「新エネルギー等のシーズ発掘・事業化に向けた技術研究開発事業」（新エネ中小・スタートアップ支援制度）の公募",
-      "institutionName": "P10020_新エネルギー等のシーズ発掘・事業化に向けた技術研究開発事業",
-      "subsidyMaxLimit": 0,
-      "subsidyRate": null,
-      "targetAreaSearch": "全国",
-      "targetNumberOfEmployees": "従業員数の制約なし",
-      "acceptanceStartDatetime": "2026-08-07T01:00Z",
-      "acceptanceEndDatetime": "2026-09-07T03:00Z"
-    },
-    {
-      "id": "a0WJ200000CDdA1MAL",
-      "title": "2026年度第2回「新エネルギー等のシーズ発掘・事業化に向けた技術研究開発事業」（未来型新エネ実証制度）の公募",
-      "institutionName": "P10020_新エネルギー等のシーズ発掘・事業化に向けた技術研究開発事業",
-      "subsidyMaxLimit": 0,
-      "subsidyRate": null,
-      "targetAreaSearch": "全国",
-      "targetNumberOfEmployees": "従業員数の制約なし",
-      "acceptanceStartDatetime": "2026-08-07T01:00Z",
-      "acceptanceEndDatetime": "2026-09-07T03:00Z"
-    },
-    {
-      "id": "a0WJ200000CDeA1MAL",
-      "title": "「競争的な水素サプライチェーン構築に向けた技術開発事業／総合調査研究／水素キャリアに係る船陸インターフェースの国際標準化に向けた基礎調査」の公募",
-      "institutionName": "P23004_競争的な水素サプライチェーン構築に向けた技術開発事業",
-      "subsidyMaxLimit": 0,
-      "subsidyRate": null,
-      "targetAreaSearch": "全国",
-      "targetNumberOfEmployees": "従業員数の制約なし",
-      "acceptanceStartDatetime": "2026-08-24T01:00Z",
-      "acceptanceEndDatetime": "2026-09-07T03:00Z"
-    },
-    {
-      "id": "a0WJ200000CDdNKMA1",
-      "title": "令和８年度 エネルギー使用合理化設備導入促進対策費補助金（資源自律経済確立産官学連携加速化事業）【二次公募】",
-      "institutionName": "エネルギー使用合理化設備導入促進対策費補助金 （資源自律経済確立産官学連携加速化事業）",
-      "subsidyMaxLimit": 40000000,
-      "subsidyRate": "公募要領を参照",
-      "targetAreaSearch": "全国",
-      "targetNumberOfEmployees": "従業員数の制約なし",
-      "acceptanceStartDatetime": "2026-08-06T05:00Z",
-      "acceptanceEndDatetime": "2026-09-07T06:00Z"
     },
     {
       "id": "a0WJ200000CDaMaMAL",
@@ -445,6 +401,17 @@
       "acceptanceEndDatetime": "2026-09-28T08:00Z"
     },
     {
+      "id": "a0WJ200000CDe3zMAD",
+      "title": "【令和８年度・第４回】INPIT外国出願補助金",
+      "institutionName": "INPIT外国出願補助金",
+      "subsidyMaxLimit": 3000000,
+      "subsidyRate": "1/2",
+      "targetAreaSearch": "全国",
+      "targetNumberOfEmployees": "300名以下",
+      "acceptanceStartDatetime": "2026-09-07T01:00Z",
+      "acceptanceEndDatetime": "2026-09-28T08:00Z"
+    },
+    {
       "id": "a0WJ200000CDdtWMAT",
       "title": "2026年度「木質バイオマス燃料等の安定的・効率的な供給・利用システム構築支援事業」の第２回公募",
       "institutionName": "P21002_木質バイオマス燃料等の安定的・効率的な供給・利用システム構築支援事業",
@@ -806,6 +773,17 @@
       "targetNumberOfEmployees": "従業員数の制約なし",
       "acceptanceStartDatetime": "2022-09-15T09:00Z",
       "acceptanceEndDatetime": "2026-10-12T14:59Z"
+    },
+    {
+      "id": "a0WJ200000CDKZFMA5",
+      "title": "令和８年度_グリーンスローモビリティ等導入促進事業（二次公募）",
+      "institutionName": "二酸化炭素排出抑制対策事業費等補助金",
+      "subsidyMaxLimit": 0,
+      "subsidyRate": "１／２以下",
+      "targetAreaSearch": "全国",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2026-09-07T01:00Z",
+      "acceptanceEndDatetime": "2026-10-16T03:00Z"
     },
     {
       "id": "a0WJ200000CDWp3MAH",
@@ -1325,17 +1303,6 @@
       "acceptanceEndDatetime": "2026-12-28T08:00Z"
     },
     {
-      "id": "a0W2x000007CStOEAW",
-      "title": "農林水産物認証取得支援事業（水産認証取得支援事業）補助金",
-      "institutionName": "農林水産物認証取得支援事業（水産認証取得支援事業）補助金",
-      "subsidyMaxLimit": 0,
-      "subsidyRate": "2/3以内",
-      "targetAreaSearch": "東京都",
-      "targetNumberOfEmployees": "従業員数の制約なし",
-      "acceptanceStartDatetime": "2022-04-01T01:00Z",
-      "acceptanceEndDatetime": "2026-12-28T08:00Z"
-    },
-    {
       "id": "a0WJ200000CDVkeMAH",
       "title": "【経済産業省】ものづくり・商業・サービス生産性向上促進補助金（20次締切）",
       "institutionName": "ものづくり補助金",
@@ -1344,6 +1311,17 @@
       "targetAreaSearch": "全国",
       "targetNumberOfEmployees": "従業員数の制約なし",
       "acceptanceStartDatetime": "2025-10-27T08:00Z",
+      "acceptanceEndDatetime": "2026-12-28T08:00Z"
+    },
+    {
+      "id": "a0W2x000007CStOEAW",
+      "title": "農林水産物認証取得支援事業（水産認証取得支援事業）補助金",
+      "institutionName": "農林水産物認証取得支援事業（水産認証取得支援事業）補助金",
+      "subsidyMaxLimit": 0,
+      "subsidyRate": "2/3以内",
+      "targetAreaSearch": "東京都",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2022-04-01T01:00Z",
       "acceptanceEndDatetime": "2026-12-28T08:00Z"
     },
     {
@@ -1433,6 +1411,17 @@
       "targetNumberOfEmployees": "従業員数の制約なし",
       "acceptanceStartDatetime": "2026-03-31T23:30Z",
       "acceptanceEndDatetime": "2026-12-28T15:00Z"
+    },
+    {
+      "id": "a0WJ200000CDaTCMA1",
+      "title": "令和８年_設備投資_事業化状況報告",
+      "institutionName": "躍進的な事業推進のための設備投資支援事業",
+      "subsidyMaxLimit": 200000000,
+      "subsidyRate": "ー（上記補助金上限額は、助成事業当時の上限額を指します）",
+      "targetAreaSearch": "栃木県/群馬県/埼玉県/千葉県/東京都/神奈川県/山梨県",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2026-09-07T00:00Z",
+      "acceptanceEndDatetime": "2026-12-31T14:59Z"
     },
     {
       "id": "a0WJ200000CDY7KMAX",
