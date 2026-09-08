@@ -1,8 +1,8 @@
 {
-  "fetchedAt": "2026-09-07T21:16:07.664Z",
+  "fetchedAt": "2026-09-08T21:15:05.544Z",
   "source": "jGrants (https://www.jgrants-portal.go.jp/)",
   "note": "複数の検索語でjGrants公開APIを検索し、重複を除いてまとめたスナップショットです。全制度を網羅するものではありません。",
-  "count": 321,
+  "count": 320,
   "items": [
     {
       "id": "a0WJ200000CDY2TMAX",
@@ -14,39 +14,6 @@
       "targetNumberOfEmployees": "従業員数の制約なし",
       "acceptanceStartDatetime": "2026-03-23T01:00Z",
       "acceptanceEndDatetime": "2026-06-21T08:00Z"
-    },
-    {
-      "id": "a0WJ200000CDaMaMAL",
-      "title": "GX分野のディープテック・スタートアップに対する 実用化研究開発・量産化実証支援事業第7回公募",
-      "institutionName": "P24011_GX分野のディープテック・スタートアップに対する実用化研究開発・量産化実証支援事業",
-      "subsidyMaxLimit": 0,
-      "subsidyRate": null,
-      "targetAreaSearch": "全国",
-      "targetNumberOfEmployees": "従業員数の制約なし",
-      "acceptanceStartDatetime": "2026-09-03T01:00Z",
-      "acceptanceEndDatetime": "2026-09-08T03:00Z"
-    },
-    {
-      "id": "a0WJ200000CDaMfMAL",
-      "title": "ディープテック・スタートアップ支援基金／ディープテック・スタートアップ支援事業第10回公募",
-      "institutionName": "P23019_ディープテック・スタートアップ支援基金／ディープテック・スタートアップ支援事業",
-      "subsidyMaxLimit": 0,
-      "subsidyRate": null,
-      "targetAreaSearch": "全国",
-      "targetNumberOfEmployees": "従業員数の制約なし",
-      "acceptanceStartDatetime": "2026-09-03T01:00Z",
-      "acceptanceEndDatetime": "2026-09-08T03:00Z"
-    },
-    {
-      "id": "a0WJ200000CDdKuMAL",
-      "title": "令和８年度国際ルール形成・市場創造型標準化推進事業費補助金（２次公募）",
-      "institutionName": "令和８年度国際ルール形成・市場創造型標準化推進事業費補助金（２次公募）",
-      "subsidyMaxLimit": 0,
-      "subsidyRate": "補助上限額と補助対象経費の2/3のうち小さい額",
-      "targetAreaSearch": "全国",
-      "targetNumberOfEmployees": "従業員数の制約なし",
-      "acceptanceStartDatetime": "2026-08-07T01:00Z",
-      "acceptanceEndDatetime": "2026-09-08T08:00Z"
     },
     {
       "id": "a0WJ200000CDdQxMAL",
@@ -390,6 +357,17 @@
       "acceptanceEndDatetime": "2026-09-25T08:00Z"
     },
     {
+      "id": "a0WJ200000CDeNDMA1",
+      "title": "「デジタル社会の将来像の実現に向けた技術課題及び社会実装方策に関する調査」の公募",
+      "institutionName": "P99029_戦略策定調査事業",
+      "subsidyMaxLimit": 0,
+      "subsidyRate": null,
+      "targetAreaSearch": "全国",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2026-09-08T01:00Z",
+      "acceptanceEndDatetime": "2026-09-28T03:00Z"
+    },
+    {
       "id": "a0WJ200000CDTzMMAX",
       "title": "【経済産業省】ものづくり・商業・サービス生産性向上促進補助金（19次締切）",
       "institutionName": "ものづくり補助金",
@@ -497,6 +475,17 @@
       "targetAreaSearch": "神奈川県",
       "targetNumberOfEmployees": "20名以下",
       "acceptanceStartDatetime": "2026-04-15T00:00Z",
+      "acceptanceEndDatetime": "2026-09-30T08:00Z"
+    },
+    {
+      "id": "a0WfQ000003Cy0HUAS",
+      "title": "【島根県】令和8年度_中小企業等海外展開支援事業費補助金（海外出願支援事業）（第５回公募）",
+      "institutionName": "中小企業等海外展開支援事業費補助金（海外出願支援事業）",
+      "subsidyMaxLimit": 3000000,
+      "subsidyRate": "1/2以内",
+      "targetAreaSearch": "島根県",
+      "targetNumberOfEmployees": "300名以下",
+      "acceptanceStartDatetime": "2026-08-31T15:00Z",
       "acceptanceEndDatetime": "2026-09-30T08:00Z"
     },
     {
