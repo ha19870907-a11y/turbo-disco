@@ -80,14 +80,29 @@ Claude(Anthropic API)が内容を読んで自動で返信します（`scripts/re
 ### 投稿ジャンル別インサイトの収集（見える化のみ・自動調整はしない）
 
 `.github/workflows/collect-thread-insights.yml` が毎週月曜 朝6:00(JST) に、自分の投稿の
-閲覧数・いいね・返信数などのインサイトを取得し、`thread-insights.json` に
-`scripts/thread-templates.json` のジャンル・カテゴリー・切り口とあわせて記録します
-（`scripts/fetch-thread-insights.js`、実行結果はワークフローのログにジャンル別平均も表示されます）。
+KPIとアカウントのフォロワー数推移を取得・記録します（`scripts/fetch-thread-insights.js`）。
+
+- **`thread-insights.json`**: 投稿ID単位のKPI記録。投稿日時・投稿本文・
+  `scripts/thread-templates.json` のジャンル/カテゴリー/切り口・
+  views/likes/replies/reposts/quotes・エンゲージメント率
+  （`(likes+replies+reposts+quotes)/views`）に加えて、前回取得時点のスナップショット
+  (`previous`)と今回との差分(`delta`)を保持し、「伸びた投稿・伸びなかった投稿」を
+  後から比較できるようにしています。
+- **`thread-follower-history.json`**: 実行するたびのフォロワー総数と、前回実行からの
+  増減(`deltaFromPrevious`)を記録する時系列ログです。
+
+**Threads APIで取得できない指標（無理に実装せず「取得不可」として扱っています）**
+- プロフィール閲覧数: Threads APIには存在しない指標です（ネイティブアプリの
+  インサイト画面にのみ表示されます）。
+- 投稿ごとのフォロー増加数・フォロー率: 「どの投稿がきっかけでフォローされたか」を
+  示す指標はThreads API(・Instagram Graph API)に存在しません。アカウント全体の
+  フォロワー数の増減は`thread-follower-history.json`で追えますが、特定の投稿への
+  因果関係付けは行っていません。
 
 このステップは**データを記録・見える化するだけ**で、投稿比率や投稿内容を自動で変更することはしません。
-どのジャンル・カテゴリーの反応が良いかを人が確認し、`scripts/thread-templates.json` や
+どのジャンル・カテゴリー・投稿の反応が良いかを人が確認し、`scripts/thread-templates.json` や
 `scripts/weekly-schedule.json` を手動で調整する判断材料として使ってください
-（将来的に、このデータをもとに配分を自動提案する仕組みを追加する構想があります）。
+（将来的に、このデータをもとに「勝ちパターン」を分析し配分を自動提案する仕組みを追加する構想があります）。
 
 ### noteの記事下書きの週次自動生成
 
