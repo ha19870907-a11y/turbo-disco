@@ -10,7 +10,7 @@ const path = require('node:path');
 
 const THREADS_API_BASE = 'https://graph.threads.net/v1.0';
 const STATE_FILE = path.join(__dirname, '..', 'thread-insights.json');
-const TOPICS_FILE = path.join(__dirname, 'thread-topics.json');
+const TEMPLATES_FILE = path.join(__dirname, 'thread-templates.json');
 const INSIGHT_METRICS = ['views', 'likes', 'replies', 'reposts', 'quotes'];
 
 function readInsightLog() {
@@ -25,11 +25,11 @@ function writeInsightLog(records) {
   fs.writeFileSync(STATE_FILE, JSON.stringify(records, null, 2) + '\n', 'utf8');
 }
 
-function buildGenreLookup() {
-  const topics = JSON.parse(fs.readFileSync(TOPICS_FILE, 'utf8'));
+function buildTemplateLookup() {
+  const templates = JSON.parse(fs.readFileSync(TEMPLATES_FILE, 'utf8'));
   const lookup = new Map();
-  for (const topic of topics) {
-    lookup.set(topic.text, topic.genre);
+  for (const template of templates) {
+    lookup.set(template.text, template);
   }
   return lookup;
 }
@@ -66,7 +66,7 @@ async function main() {
     throw new Error('THREADS_USER_ID と THREADS_ACCESS_TOKEN の環境変数を設定してください。');
   }
 
-  const genreByText = buildGenreLookup();
+  const templateByText = buildTemplateLookup();
   const log = readInsightLog();
   const byId = new Map(log.map((record) => [record.id, record]));
 
@@ -86,9 +86,13 @@ async function main() {
       continue;
     }
 
+    const template = templateByText.get(post.text);
     byId.set(post.id, {
       id: post.id,
-      genre: genreByText.get(post.text) ?? '不明',
+      templateId: template?.id ?? null,
+      genre: template?.genre ?? '不明',
+      category: template?.category ?? '不明',
+      angle: template?.angle ?? '不明',
       timestamp: post.timestamp,
       permalink: post.permalink,
       views: insights.views ?? 0,
