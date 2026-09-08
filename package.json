@@ -8,7 +8,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "post:thread": "node scripts/post-thread.js"
+    "post:thread": "node scripts/post-thread.js",
+    "threads:insights": "node scripts/fetch-thread-insights.js"
   },
   "engines": {
     "node": ">=18"

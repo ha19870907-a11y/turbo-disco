@@ -2,13 +2,63 @@ name: Daily Threads Post
 
 on:
   schedule:
-    # 8:00 JST (前日23:00 UTC)
-    - cron: "0 23 * * *"
-    # 13:00 JST (4:00 UTC)
-    - cron: "0 4 * * *"
-    # 20:00 JST (11:00 UTC)
-    - cron: "0 11 * * *"
+    # 曜日ごとに異なる時刻(JST)に投稿するため、UTC換算した曜日別crontabを個別に定義している。
+    # 平日(月〜金) 7:00 / 12:15 / 20:30 JST、土日 9:00 / 13:00 / 20:30 JST。
+    # 実際にどのジャンルを投稿するかはscripts/weekly-schedule.jsonで管理し、
+    # 実行時刻(JST)から自動判定するため、多少の実行遅延やActionsの仕様変更にも強い。
+
+    # 月曜 7:00 JST (日曜 22:00 UTC)
+    - cron: "0 22 * * 0"
+    # 月曜 12:15 JST (月曜 3:15 UTC)
+    - cron: "15 3 * * 1"
+    # 月曜 20:30 JST (月曜 11:30 UTC)
+    - cron: "30 11 * * 1"
+
+    # 火曜 7:00 JST (月曜 22:00 UTC)
+    - cron: "0 22 * * 1"
+    # 火曜 12:15 JST (火曜 3:15 UTC)
+    - cron: "15 3 * * 2"
+    # 火曜 20:30 JST (火曜 11:30 UTC)
+    - cron: "30 11 * * 2"
+
+    # 水曜 7:00 JST (火曜 22:00 UTC)
+    - cron: "0 22 * * 2"
+    # 水曜 12:15 JST (水曜 3:15 UTC)
+    - cron: "15 3 * * 3"
+    # 水曜 20:30 JST (水曜 11:30 UTC)
+    - cron: "30 11 * * 3"
+
+    # 木曜 7:00 JST (水曜 22:00 UTC)
+    - cron: "0 22 * * 3"
+    # 木曜 12:15 JST (木曜 3:15 UTC)
+    - cron: "15 3 * * 4"
+    # 木曜 20:30 JST (木曜 11:30 UTC)
+    - cron: "30 11 * * 4"
+
+    # 金曜 7:00 JST (木曜 22:00 UTC)
+    - cron: "0 22 * * 4"
+    # 金曜 12:15 JST (金曜 3:15 UTC)
+    - cron: "15 3 * * 5"
+    # 金曜 20:30 JST (金曜 11:30 UTC)
+    - cron: "30 11 * * 5"
+
+    # 土曜 9:00 JST (土曜 0:00 UTC)
+    - cron: "0 0 * * 6"
+    # 土曜 13:00 JST (土曜 4:00 UTC)
+    - cron: "0 4 * * 6"
+    # 土曜 20:30 JST (土曜 11:30 UTC)
+    - cron: "30 11 * * 6"
+
+    # 日曜 9:00 JST (日曜 0:00 UTC)
+    - cron: "0 0 * * 0"
+    # 日曜 13:00 JST (日曜 4:00 UTC)
+    - cron: "0 4 * * 0"
+    # 日曜 20:30 JST (日曜 11:30 UTC)
+    - cron: "30 11 * * 0"
   workflow_dispatch: {}
+
+permissions:
+  contents: write
 
 jobs:
   post:
@@ -27,3 +77,15 @@ jobs:
           THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
         run: node scripts/post-daily-thread.js
+
+      - name: Commit updated post history
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add thread-post-history.json
+          if git diff --cached --quiet; then
+            echo "変更なし"
+          else
+            git commit -m "投稿履歴を更新"
+            git push
+          fi
