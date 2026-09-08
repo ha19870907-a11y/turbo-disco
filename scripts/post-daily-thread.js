@@ -27,7 +27,7 @@ function slotForNow(now = new Date()) {
 async function main() {
   const { dayOfYear, slot } = slotForNow();
   const index = (dayOfYear * SLOTS_PER_DAY + slot) % topics.length;
-  const text = topics[index];
+  const text = topics[index].text;
   try {
     const result = await postToThreads(text);
     console.log(`Threadsに投稿しました（${index + 1}/${topics.length}件目, ID: ${result.id}）`);

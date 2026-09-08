@@ -42,6 +42,18 @@ Claude(Anthropic API)が内容を読んで自動で返信します（`scripts/re
 返信済みのコメントIDは `replied-comments.json` に記録し、二重返信を防ぎます。
 利用には `ANTHROPIC_API_KEY` と、Threads側の `threads_manage_replies` / `threads_read_replies` 権限が必要です。
 
+### 投稿ジャンル別インサイトの収集（見える化のみ・自動調整はしない）
+
+`thread-topics.json` の各投稿ネタには `genre`（児童手当・ひとり親・出産・育休・教育・保育・
+不妊治療・節税・子育て支援・医療費）を付けています。
+`.github/workflows/collect-thread-insights.yml` が毎週月曜 朝6:00(JST) に、自分の投稿の
+閲覧数・いいね・返信数などのインサイトを取得し、`thread-insights.json` にジャンルごと記録します
+（`scripts/fetch-thread-insights.js`、実行結果はワークフローのログにジャンル別平均も表示されます）。
+
+このステップは**データを記録・見える化するだけ**で、投稿比率や投稿内容を自動で変更することはしません。
+どのジャンルの反応が良いかを人が確認し、`thread-topics.json` のネタ構成を手動で調整する
+判断材料として使ってください。
+
 ### noteの記事下書きの週次自動生成
 
 noteには公式の投稿APIが無いため自動投稿はしていませんが、記事の下書きだけは自動化できます。
