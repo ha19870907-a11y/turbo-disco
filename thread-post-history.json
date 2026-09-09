@@ -50,5 +50,18 @@
     "angle": "地域",
     "threadId": "17964175677175544",
     "postedAt": "2026-09-09T03:27:26.834Z"
+  },
+  {
+    "date": "2026-09-09",
+    "dayKey": "wed",
+    "slotIndex": 2,
+    "time": "20:30",
+    "label": "制度比較",
+    "templateId": "TPL-022",
+    "genre": "出産",
+    "category": "比較",
+    "angle": "注意点",
+    "threadId": "18077531342371847",
+    "postedAt": "2026-09-09T11:36:10.792Z"
   }
 ]
