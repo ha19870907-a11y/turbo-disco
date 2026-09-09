@@ -81,10 +81,12 @@ async function fetchMediaInsights(postId, accessToken) {
 // followers_countは「期間の終了時点での合計フォロワー数」を返す仕様のため、
 // 直近1日分の期間を指定して最新の合計値を取得する。Instagram未連携のアカウントでは
 // 失敗することがあるため、呼び出し側でエラーを捕捉してスキップ可能にしている。
-async function fetchFollowersCount(userId, accessToken) {
+// パスは/{userId}ではなく/meを使う(アクセストークンが表すアカウントを直接指すため、
+// THREADS_USER_IDとトークンの紐付けがずれていても影響を受けない)。
+async function fetchFollowersCount(accessToken) {
   const nowSec = Math.floor(Date.now() / 1000);
   const sinceSec = nowSec - 86400;
-  const body = await threadsGet(`/${userId}/threads_insights`, {
+  const body = await threadsGet(`/me/threads_insights`, {
     metric: 'followers_count',
     since: String(sinceSec),
     until: String(nowSec),
@@ -107,11 +109,11 @@ function computeEngagementRate({ views, likes, replies, reposts, quotes }) {
   return Number(((likes + replies + reposts + quotes) / views).toFixed(4));
 }
 
-async function updatePostInsights(userId, accessToken, templateByText) {
+async function updatePostInsights(accessToken, templateByText) {
   const log = readJsonFile(STATE_FILE, []);
   const byId = new Map(log.map((record) => [record.id, record]));
 
-  const posts = await threadsGet(`/${userId}/threads`, {
+  const posts = await threadsGet(`/me/threads`, {
     fields: 'id,text,timestamp,permalink',
     limit: '50',
     access_token: accessToken,
@@ -183,10 +185,10 @@ async function updatePostInsights(userId, accessToken, templateByText) {
   return records;
 }
 
-async function updateFollowerHistory(userId, accessToken) {
+async function updateFollowerHistory(accessToken) {
   let followersCount;
   try {
-    followersCount = await fetchFollowersCount(userId, accessToken);
+    followersCount = await fetchFollowersCount(accessToken);
   } catch (err) {
     console.error(
       `フォロワー数の取得に失敗しました（Instagramと連携していないアカウントでは取得できません）: ${err.message}`
@@ -257,10 +259,9 @@ function printGrowthSummary(records) {
 }
 
 async function main() {
-  const userId = (process.env.THREADS_USER_ID || '').trim();
   const accessToken = (process.env.THREADS_ACCESS_TOKEN || '').trim();
-  if (!userId || !accessToken) {
-    throw new Error('THREADS_USER_ID と THREADS_ACCESS_TOKEN の環境変数を設定してください。');
+  if (!accessToken) {
+    throw new Error('THREADS_ACCESS_TOKEN の環境変数を設定してください。');
   }
 
   console.log(
@@ -268,11 +269,11 @@ async function main() {
   );
 
   const templateByText = buildTemplateLookup();
-  const records = await updatePostInsights(userId, accessToken, templateByText);
+  const records = await updatePostInsights(accessToken, templateByText);
   printGenreSummary(records);
   printGrowthSummary(records);
 
-  const followerEntry = await updateFollowerHistory(userId, accessToken);
+  const followerEntry = await updateFollowerHistory(accessToken);
   if (followerEntry) {
     const deltaText = followerEntry.deltaFromPrevious == null ? '(初回記録)' : `(前回比 ${followerEntry.deltaFromPrevious >= 0 ? '+' : ''}${followerEntry.deltaFromPrevious})`;
     console.log(`\n--- フォロワー数 ---\n現在のフォロワー数: ${followerEntry.followersCount} ${deltaText}`);
