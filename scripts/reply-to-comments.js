@@ -74,8 +74,10 @@ async function generateReply(commentText) {
   return text;
 }
 
-async function postReply(userId, accessToken, replyToId, text) {
-  const createUrl = new URL(`${THREADS_API_BASE}/${userId}/threads`);
+async function postReply(accessToken, replyToId, text) {
+  // /{userId}/...ではなく/me/...を使う(アクセストークン自身のアカウントを直接指すため、
+  // THREADS_USER_IDとトークンの紐付けがずれていても影響を受けない。詳細はfetch-thread-insights.js参照)。
+  const createUrl = new URL(`${THREADS_API_BASE}/me/threads`);
   createUrl.searchParams.set('media_type', 'TEXT');
   createUrl.searchParams.set('text', text);
   createUrl.searchParams.set('reply_to_id', replyToId);
@@ -89,7 +91,7 @@ async function postReply(userId, accessToken, replyToId, text) {
 
   await new Promise((resolve) => setTimeout(resolve, 5000));
 
-  const publishUrl = new URL(`${THREADS_API_BASE}/${userId}/threads_publish`);
+  const publishUrl = new URL(`${THREADS_API_BASE}/me/threads_publish`);
   publishUrl.searchParams.set('creation_id', createBody.id);
   publishUrl.searchParams.set('access_token', accessToken);
 
@@ -116,7 +118,7 @@ async function main() {
 
   const repliedIds = readState();
 
-  const posts = await threadsGet(`/${userId}/threads`, {
+  const posts = await threadsGet(`/me/threads`, {
     fields: 'id',
     limit: '25',
     access_token: accessToken,
@@ -150,7 +152,7 @@ async function main() {
           continue;
         }
         const finalText = replyText.slice(0, MAX_REPLY_LENGTH);
-        const result = await postReply(userId, accessToken, reply.id, finalText);
+        const result = await postReply(accessToken, reply.id, finalText);
         console.log(`コメント ${reply.id} に返信しました（ID: ${result.id}）`);
         repliedIds.add(reply.id);
         repliedCount += 1;
