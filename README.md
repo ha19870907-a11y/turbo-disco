@@ -105,6 +105,51 @@ KPIとアカウントのフォロワー数推移を取得・記録します（`s
 `scripts/weekly-schedule.json` を手動で調整する判断材料として使ってください
 （将来的に、このデータをもとに「勝ちパターン」を分析し配分を自動提案する仕組みを追加する構想があります）。
 
+### 収益導線・コンバージョン計測（STEP3.5・見える化のみ）
+
+「フォロワーが増える投稿」と「売上につながる投稿」を区別できるようにするための計測基盤です。
+アフィリエイト・自社サイト送客・有料コンテンツ・専門家（税理士等）送客・自社サービスなど、
+複数の収益化モデルに対応できる設計にしています。STEP1〜3のファイルは一切変更していません。
+
+- **`scripts/monetization-links.json`**: 収益導線リンクの登録簿（初期状態は空）。
+  `linkId` / `campaignId` / `destination` / `revenueType` / `baseUrl` を持ちます。
+  実際にリンクを使う際は、ここに実在するURLを追加してください（架空のリンクは含めていません）。
+- **`scripts/template-links.json`**: どのテンプレート(`thread-templates.json`のID)に
+  どの`linkId`を紐付けるかのマッピング（初期状態は空`{}`）。`thread-templates.json`自体は
+  変更せず、この別ファイルで疎結合に管理しています。
+- **`monetization-data.json`**: 投稿(`postId`)とリンク(`linkId`)ごとのクリック数・
+  コンバージョン数・売上を記録する実績データ。`scripts/post-daily-thread.js`が、
+  リンクが紐付いたテンプレートで投稿した際に自動で0件のレコードを作成し、
+  実際の数値は`scripts/update-monetization.js`で手動反映します
+  （Threads APIにはクリック数・CV・売上を取得する手段が無いため、遷移先サイトの
+  アクセス解析やASP管理画面などの実績を人が入力する前提です）。
+- **UTM計測**: `scripts/monetization.js`の`buildTrackingUrl()`が、
+  `utm_source=threads&utm_medium=social&utm_campaign=<campaignId>&utm_content=<postId>`
+  付きの計測用URLを生成します。
+
+**実績値の反映方法**
+```bash
+node scripts/update-monetization.js --postId <投稿ID> --linkId <リンクID> \
+  --clicks 12 --conversions 2 --revenue 6000 --conversionType purchase
+```
+
+**分析・レポート**
+```bash
+npm run threads:monetization-report   # CTR/CVR/売上・ランキング・クロス集計をコンソール出力
+npm run threads:dashboard             # dashboard/index.html に管理画面を生成(gitには含めないスナップショット)
+```
+
+`scripts/monetization-report.js`は、投稿を「拡散型／集客型／収益型／データ不足」に簡易分類します
+（現時点のデータ量に対する相対順位による暫定ヒューリスティックで、固定の重み付けで
+勝敗を決定するものではありません。データが蓄積されたらSTEP4で見直す前提です）。
+Views・エンゲージメント率だけで「勝ち投稿」を決めず、クリック・CV・売上でも別々に
+ランキングできるようにしているのはこのためです（バズった投稿が必ずしも収益に
+つながるとは限らないため）。
+
+**取得できない指標**: プロフィール訪問数は、Threads APIに指標が存在しないことに加え、
+Threadsのプロフィール画面上での出来事のため外部サイト側のUTM計測でも捕捉できません。
+常に「取得不可」として扱い、推測値は入れていません。
+
 ### noteの記事下書きの週次自動生成
 
 noteには公式の投稿APIが無いため自動投稿はしていませんが、記事の下書きだけは自動化できます。

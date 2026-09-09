@@ -14,6 +14,7 @@ const path = require('node:path');
 
 const { postToThreads } = require('./post-thread.js');
 const { resolveSlot, pickTemplate } = require('./scheduler.js');
+const { readTemplateLinks, registerPostLink } = require('./monetization.js');
 
 const templates = require('./thread-templates.json');
 const schedule = require('./weekly-schedule.json');
@@ -70,6 +71,27 @@ async function main() {
       postedAt: new Date().toISOString(),
     });
     writeHistory(history);
+
+    // STEP3.5: このテンプレートに収益導線リンクが紐付けられていれば記録する(任意・追加機能)。
+    // 未設定のテンプレートがほとんどのため、通常は何もしない。失敗しても投稿自体は
+    // 既に成功しているので、ここでの例外は握りつぶしてログのみ出す。
+    try {
+      const templateLinks = readTemplateLinks();
+      const linkId = templateLinks[template.id];
+      if (linkId) {
+        registerPostLink({
+          postId: result.id,
+          linkId,
+          templateId: template.id,
+          genre: template.genre,
+          category: template.category,
+          angle: template.angle,
+        });
+        console.log(`収益導線リンク ${linkId} を投稿 ${result.id} に紐付けて記録しました。`);
+      }
+    } catch (linkErr) {
+      console.error(`収益導線リンクの記録に失敗しました(投稿自体は成功しています): ${linkErr.message}`);
+    }
   } catch (err) {
     console.error(err.message);
     process.exitCode = 1;
