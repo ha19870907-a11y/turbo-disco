@@ -60,13 +60,17 @@
       <p class="hint">
         写真・動画・入力した文章は、ブラウザを閉じたりページを再読み込みすると消えてしまいます。
         作業を中断する前にここで一時保存しておくと、次回このページを開いたときに続きから再開できます
-        （この端末のブラウザ内だけに保存され、外部には送信されません）。
+        （この端末のブラウザ内だけに保存され、外部には送信されません）。下書きは
+        「テンプレートを選ぶ」で選んだテンプレートごとに、それぞれ独立して保存されます
+        （例: オープニング演出とエンドロールを両方同時に作っていても、片方を保存しても
+        もう片方の下書きは上書きされません）。保存・復元・削除の操作は、常に今選んで
+        いるテンプレートに対して行われます。
       </p>
       <button id="save-draft-btn" class="ghost-btn" type="button">💾 今の内容を一時保存する</button>
       <button id="delete-draft-btn" class="ghost-btn hidden" type="button">🗑 保存した下書きを削除</button>
       <p id="draft-status" class="hint"></p>
       <div id="draft-restore-box" class="hidden">
-        <p class="hint">前回保存した下書きがあります（<span id="draft-saved-at"></span>）。</p>
+        <p class="hint">このテンプレートで前回保存した下書きがあります（<span id="draft-saved-at"></span>）。</p>
         <button id="restore-draft-btn" class="primary-btn" type="button">📂 下書きを復元する</button>
       </div>
     </section>
@@ -613,6 +617,6 @@
     </p>
   </footer>
 
-  <script src="app.js?v=35"></script>
+  <script src="app.js?v=36"></script>
 </body>
 </html>
