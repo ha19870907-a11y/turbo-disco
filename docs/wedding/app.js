@@ -870,7 +870,13 @@ const thanksGroup = createPhotoGroup({
 });
 
 document.querySelectorAll('input[name="template"]').forEach((radio) => {
-  radio.addEventListener("change", updateTemplateVisibility);
+  radio.addEventListener("change", () => {
+    // ユーザーが自分でテンプレートを切り替えた時だけステータス表示をクリアする。
+    // updateTemplateVisibility()自体はrestoreDraftData()からも内部的に呼ばれる
+    // ため、そちらでクリアすると「復元中…」の表示が復元完了前に消えてしまう。
+    els.draftStatus.textContent = "";
+    updateTemplateVisibility();
+  });
 });
 
 function updateTemplateVisibility() {
@@ -893,6 +899,12 @@ function updateTemplateVisibility() {
   els.thanksSection.classList.toggle("hidden", !isThanks);
   els.thanksPhotosSection.classList.toggle("hidden", !isThanks);
   els.thanksEntriesSection.classList.toggle("hidden", !isThanks);
+  // 下書きの有無はテンプレートごとに非同期(IndexedDB)で確認するため、確認が
+  // 終わるまでの一瞬、前のテンプレートの下書き情報（保存日時など）が誤って
+  // 表示され続けることがないよう、切り替えた瞬間にいったん隠しておく。
+  els.draftRestoreBox.classList.add("hidden");
+  els.deleteDraftBtn.classList.add("hidden");
+  refreshDraftUIForCurrentTemplate();
   updateDurationEstimate();
 }
 
@@ -2897,7 +2909,6 @@ function fixVideoDuration(videoEl) {
 
 const DRAFT_DB_NAME = "wedding-movie-draft-db";
 const DRAFT_STORE_NAME = "drafts";
-const DRAFT_KEY = "current";
 
 function openDraftDB() {
   return new Promise((resolve, reject) => {
@@ -2910,31 +2921,35 @@ function openDraftDB() {
   });
 }
 
+// 下書きはテンプレート（スタンダード／オープニング演出／エンドロール／2人の
+// プロフィール／親への感謝ムービー）ごとに、それぞれ独立した保存枠を持つ
+// （IndexedDBのキーをテンプレート名そのものにする）。1つのテンプレートで保存
+// しても、他のテンプレートの下書きは上書きされない。
 async function saveDraftToDB(data) {
   const db = await openDraftDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(DRAFT_STORE_NAME, "readwrite");
-    tx.objectStore(DRAFT_STORE_NAME).put(data, DRAFT_KEY);
+    tx.objectStore(DRAFT_STORE_NAME).put(data, data.template);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
 }
 
-async function loadDraftFromDB() {
+async function loadDraftFromDB(template) {
   const db = await openDraftDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(DRAFT_STORE_NAME, "readonly");
-    const req = tx.objectStore(DRAFT_STORE_NAME).get(DRAFT_KEY);
+    const req = tx.objectStore(DRAFT_STORE_NAME).get(template);
     req.onsuccess = () => resolve(req.result || null);
     req.onerror = () => reject(req.error);
   });
 }
 
-async function deleteDraftFromDB() {
+async function deleteDraftFromDB(template) {
   const db = await openDraftDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(DRAFT_STORE_NAME, "readwrite");
-    tx.objectStore(DRAFT_STORE_NAME).delete(DRAFT_KEY);
+    tx.objectStore(DRAFT_STORE_NAME).delete(template);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
@@ -3239,6 +3254,65 @@ els.addBgmBtn.addEventListener("click", async () => {
 });
 
 // --- 下書きUIの配線 ---
+// 下書きはテンプレートごとに独立して保存されるため、保存・復元・削除ボタンは
+// 常に「今選んでいるテンプレート」に対して働く。テンプレートを切り替えるたびに
+// （updateTemplateVisibility経由で）refreshDraftUIForCurrentTemplateを呼び直し、
+// その時点のテンプレートに保存済みの下書きがあるかどうかを表示に反映する。
+
+const TEMPLATE_LABELS = {
+  standard: "スタンダード",
+  opening: "オープニング演出",
+  endroll: "エンドロール",
+  profile: "2人のプロフィール",
+  thanks: "親への感謝ムービー",
+};
+
+// 以前のバージョンでは下書きを固定キー"current"に1件だけ保存していた。
+// テンプレートごとの保存に移行するにあたり、そのまま放置すると既存の下書きが
+// 見えなくなってしまうため、初回起動時に1度だけそのテンプレートの保存枠へ
+// 移し替える（移行先に既に下書きがある場合は上書きしない）。
+async function migrateLegacyDraft() {
+  if (!window.indexedDB) return;
+  try {
+    const legacy = await loadDraftFromDB("current");
+    if (!legacy) return;
+    const template = legacy.template || "standard";
+    const existing = await loadDraftFromDB(template);
+    if (!existing) {
+      await saveDraftToDB(legacy);
+    }
+    await deleteDraftFromDB("current");
+  } catch (err) {
+    // 移行に失敗しても、下書き機能自体は使えるように諦める
+  }
+}
+
+// テンプレートを素早く連続で切り替えると、IndexedDBへの問い合わせが複数同時に
+// 発生し、後に発行した問い合わせの結果が先に発行した問い合わせより先に返ってくる
+// ことがある（順序の逆転）。この番号を使って「自分が最新の呼び出しか」を確認し、
+// 古い呼び出しの結果が後から画面に反映されて古いテンプレートの情報を誤って
+// 表示してしまわないようにする。
+let draftUIRefreshToken = 0;
+
+async function refreshDraftUIForCurrentTemplate() {
+  if (!window.indexedDB) return;
+  const token = ++draftUIRefreshToken;
+  const template = getTemplate();
+  try {
+    const data = await loadDraftFromDB(template);
+    if (token !== draftUIRefreshToken) return; // 途中でさらに新しい呼び出しが発生した
+    if (data) {
+      els.draftRestoreBox.classList.remove("hidden");
+      els.draftSavedAt.textContent = new Date(data.savedAt).toLocaleString("ja-JP");
+      els.deleteDraftBtn.classList.remove("hidden");
+    } else {
+      els.draftRestoreBox.classList.add("hidden");
+      els.deleteDraftBtn.classList.add("hidden");
+    }
+  } catch (err) {
+    // IndexedDBが使えない/壊れている環境では下書き機能を静かに諦める
+  }
+}
 
 if (!window.indexedDB) {
   els.draftSection.classList.add("hidden");
@@ -3249,8 +3323,9 @@ if (!window.indexedDB) {
     try {
       const data = collectDraftData();
       await saveDraftToDB(data);
-      els.draftStatus.textContent = `保存しました（${new Date(data.savedAt).toLocaleString("ja-JP")}）`;
-      els.deleteDraftBtn.classList.remove("hidden");
+      const label = TEMPLATE_LABELS[data.template] || data.template;
+      els.draftStatus.textContent = `「${label}」の下書きを保存しました（${new Date(data.savedAt).toLocaleString("ja-JP")}）`;
+      await refreshDraftUIForCurrentTemplate();
     } catch (err) {
       els.draftStatus.textContent = `保存に失敗しました: ${err.message || err}`;
     } finally {
@@ -3259,23 +3334,24 @@ if (!window.indexedDB) {
   });
 
   els.deleteDraftBtn.addEventListener("click", async () => {
-    if (!confirm("保存した下書きを削除しますか？")) return;
+    const label = TEMPLATE_LABELS[getTemplate()] || getTemplate();
+    if (!confirm(`「${label}」の下書きを削除しますか？`)) return;
     try {
-      await deleteDraftFromDB();
+      await deleteDraftFromDB(getTemplate());
       els.draftStatus.textContent = "下書きを削除しました";
-      els.deleteDraftBtn.classList.add("hidden");
-      els.draftRestoreBox.classList.add("hidden");
+      await refreshDraftUIForCurrentTemplate();
     } catch (err) {
       els.draftStatus.textContent = `削除に失敗しました: ${err.message || err}`;
     }
   });
 
   els.restoreDraftBtn.addEventListener("click", async () => {
-    if (!confirm("現在の内容を上書きして、保存した下書きを復元しますか？")) return;
+    const label = TEMPLATE_LABELS[getTemplate()] || getTemplate();
+    if (!confirm(`現在の内容を上書きして、「${label}」の下書きを復元しますか？`)) return;
     els.restoreDraftBtn.disabled = true;
     els.draftStatus.textContent = "復元中…";
     try {
-      const data = await loadDraftFromDB();
+      const data = await loadDraftFromDB(getTemplate());
       if (!data) {
         els.draftStatus.textContent = "下書きが見つかりませんでした";
         return;
@@ -3290,16 +3366,8 @@ if (!window.indexedDB) {
   });
 
   (async () => {
-    try {
-      const data = await loadDraftFromDB();
-      if (data) {
-        els.draftRestoreBox.classList.remove("hidden");
-        els.draftSavedAt.textContent = new Date(data.savedAt).toLocaleString("ja-JP");
-        els.deleteDraftBtn.classList.remove("hidden");
-      }
-    } catch (err) {
-      // IndexedDBが使えない/壊れている環境では下書き機能を静かに諦める
-    }
+    await migrateLegacyDraft();
+    refreshDraftUIForCurrentTemplate();
   })();
 }
 
