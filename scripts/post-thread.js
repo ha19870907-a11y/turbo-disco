@@ -23,7 +23,9 @@ async function postToThreads(text, { userId, accessToken } = {}) {
     throw new Error(`Threadsの投稿は${MAX_TEXT_LENGTH}文字までです（現在${text.length}文字）。`);
   }
 
-  const createUrl = new URL(`${API_BASE}/${userId}/threads`);
+  // /{userId}/...ではなく/me/...を使う(アクセストークン自身のアカウントを直接指すため、
+  // THREADS_USER_IDとトークンの紐付けがずれていても影響を受けない。詳細はfetch-thread-insights.js参照)。
+  const createUrl = new URL(`${API_BASE}/me/threads`);
   createUrl.searchParams.set('media_type', 'TEXT');
   createUrl.searchParams.set('text', text);
   createUrl.searchParams.set('access_token', accessToken);
@@ -37,7 +39,7 @@ async function postToThreads(text, { userId, accessToken } = {}) {
   // コンテナ作成直後は公開に失敗することがあるため、少し待ってから公開する。
   await new Promise((resolve) => setTimeout(resolve, 5000));
 
-  const publishUrl = new URL(`${API_BASE}/${userId}/threads_publish`);
+  const publishUrl = new URL(`${API_BASE}/me/threads_publish`);
   publishUrl.searchParams.set('creation_id', createBody.id);
   publishUrl.searchParams.set('access_token', accessToken);
 
