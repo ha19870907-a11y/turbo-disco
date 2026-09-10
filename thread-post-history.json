@@ -89,5 +89,18 @@
     "angle": "申請方法",
     "threadId": "18091283486649726",
     "postedAt": "2026-09-10T03:26:37.804Z"
+  },
+  {
+    "date": "2026-09-10",
+    "dayKey": "thu",
+    "slotIndex": 2,
+    "time": "20:30",
+    "label": "クイズ",
+    "templateId": "TPL-058",
+    "genre": "保育",
+    "category": "クイズ",
+    "angle": "対象者",
+    "threadId": "17990724599847899",
+    "postedAt": "2026-09-10T11:37:16.654Z"
   }
 ]
