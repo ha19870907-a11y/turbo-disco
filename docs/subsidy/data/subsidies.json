@@ -1,8 +1,8 @@
 {
-  "fetchedAt": "2026-09-09T21:14:52.232Z",
+  "fetchedAt": "2026-09-10T21:15:10.754Z",
   "source": "jGrants (https://www.jgrants-portal.go.jp/)",
   "note": "複数の検索語でjGrants公開APIを検索し、重複を除いてまとめたスナップショットです。全制度を網羅するものではありません。",
-  "count": 323,
+  "count": 324,
   "items": [
     {
       "id": "a0WJ200000CDY2TMAX",
@@ -852,6 +852,17 @@
       "acceptanceEndDatetime": "2026-10-16T14:59Z"
     },
     {
+      "id": "a0WJ200000CDeN8MAL",
+      "title": "「地域未利用バイオマスを活用したバイオガスの産業熱利用推進に向けた動向調査」の公募",
+      "institutionName": "調査等",
+      "subsidyMaxLimit": 0,
+      "subsidyRate": null,
+      "targetAreaSearch": "全国",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2026-09-10T01:00Z",
+      "acceptanceEndDatetime": "2026-10-19T03:00Z"
+    },
+    {
       "id": "a0WJ200000CDPyeMAH",
       "title": "［第十三回］事業再構築補助金_GX進出類型（交付申請等）",
       "institutionName": "事業再構築補助金",
@@ -1314,14 +1325,14 @@
       "acceptanceEndDatetime": "2026-12-25T08:15Z"
     },
     {
-      "id": "a0W2x000007CStEEAW",
-      "title": "農林水産物認証取得支援事業（農家認証取得支援事業）補助金",
-      "institutionName": "農林水産物認証取得支援事業（農家認証取得支援事業）補助金",
-      "subsidyMaxLimit": 0,
-      "subsidyRate": "1/2以内",
-      "targetAreaSearch": "東京都",
+      "id": "a0WJ200000CDVkeMAH",
+      "title": "【経済産業省】ものづくり・商業・サービス生産性向上促進補助金（20次締切）",
+      "institutionName": "ものづくり補助金",
+      "subsidyMaxLimit": 35000000,
+      "subsidyRate": "1/2 もしくは 2/3",
+      "targetAreaSearch": "全国",
       "targetNumberOfEmployees": "従業員数の制約なし",
-      "acceptanceStartDatetime": "2023-04-03T00:00Z",
+      "acceptanceStartDatetime": "2025-10-27T08:00Z",
       "acceptanceEndDatetime": "2026-12-28T08:00Z"
     },
     {
@@ -1336,14 +1347,14 @@
       "acceptanceEndDatetime": "2026-12-28T08:00Z"
     },
     {
-      "id": "a0WJ200000CDVkeMAH",
-      "title": "【経済産業省】ものづくり・商業・サービス生産性向上促進補助金（20次締切）",
-      "institutionName": "ものづくり補助金",
-      "subsidyMaxLimit": 35000000,
-      "subsidyRate": "1/2 もしくは 2/3",
-      "targetAreaSearch": "全国",
+      "id": "a0W2x000007CStEEAW",
+      "title": "農林水産物認証取得支援事業（農家認証取得支援事業）補助金",
+      "institutionName": "農林水産物認証取得支援事業（農家認証取得支援事業）補助金",
+      "subsidyMaxLimit": 0,
+      "subsidyRate": "1/2以内",
+      "targetAreaSearch": "東京都",
       "targetNumberOfEmployees": "従業員数の制約なし",
-      "acceptanceStartDatetime": "2025-10-27T08:00Z",
+      "acceptanceStartDatetime": "2023-04-03T00:00Z",
       "acceptanceEndDatetime": "2026-12-28T08:00Z"
     },
     {
