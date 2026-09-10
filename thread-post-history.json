@@ -76,5 +76,18 @@
     "angle": "金額",
     "threadId": "18082849622695837",
     "postedAt": "2026-09-09T22:03:35.515Z"
+  },
+  {
+    "date": "2026-09-10",
+    "dayKey": "thu",
+    "slotIndex": 1,
+    "time": "12:15",
+    "label": "補助金",
+    "templateId": "TPL-034",
+    "genre": "補助金",
+    "category": "コメント誘導",
+    "angle": "申請方法",
+    "threadId": "18091283486649726",
+    "postedAt": "2026-09-10T03:26:37.804Z"
   }
 ]
