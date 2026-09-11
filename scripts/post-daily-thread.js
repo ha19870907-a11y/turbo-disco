@@ -12,7 +12,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { postToThreads } = require('./post-thread.js');
+const { postToThreads, postReplyToThreads } = require('./post-thread.js');
 const { resolveSlot, pickTemplate } = require('./scheduler.js');
 const { readTemplateLinks, registerPostLink } = require('./monetization.js');
 
@@ -71,6 +71,18 @@ async function main() {
       postedAt: new Date().toISOString(),
     });
     writeHistory(history);
+
+    // クイズ形式のテンプレートは、答え(answerText)をメイン投稿には含めず、
+    // 自分の投稿への返信として別立てで投稿する。フィード上では答えが見えず、
+    // 投稿を開いてリプ欄を見て初めて答えがわかる構成になる。
+    if (template.answerText) {
+      try {
+        const answerResult = await postReplyToThreads(template.answerText, result.id);
+        console.log(`クイズの答えをリプ欄に投稿しました（ID: ${answerResult.id}）。`);
+      } catch (answerErr) {
+        console.error(`クイズの答えの投稿に失敗しました(本体の投稿自体は成功しています): ${answerErr.message}`);
+      }
+    }
 
     // STEP3.5: このテンプレートに収益導線リンクが紐付けられていれば記録する(任意・追加機能)。
     // 未設定のテンプレートがほとんどのため、通常は何もしない。失敗しても投稿自体は
