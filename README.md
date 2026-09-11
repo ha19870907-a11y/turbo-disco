@@ -63,6 +63,12 @@ npm run post:thread -- "投稿したいテキスト"
 （1件500文字以内、`genre`/`category`/`angle`のタグ付けを忘れずに）。曜日別の配分自体を
 変えたい場合は `scripts/weekly-schedule.json` を編集してください。
 
+`category`が「クイズ」のテンプレートは、任意で`answerText`（答えの文章）を設定できます。
+設定すると、`text`(問題文)だけが本体の投稿として公開され、`answerText`はその投稿への
+**リプライとして別立てで投稿**されます。フィード上では答えが見えず、投稿を開いて
+リプ欄を見て初めて答えがわかる構成になります（`scripts/post-daily-thread.js` /
+`scripts/post-thread.js`の`postReplyToThreads`）。
+
 実行時刻(JST)から曜日・スロットを自動判定するため、Actionsの実行が多少遅延しても
 その時刻にふさわしい投稿が選ばれます。また同じ日・スロットに既に投稿済みの場合は
 再実行してもスキップされ、二重投稿を防ぎます。
