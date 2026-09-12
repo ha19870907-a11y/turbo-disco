@@ -141,5 +141,18 @@
     "angle": "冒頭",
     "threadId": "17906015940553142",
     "postedAt": "2026-09-11T11:36:10.190Z"
+  },
+  {
+    "date": "2026-09-12",
+    "dayKey": "sat",
+    "slotIndex": 0,
+    "time": "09:00",
+    "label": "家族向け制度",
+    "templateId": "TPL-007",
+    "genre": "ひとり親",
+    "category": "属性別",
+    "angle": "地域",
+    "threadId": "17908301532532062",
+    "postedAt": "2026-09-12T00:12:26.047Z"
   }
 ]
