@@ -167,5 +167,18 @@
     "angle": "地域",
     "threadId": "18085579415470774",
     "postedAt": "2026-09-12T04:14:23.577Z"
+  },
+  {
+    "date": "2026-09-12",
+    "dayKey": "sat",
+    "slotIndex": 2,
+    "time": "20:30",
+    "label": "コメントを促す投稿",
+    "templateId": "TPL-052",
+    "genre": "ひとり親",
+    "category": "コメント誘導",
+    "angle": "注意点",
+    "threadId": "17909435511508440",
+    "postedAt": "2026-09-12T11:35:07.255Z"
   }
 ]
