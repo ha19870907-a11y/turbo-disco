@@ -34,6 +34,26 @@ npm run post:x -- "投稿したいテキスト"
 - GitHubリポジトリの Actions タブから `Post to X` ワークフローを手動実行（Run workflow）すると、
   パソコンがなくてもスマホのブラウザだけからテキストを指定して投稿できます。
 
+### 子育て・補助金情報の自動投稿（Threadsと同じ配分・テンプレートを再利用）
+
+`.github/workflows/daily-x.yml` が、Threads版（`daily-thread.yml`）と全く同じ時刻・曜日別配分で
+Xへ自動投稿します（`scripts/post-daily-x.js`）。投稿テンプレート（`scripts/thread-templates.json`。
+すべて280文字以内のためXにもそのまま使えます）と曜日別配分（`scripts/weekly-schedule.json`）、
+ローテーションロジック（`scripts/scheduler.js`）はThreads側とまるごと共有していますが、
+**投稿履歴だけは`x-post-history.json`に別立てで記録**することで、ThreadsとXそれぞれ独立して
+「直近と同じテンプレート・同じ制度×切り口を避ける」ローテーションを行います
+（Threads側の投稿履歴`thread-post-history.json`とは混ざりません）。
+
+- テンプレートの追加・編集やジャンル配分の変更は、Threads側と同じく
+  `scripts/thread-templates.json` / `scripts/weekly-schedule.json` を編集すれば
+  ThreadsとX両方に反映されます。
+- クイズ形式のテンプレート（`answerText`あり）は、Threads側と同様に答えを本体の投稿には含めず、
+  自分の投稿へのリプライとして別立てで投稿します（`scripts/post-to-x.js`の`postReplyToX`）。
+- 実行時刻(JST)から曜日・スロットを自動判定し、同じ日・スロットに投稿済みなら再実行しても
+  スキップするため、Actionsの実行遅延や再実行があっても二重投稿にはなりません。
+- 収益導線・コンバージョン計測（STEP3.5・後述）は現時点ではThreads専用で、Xの投稿には
+  紐付けていません。
+
 ## Threads自動投稿ツール
 
 Meta社のSNS「Threads」に、指定したテキストを自動投稿するスクリプトです（`scripts/post-thread.js`）。

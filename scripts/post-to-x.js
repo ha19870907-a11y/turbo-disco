@@ -68,20 +68,8 @@ function buildOAuthHeader({ method, url, apiKey, apiSecret, accessToken, accessT
   );
 }
 
-async function postToX(text, { apiKey, apiSecret, accessToken, accessTokenSecret } = {}) {
-  ({ apiKey, apiSecret, accessToken, accessTokenSecret } = requireCredentials({
-    apiKey,
-    apiSecret,
-    accessToken,
-    accessTokenSecret,
-  }));
-  if (!text || !text.trim()) {
-    throw new Error('投稿するテキストを指定してください。');
-  }
-  if (text.length > MAX_TEXT_LENGTH) {
-    throw new Error(`Xの投稿は${MAX_TEXT_LENGTH}文字までです（現在${text.length}文字）。`);
-  }
-
+// ツイート投稿の共通処理。replyToIdを指定すると、そのツイートID×宛の返信として投稿する。
+async function createTweet(text, { apiKey, apiSecret, accessToken, accessTokenSecret }, { replyToId } = {}) {
   const authHeader = buildOAuthHeader({
     method: 'POST',
     url: API_URL,
@@ -91,13 +79,18 @@ async function postToX(text, { apiKey, apiSecret, accessToken, accessTokenSecret
     accessTokenSecret,
   });
 
+  const payload = { text };
+  if (replyToId) {
+    payload.reply = { in_reply_to_tweet_id: replyToId };
+  }
+
   const res = await fetch(API_URL, {
     method: 'POST',
     headers: {
       Authorization: authHeader,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify(payload),
   });
   const body = await res.json();
   if (!res.ok) {
@@ -105,6 +98,35 @@ async function postToX(text, { apiKey, apiSecret, accessToken, accessTokenSecret
   }
 
   return body.data;
+}
+
+async function postToX(text, { apiKey, apiSecret, accessToken, accessTokenSecret } = {}) {
+  const creds = requireCredentials({ apiKey, apiSecret, accessToken, accessTokenSecret });
+  if (!text || !text.trim()) {
+    throw new Error('投稿するテキストを指定してください。');
+  }
+  if (text.length > MAX_TEXT_LENGTH) {
+    throw new Error(`Xの投稿は${MAX_TEXT_LENGTH}文字までです（現在${text.length}文字）。`);
+  }
+
+  return createTweet(text, creds);
+}
+
+// 自分の投稿(replyToId)への返信として投稿する。クイズの答えなど、
+// メインの投稿では見せず、タップして開かないと見えない形で内容を出したい場合に使う。
+async function postReplyToX(text, replyToId, { apiKey, apiSecret, accessToken, accessTokenSecret } = {}) {
+  const creds = requireCredentials({ apiKey, apiSecret, accessToken, accessTokenSecret });
+  if (!replyToId) {
+    throw new Error('返信先のreplyToIdを指定してください。');
+  }
+  if (!text || !text.trim()) {
+    throw new Error('返信するテキストを指定してください。');
+  }
+  if (text.length > MAX_TEXT_LENGTH) {
+    throw new Error(`Xの投稿は${MAX_TEXT_LENGTH}文字までです（現在${text.length}文字）。`);
+  }
+
+  return createTweet(text, creds, { replyToId });
 }
 
 async function main() {
@@ -122,4 +144,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { postToX };
+module.exports = { postToX, postReplyToX };
