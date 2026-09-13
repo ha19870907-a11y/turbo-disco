@@ -9,6 +9,7 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "post:thread": "node scripts/post-thread.js",
+    "post:x": "node scripts/post-to-x.js",
     "threads:insights": "node scripts/fetch-thread-insights.js",
     "threads:monetization-report": "node scripts/monetization-report.js",
     "threads:dashboard": "node scripts/generate-dashboard.js"

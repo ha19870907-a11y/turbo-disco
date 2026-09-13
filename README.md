@@ -6,6 +6,33 @@
 - **[競艇予想ツール](#競艇予想ツール)**（`docs/` / `server.js` + `public/` + `src/`）
 - **[支援制度ナビ（補助金・助成金マッチングツール）](#支援制度ナビ補助金助成金マッチングツール)**（`docs/subsidy/`）
 - **[Threads自動投稿ツール](#threads自動投稿ツール)**（`scripts/post-thread.js`）
+- **[X自動投稿ツール](#x自動投稿ツール)**（`scripts/post-to-x.js`）
+
+## X自動投稿ツール
+
+X（旧Twitter）に、指定したテキストを自動投稿するスクリプトです（`scripts/post-to-x.js`）。
+X Developer PortalでAppを作成し、投稿権限（Read and Write）を持つAPIキー・アクセストークンを
+環境変数に設定して使います。
+
+```bash
+export X_API_KEY=xxxxxxxxxx
+export X_API_SECRET=xxxxxxxxxx
+export X_ACCESS_TOKEN=xxxxxxxxxx
+export X_ACCESS_TOKEN_SECRET=xxxxxxxxxx
+
+npm run post:x -- "投稿したいテキスト"
+```
+
+- 内部的には X API v2 の投稿エンドポイント（`POST /2/tweets`）を、OAuth 1.0a（User Context）で
+  署名して呼び出します。外部ライブラリは使わず、Node.jsの`crypto`モジュールだけで署名を
+  生成しています。
+- 投稿は280文字までです（Xの標準的な文字数制限）。
+- APIキー・アクセストークンは第三者に見られない環境変数・シークレットストアで管理し、
+  リポジトリやチャットに直接書き込まないでください。
+- 定期実行したい場合は、このスクリプトを cron や GitHub Actions の `schedule` トリガーなどから
+  呼び出す形で自動化できます。
+- GitHubリポジトリの Actions タブから `Post to X` ワークフローを手動実行（Run workflow）すると、
+  パソコンがなくてもスマホのブラウザだけからテキストを指定して投稿できます。
 
 ## Threads自動投稿ツール
 
