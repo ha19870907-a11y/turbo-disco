@@ -258,5 +258,18 @@
     "angle": "金額",
     "threadId": "18474066958118498",
     "postedAt": "2026-09-14T11:39:07.888Z"
+  },
+  {
+    "date": "2026-09-15",
+    "dayKey": "tue",
+    "slotIndex": 0,
+    "time": "07:00",
+    "label": "知らないと損する制度",
+    "templateId": "TPL-032",
+    "genre": "補助金",
+    "category": "知らないと損",
+    "angle": "冒頭",
+    "threadId": "17863366665675898",
+    "postedAt": "2026-09-14T22:06:45.441Z"
   }
 ]
