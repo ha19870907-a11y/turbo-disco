@@ -245,5 +245,18 @@
     "angle": "注意点",
     "threadId": "17967551424178424",
     "postedAt": "2026-09-14T03:30:56.702Z"
+  },
+  {
+    "date": "2026-09-14",
+    "dayKey": "mon",
+    "slotIndex": 2,
+    "time": "20:30",
+    "label": "クイズ",
+    "templateId": "TPL-048",
+    "genre": "児童手当",
+    "category": "クイズ",
+    "angle": "金額",
+    "threadId": "18474066958118498",
+    "postedAt": "2026-09-14T11:39:07.888Z"
   }
 ]
