@@ -12,6 +12,13 @@ const SOURCES = [
   { base: "https://raw.githubusercontent.com/boatraceopenapi/api/gh-pages/docs/v1", label: "代替データミラー", hasOdds: false },
 ];
 
+// メインデータ源にオッズが無い場合(=fallback使用時)に補完する、別プロジェクトのオッズ専用API。
+// BoatraceOpenAPI/previews を元に約30分間隔で更新されており、単勝/3連単ともスキーマがTurnmarkと同じ形。
+const ODDS_SOURCES = [
+  { base: "https://lamrongol.github.io/BoatraceOdds/v3", label: "オッズ補完" },
+  { base: "https://raw.githubusercontent.com/lamrongol/BoatraceOdds/gh-pages/docs/v3", label: "オッズ補完ミラー" },
+];
+
 const CACHE_TTL_MS = 60 * 1000; // 元データの更新間隔(約3分)より短い周期でポーリングして反映を早める
 const FETCH_TIMEOUT_MS = 10 * 1000;
 
@@ -47,6 +54,49 @@ async function fetchLive(date) {
   throw new Error(`データ取得に失敗しました: ${errors.join(" / ")}`);
 }
 
+// BoatraceOddsのフィールド名(*_odds)をTurnmark側のキー名に合わせて変換する。
+const ODDS_FIELD_MAP = {
+  win_odds: "win",
+  place_odds: "place",
+  exacta_odds: "exacta",
+  quinella_odds: "quinella",
+  quinella_place_odds: "quinella_place",
+  trifecta_odds: "trifecta",
+  trio_odds: "trio",
+};
+
+async function fetchSupplementalOdds(date) {
+  for (const src of ODDS_SOURCES) {
+    try {
+      const data = await fetchWithTimeout(urlFor(src.base, date));
+      if (Array.isArray(data?.odds)) return data.odds;
+    } catch {
+      // 補完データは無くてもアプリは動くので、失敗は無視して次のソースへ
+    }
+  }
+  return null;
+}
+
+// メインデータ源(usedFallback時)に odds が無いレースへ、補完APIの単勝/3連単等を差し込む。
+// 1件でも実際に補えたら true を返す(true の場合のみ「補完データ使用」の表示に切り替える)。
+function mergeSupplementalOdds(dayData, oddsList) {
+  if (!Array.isArray(oddsList) || oddsList.length === 0) return false;
+  const stadiums = dayData?.programs?.stadiums || {};
+  let merged = false;
+  for (const entry of oddsList) {
+    const race = stadiums[String(entry.stadium_number)]?.races?.[String(entry.number)];
+    if (!race || race.odds) continue;
+    const odds = {};
+    for (const [srcKey, destKey] of Object.entries(ODDS_FIELD_MAP)) {
+      if (entry[srcKey] != null) odds[destKey] = entry[srcKey];
+    }
+    if (Object.keys(odds).length === 0) continue;
+    race.odds = odds;
+    merged = true;
+  }
+  return merged;
+}
+
 function loadFixture() {
   const fixturePath = path.join(__dirname, "..", "fixtures", "sample-20260401.json");
   const raw = fs.readFileSync(fixturePath, "utf-8");
@@ -72,7 +122,12 @@ async function getDay(date, opts = {}) {
 
   try {
     const { data, usedFallback } = await fetchLive(date);
-    const entry = { data, fetchedAt: Date.now(), usedFallback };
+    let oddsSupplemented = false;
+    if (usedFallback) {
+      const oddsList = await fetchSupplementalOdds(date);
+      oddsSupplemented = mergeSupplementalOdds(data, oddsList);
+    }
+    const entry = { data, fetchedAt: Date.now(), usedFallback, oddsSupplemented };
     cache.set(date, entry);
     return { ...entry, source: "live" };
   } catch (err) {

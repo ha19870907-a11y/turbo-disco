@@ -80,7 +80,7 @@ async function fetchDay(params = {}) {
   return getDay(date, { forceSample: state.sample });
 }
 
-function setStatusBadge(source, error, usedFallback) {
+function setStatusBadge(source, error, usedFallback, oddsSupplemented) {
   el.statusBadge.classList.remove("live", "sample", "error");
   if (error) {
     el.statusBadge.textContent = `取得失敗: ${error}`;
@@ -93,7 +93,8 @@ function setStatusBadge(source, error, usedFallback) {
     "stale-cache": "🟡 一時的に古いデータ",
     sample: "🟠 サンプルデータ",
   };
-  el.statusBadge.textContent = usedFallback ? `${labels[source] || source}（代替データ・オッズ非対応）` : labels[source] || source;
+  const suffix = usedFallback ? (oddsSupplemented ? "（代替データ・オッズ補完）" : "（代替データ・オッズ非対応）") : "";
+  el.statusBadge.textContent = `${labels[source] || source}${suffix}`;
   el.statusBadge.classList.add(source === "sample" ? "sample" : usedFallback ? "sample" : "live");
 }
 
@@ -126,9 +127,9 @@ async function loadStadiums() {
   el.stadiumGrid.innerHTML = `<div class="empty-state">読み込み中…</div>`;
   const seq = ++state.loadSeq;
   try {
-    const { data, source, error, usedFallback } = await fetchDay();
+    const { data, source, error, usedFallback, oddsSupplemented } = await fetchDay();
     if (seq !== state.loadSeq) return;
-    setStatusBadge(source, error, usedFallback);
+    setStatusBadge(source, error, usedFallback, oddsSupplemented);
     const stadiums = buildStadiumList(data);
     if (stadiums.length === 0) {
       el.stadiumGrid.innerHTML = `
@@ -176,9 +177,9 @@ async function loadRaces() {
   el.raceGrid.innerHTML = `<div class="empty-state">読み込み中…</div>`;
   const seq = ++state.loadSeq;
   try {
-    const { data, source, error, usedFallback } = await fetchDay();
+    const { data, source, error, usedFallback, oddsSupplemented } = await fetchDay();
     if (seq !== state.loadSeq) return;
-    setStatusBadge(source, error, usedFallback);
+    setStatusBadge(source, error, usedFallback, oddsSupplemented);
     const result = buildRaceList(data, state.stadium);
     el.raceListTitle.textContent = `${result.stadiumName} - ${state.date}`;
     el.raceGrid.innerHTML = "";
@@ -449,9 +450,9 @@ async function loadRaceDetail() {
   el.resultBox.innerHTML = "";
   const seq = ++state.loadSeq;
   try {
-    const { data, source, error, usedFallback } = await fetchDay();
+    const { data, source, error, usedFallback, oddsSupplemented } = await fetchDay();
     if (seq !== state.loadSeq) return;
-    setStatusBadge(source, error, usedFallback);
+    setStatusBadge(source, error, usedFallback, oddsSupplemented);
     const detail = buildRaceDetail(data, state.stadium, state.race);
     if (!detail) throw new Error("指定されたレースが見つかりません");
 

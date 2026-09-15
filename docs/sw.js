@@ -47,6 +47,7 @@ function isExternalDataRequest(url) {
   return (
     url.hostname === "turnmark.github.io" ||
     url.hostname === "boatraceopenapi.github.io" ||
+    url.hostname === "lamrongol.github.io" ||
     url.hostname === "raw.githubusercontent.com"
   );
 }

@@ -83,7 +83,7 @@
     return body;
   }
 
-  function setStatusBadge(source, error, usedFallback) {
+  function setStatusBadge(source, error, usedFallback, oddsSupplemented) {
     el.statusBadge.classList.remove("live", "sample", "error");
     if (error) {
       el.statusBadge.textContent = `取得失敗: ${error}`;
@@ -96,7 +96,8 @@
       "stale-cache": "🟡 一時的に古いデータ",
       sample: "🟠 サンプルデータ",
     };
-    el.statusBadge.textContent = usedFallback ? `${labels[source] || source}（代替データ・オッズ非対応）` : labels[source] || source;
+    const suffix = usedFallback ? (oddsSupplemented ? "（代替データ・オッズ補完）" : "（代替データ・オッズ非対応）") : "";
+    el.statusBadge.textContent = `${labels[source] || source}${suffix}`;
     el.statusBadge.classList.add(source === "sample" ? "sample" : usedFallback ? "sample" : "live");
   }
 
@@ -131,7 +132,7 @@
     try {
       const data = await api("/api/stadiums");
       if (seq !== state.loadSeq) return;
-      setStatusBadge(data.source, data.error, data.usedFallback);
+      setStatusBadge(data.source, data.error, data.usedFallback, data.oddsSupplemented);
       if (data.stadiums.length === 0) {
         el.stadiumGrid.innerHTML = `
           <div class="empty-state">
@@ -180,7 +181,7 @@
     try {
       const data = await api("/api/races", { stadium: state.stadium });
       if (seq !== state.loadSeq) return;
-      setStatusBadge(data.source, data.error, data.usedFallback);
+      setStatusBadge(data.source, data.error, data.usedFallback, data.oddsSupplemented);
       el.raceListTitle.textContent = `${data.stadiumName} - ${data.date}`;
       el.raceGrid.innerHTML = "";
       for (const r of data.races) {
@@ -449,7 +450,7 @@
     try {
       const data = await api("/api/race", { stadium: state.stadium, race: state.race });
       if (seq !== state.loadSeq) return;
-      setStatusBadge(data.source, data.error, data.usedFallback);
+      setStatusBadge(data.source, data.error, data.usedFallback, data.oddsSupplemented);
       el.detailTitle.textContent = `${data.stadiumName} ${data.raceNumber}R ${data.title || ""}`;
       el.raceMeta.innerHTML = `
         <span>締切: <b>${data.closedAt ?? "-"}</b></span>

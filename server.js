@@ -56,7 +56,7 @@ app.get("/api/stadiums", async (req, res, next) => {
   try {
     const date = parseDateParam(req);
     const sample = req.query.sample === "1";
-    const { data, source, fetchedAt, error, usedFallback } = await getDay(date, { forceSample: sample });
+    const { data, source, fetchedAt, error, usedFallback, oddsSupplemented } = await getDay(date, { forceSample: sample });
     const stadiums = data?.programs?.stadiums || {};
 
     const list = Object.keys(stadiums)
@@ -73,7 +73,7 @@ app.get("/api/stadiums", async (req, res, next) => {
       })
       .sort((a, b) => a.stadiumNumber - b.stadiumNumber);
 
-    res.json({ date, source, fetchedAt, error: error || null, usedFallback, stadiums: list });
+    res.json({ date, source, fetchedAt, error: error || null, usedFallback, oddsSupplemented, stadiums: list });
   } catch (err) {
     next(err);
   }
@@ -89,10 +89,10 @@ app.get("/api/races", async (req, res, next) => {
       err.status = 400;
       throw err;
     }
-    const { data, source, fetchedAt, error, usedFallback } = await getDay(date, { forceSample: sample });
+    const { data, source, fetchedAt, error, usedFallback, oddsSupplemented } = await getDay(date, { forceSample: sample });
     const stadiumData = data?.programs?.stadiums?.[stadium];
     if (!stadiumData) {
-      return res.json({ date, source, fetchedAt, usedFallback, stadiumNumber: Number(stadium), races: [] });
+      return res.json({ date, source, fetchedAt, usedFallback, oddsSupplemented, stadiumNumber: Number(stadium), races: [] });
     }
     const races = Object.keys(stadiumData.races)
       .sort((a, b) => Number(a) - Number(b))
@@ -112,6 +112,7 @@ app.get("/api/races", async (req, res, next) => {
       fetchedAt,
       error: error || null,
       usedFallback,
+      oddsSupplemented,
       stadiumNumber: Number(stadium),
       stadiumName: stadiumName(stadium),
       races,
@@ -131,7 +132,7 @@ app.get("/api/race", async (req, res, next) => {
       err.status = 400;
       throw err;
     }
-    const { data, source, fetchedAt, error, usedFallback } = await getDay(date, { forceSample: sample });
+    const { data, source, fetchedAt, error, usedFallback, oddsSupplemented } = await getDay(date, { forceSample: sample });
     const race = data?.programs?.stadiums?.[stadium]?.races?.[raceNumber];
     if (!race) {
       const err = new Error("指定されたレースが見つかりません");
@@ -147,6 +148,7 @@ app.get("/api/race", async (req, res, next) => {
       fetchedAt,
       error: error || null,
       usedFallback,
+      oddsSupplemented,
       stadiumNumber: Number(stadium),
       stadiumName: stadiumName(stadium),
       raceNumber: Number(raceNumber),
