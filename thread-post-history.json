@@ -297,5 +297,18 @@
     "angle": "冒頭",
     "threadId": "18132067039677354",
     "postedAt": "2026-09-15T11:39:48.367Z"
+  },
+  {
+    "date": "2026-09-16",
+    "dayKey": "wed",
+    "slotIndex": 0,
+    "time": "07:00",
+    "label": "子育て支援",
+    "templateId": "TPL-058",
+    "genre": "保育",
+    "category": "クイズ",
+    "angle": "対象者",
+    "threadId": "18093663281440217",
+    "postedAt": "2026-09-15T22:10:44.582Z"
   }
 ]
