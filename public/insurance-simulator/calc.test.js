@@ -219,6 +219,50 @@ test("simulateAllScenarios: 空のシナリオリストはエラーになる", (
   );
 });
 
+test("simulateScenario: 実際のソニー生命設計書（解約返戻金表）の数値と概ね整合する", () => {
+  // 契約年齢40歳・死亡保障1,000万円・年払保険料278,040円（月払23,170円）の
+  // 実際の解約返戻金表（運用利回り-3%/0%/3%、13年分の解約返戻金）に対する
+  // 回帰チェック。DEFAULT_ASSUMPTIONSのinitialCostRate/coiLoadingFactorは
+  // このデータに最小二乗フィットして逆算した値（性別は設計書からは不明のため
+  // 男性の死亡率カーブを仮定）。ここでは資産運用関係費用・契約関係費を0として、
+  // フィット時と同じ条件で再現できることを確認する。
+  const issueAge = 40;
+  const sumAssured = 10000000;
+  const monthlyPremium = Math.round(278040 / 12);
+  const target = {
+    "-0.03": [0, 222000, 443000, 657000, 865000, 1067000, 1263000, 1452000, 1635000, 1813000, 1960000, 2102000],
+    "0": [0, 235000, 472000, 708000, 944000, 1179000, 1413000, 1645000, 1877000, 2108000, 2313000, 2517000],
+    "0.03": [1000, 248000, 502000, 762000, 1028000, 1301000, 1580000, 1866000, 2159000, 2458000, 2740000, 3030000],
+  };
+
+  for (const [rateStr, expected] of Object.entries(target)) {
+    const { rows } = simulateScenario({
+      issueAge,
+      gender: "male",
+      sumAssured,
+      payToAge: null,
+      monthlyPremium,
+      annualReturnRate: Number(rateStr),
+      mgmtFeeAnnualRate: 0,
+      maintenanceFeeMonthly: 0,
+      simEndAge: issueAge + expected.length,
+    });
+    expected.forEach((expectedValue, i) => {
+      const actual = rows[i].accountValue;
+      // DEFAULT_ASSUMPTIONSはフィットした値をキリの良い数字に丸めているため、
+      // 最適値そのものより誤差が大きくなる。絶対誤差(4万円)と相対誤差(5%)の
+      // どちらか緩い方を許容する。
+      const absTolerance = 40000;
+      const relTolerance = expectedValue * 0.05;
+      const tolerance = Math.max(absTolerance, relTolerance);
+      assert.ok(
+        Math.abs(actual - expectedValue) <= tolerance,
+        `rate=${rateStr} year=${i + 1}: expected≈${expectedValue}, got ${Math.round(actual)}`
+      );
+    });
+  }
+});
+
 test("simulateScenario: 契約年齢がシミュレーション終了年齢以上だとエラー", () => {
   assert.throws(() =>
     simulateScenario({
