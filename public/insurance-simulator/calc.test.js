@@ -346,6 +346,46 @@ test("simulateScenario: 保険料払込期間が10年未満で完了した場合
   );
 });
 
+test("simulateScenario: 返戻率は解約返戻金÷払込保険料累計と一致し、0以上である", () => {
+  const results = simulateAllScenarios({
+    issueAge: 40,
+    gender: "female",
+    sumAssured: 10000000,
+    payToAge: 60,
+    monthlyPremium: 20000,
+  });
+  for (const r of results) {
+    for (const row of r.result.rows) {
+      assert.ok(row.returnRate >= 0, `age ${row.age}: returnRate is negative`);
+      if (row.cumulativePremium > 0) {
+        const expected = row.surrenderValue / row.cumulativePremium;
+        assert.ok(
+          Math.abs(row.returnRate - expected) < 1e-9,
+          `age ${row.age}: returnRate should equal surrenderValue/cumulativePremium`
+        );
+      } else {
+        assert.equal(row.returnRate, 0);
+      }
+    }
+  }
+});
+
+test("simulateScenario: 返戻率は解約控除費用がゼロになる10年目にかけて上昇する", () => {
+  const { rows } = simulateScenario({
+    issueAge: 30,
+    gender: "male",
+    sumAssured: 10000000,
+    payToAge: null,
+    monthlyPremium: 20000,
+    annualReturnRate: 0.03,
+  });
+  const year1 = rows.find((r) => r.age === 30).returnRate;
+  const year5 = rows.find((r) => r.age === 34).returnRate;
+  const year10 = rows.find((r) => r.age === 39).returnRate;
+  assert.ok(year1 < year5, "1年目より5年目の方が返戻率が高いはず");
+  assert.ok(year5 < year10, "5年目より10年目の方が返戻率が高いはず（解約控除費用が逓減するため）");
+});
+
 test("simulateScenario: 契約年齢がシミュレーション終了年齢以上だとエラー", () => {
   assert.throws(() =>
     simulateScenario({

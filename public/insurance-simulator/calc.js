@@ -287,6 +287,8 @@
           ? (surrenderChargeBase * (SURRENDER_CHARGE_YEARS - policyYear)) / (SURRENDER_CHARGE_YEARS - 1)
           : 0;
       const surrenderValue = lapsed ? 0 : Math.max(accountValue - surrenderCharge, 0);
+      // 返戻率：既払込保険料累計に対する解約返戻金の割合。
+      const returnRate = cumulativePremium > 0 ? surrenderValue / cumulativePremium : 0;
       rows.push({
         age,
         premiumThisYear,
@@ -297,6 +299,7 @@
         investmentGainThisYear,
         accountValue,
         surrenderValue,
+        returnRate,
         deathBenefit,
         lapsed,
       });
@@ -314,6 +317,7 @@
             investmentGainThisYear: 0,
             accountValue: 0,
             surrenderValue: 0,
+            returnRate: 0,
             deathBenefit: 0,
             lapsed: true,
           });

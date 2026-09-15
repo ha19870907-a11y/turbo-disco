@@ -9,6 +9,7 @@
   };
 
   const yen = (n) => `${Math.round(n).toLocaleString("ja-JP")}円`;
+  const pct = (n) => `${(n * 100).toFixed(1)}%`;
 
   const form = document.getElementById("sim-form");
   const errorBox = document.getElementById("error-box");
@@ -289,6 +290,7 @@
       ["累計契約関係費", yen(totalMaintenance)],
       ["累計運用損益（資産運用関係費用控除後）", yen(totalGain)],
       [`${finalRow.age}歳時点の特別勘定価格`, yen(finalRow.accountValue)],
+      [`${finalRow.age}歳時点の返戻率`, pct(finalRow.returnRate)],
     ];
     items.forEach(([label, value]) => {
       const stat = document.createElement("div");
@@ -317,6 +319,7 @@
         <td>${yen(r.maintenanceFeeThisYear)}</td>
         <td>${yen(r.accountValue)}</td>
         <td>${yen(r.surrenderValue)}</td>
+        <td>${pct(r.returnRate)}</td>
         <td>${yen(r.deathBenefit)}</td>
       `;
       tbody.appendChild(tr);
