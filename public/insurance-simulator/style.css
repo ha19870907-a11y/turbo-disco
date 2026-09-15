@@ -95,7 +95,7 @@ main {
   color: var(--text);
   padding: 8px 10px;
   border-radius: var(--radius);
-  font-size: 0.95rem;
+  font-size: 16px;
   width: 100%;
 }
 
@@ -105,13 +105,13 @@ main {
 .scenario-select { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; padding-top: 4px; }
 .scenario-check { display: flex; align-items: center; gap: 6px; font-size: 0.95rem; color: var(--text); }
 .scenario-custom-input {
-  width: 80px;
+  width: 70px;
   background: var(--panel-2);
   border: 1px solid var(--border);
   color: var(--text);
   padding: 6px 8px;
   border-radius: var(--radius);
-  font-size: 0.9rem;
+  font-size: 16px;
 }
 
 details.advanced { margin-top: 4px; }
