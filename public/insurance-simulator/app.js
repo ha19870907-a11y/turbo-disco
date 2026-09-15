@@ -26,10 +26,10 @@
       opt.value = account.key;
       opt.textContent = account.key === "custom"
         ? account.label
-        : `${account.label}（資産運用関係費用 年率${(account.mgmtFeeAnnualRate * 100).toFixed(1)}%）`;
+        : `${account.label}（資産運用関係費用 年率${(account.mgmtFeeAnnualRate * 100).toFixed(2)}%）`;
       specialAccountSelect.appendChild(opt);
     });
-    specialAccountSelect.value = "balanced";
+    specialAccountSelect.value = "diversified";
     updateCustomMgmtFeeVisibility();
   }
 
@@ -88,8 +88,8 @@
     const expenseLoadingRate = Number(document.getElementById("expenseLoading").value) / 100;
     const mgmtFeeAnnualRate = readMgmtFeeAnnualRate();
     const maintenanceFeeMonthly = Number(document.getElementById("maintenanceFee").value);
-    const firstYearCostRate = Number(document.getElementById("firstYearCost").value) / 100;
-    const ongoingCostRate = Number(document.getElementById("ongoingCost").value) / 100;
+    const policyCostRate = Number(document.getElementById("policyCost").value) / 100;
+    const surrenderChargeRate = Number(document.getElementById("surrenderCharge").value) / 100;
     const coiLoadingFactor = Number(document.getElementById("coiLoading").value) / 100;
 
     if (!Number.isFinite(issueAge) || issueAge < 0 || issueAge > 90) {
@@ -114,8 +114,8 @@
       expenseLoadingRate,
       mgmtFeeAnnualRate,
       maintenanceFeeMonthly,
-      firstYearCostRate,
-      ongoingCostRate,
+      policyCostRate,
+      surrenderChargeRate,
       coiLoadingFactor,
     };
   }
@@ -316,6 +316,7 @@
         <td>${yen(r.policyCostThisYear)}</td>
         <td>${yen(r.maintenanceFeeThisYear)}</td>
         <td>${yen(r.accountValue)}</td>
+        <td>${yen(r.surrenderValue)}</td>
         <td>${yen(r.deathBenefit)}</td>
       `;
       tbody.appendChild(tr);

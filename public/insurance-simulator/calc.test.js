@@ -219,12 +219,12 @@ test("simulateAllScenarios: 空のシナリオリストはエラーになる", (
   );
 });
 
-test("simulateScenario: 実際のソニー生命設計書B（契約年齢30歳・40年分・4シナリオ）と概ね整合する", () => {
+test("simulateScenario: 実際のソニー生命設計書B（契約年齢30歳・40年分・4シナリオ）の解約返戻金と概ね整合する", () => {
   // 契約年齢30歳・死亡保障1,000万円・年払保険料182,400円（月払15,200円）・
   // 払込満了70歳の実際の解約返戻金表（運用利回り-3%/0%/3%/6%、40年分）に対する
-  // 回帰チェック。DEFAULT_ASSUMPTIONSはこのデータ（設計書Bとして参照している、
-  // 最も情報量の多い実データ）に最小二乗フィットして逆算した値を丸めたもの
-  // （性別は設計書からは不明のため男性の死亡率カーブを仮定）。
+  // 回帰チェック。積立金（accountValue）ではなく、解約控除費用を反映した
+  // surrenderValueで比較する（公式資料「変額虎の巻」の費用構造の説明に基づき、
+  // 積立金と解約返戻金を分離した2段階モデルに変更済み）。
   const issueAge = 30;
   const sumAssured = 10000000;
   const monthlyPremium = Math.round(182400 / 12);
@@ -247,12 +247,11 @@ test("simulateScenario: 実際のソニー生命設計書B（契約年齢30歳�
       simEndAge: issueAge + expected.length,
     });
     expected.forEach((expectedValue, i) => {
-      const actual = rows[i].accountValue;
-      // 初年度は「実際には解約返戻金のみを減らす解約控除」が本モデルでは
-      // 再現しきれておらず乖離が大きいため、絶対誤差の許容幅を広めに取る。
-      // 相対誤差は分母が小さい早期の年で暴れるため、絶対誤差(70万円)との
-      // どちらか緩い方を採用する。
-      const absTolerance = 700000;
+      const actual = rows[i].surrenderValue;
+      // DEFAULT_ASSUMPTIONSはフィットした値をキリの良い数字に丸めているため、
+      // 最適値そのものより誤差が大きくなる。絶対誤差(15万円)と相対誤差(10%)の
+      // どちらか緩い方を許容する。
+      const absTolerance = 150000;
       const relTolerance = expectedValue * 0.1;
       const tolerance = Math.max(absTolerance, relTolerance);
       assert.ok(
@@ -263,11 +262,10 @@ test("simulateScenario: 実際のソニー生命設計書B（契約年齢30歳�
   }
 });
 
-test("simulateScenario: 実際のソニー生命設計書A（契約年齢40歳・13年分）とは大きくは矛盾しない（既知の乖離あり）", () => {
-  // 設計書A（契約年齢40歳・死亡保障1,000万円・年払278,040円、13年分）は、
-  // 設計書Bより情報量が少なく、両者を単一モデルで同時に精度良く再現することは
-  // できなかった（コメント参照）。ここでは「オーダーが大きく外れていないか」の
-  // 粗いチェックに留め、厳密な一致は要求しない。
+test("simulateScenario: 実際のソニー生命設計書A（契約年齢40歳・13年分）の解約返戻金とも整合する", () => {
+  // 設計書A（契約年齢40歳・死亡保障1,000万円・年払278,040円、13年分）。
+  // 積立金/解約返戻金の2段階モデルに変更後は、設計書Bと同じ既定値でこちらも
+  // 良好に再現できる（旧モデルでは単一パラメータで両立できなかった）。
   const issueAge = 40;
   const sumAssured = 10000000;
   const monthlyPremium = Math.round(278040 / 12);
@@ -287,13 +285,65 @@ test("simulateScenario: 実際のソニー生命設計書A（契約年齢40歳�
       annualReturnRate: Number(rateStr),
       simEndAge: issueAge + expected.length,
     });
-    const lastExpected = expected[expected.length - 1];
-    const lastActual = rows[rows.length - 1].accountValue;
-    assert.ok(
-      Math.abs(lastActual - lastExpected) <= Math.max(600000, lastExpected * 0.2),
-      `rate=${rateStr} final year: expected≈${lastExpected}, got ${Math.round(lastActual)}`
-    );
+    expected.forEach((expectedValue, i) => {
+      const actual = rows[i].surrenderValue;
+      const absTolerance = 60000;
+      const relTolerance = expectedValue * 0.1;
+      const tolerance = Math.max(absTolerance, relTolerance);
+      assert.ok(
+        Math.abs(actual - expectedValue) <= tolerance,
+        `rate=${rateStr} year=${i + 1}: expected≈${expectedValue}, got ${Math.round(actual)}`
+      );
+    });
   }
+});
+
+test("simulateScenario: 解約返戻金は積立金（特別勘定価格）を上回らない", () => {
+  const { rows } = simulateScenario({
+    issueAge: 30,
+    gender: "male",
+    sumAssured: 10000000,
+    payToAge: 60,
+    monthlyPremium: 20000,
+    annualReturnRate: 0.03,
+  });
+  for (const row of rows) {
+    assert.ok(row.surrenderValue <= row.accountValue + 1e-6, `age ${row.age}: surrenderValue > accountValue`);
+  }
+});
+
+test("simulateScenario: 解約控除費用は保険料払込10年目でゼロになる", () => {
+  const { rows } = simulateScenario({
+    issueAge: 30,
+    gender: "male",
+    sumAssured: 10000000,
+    payToAge: null,
+    monthlyPremium: 20000,
+    annualReturnRate: 0.03,
+  });
+  const year9 = rows.find((r) => r.age === 38); // 保険料払込9年目
+  const year10 = rows.find((r) => r.age === 39); // 保険料払込10年目
+  assert.ok(year9.accountValue - year9.surrenderValue > 0, "9年目はまだ解約控除費用が残っているはず");
+  assert.ok(
+    Math.abs(year10.accountValue - year10.surrenderValue) < 1e-6,
+    "10年目には解約控除費用がゼロになっているはず"
+  );
+});
+
+test("simulateScenario: 保険料払込期間が10年未満で完了した場合、完了後は解約控除費用がかからない", () => {
+  const { rows } = simulateScenario({
+    issueAge: 30,
+    gender: "male",
+    sumAssured: 10000000,
+    payToAge: 35, // 5年間のみ払込
+    monthlyPremium: 20000,
+    annualReturnRate: 0.03,
+  });
+  const afterPayment = rows.find((r) => r.age === 35); // 払込完了直後
+  assert.ok(
+    Math.abs(afterPayment.accountValue - afterPayment.surrenderValue) < 1e-6,
+    "払込完了後は10年未満でも解約控除費用がゼロになっているはず"
+  );
 });
 
 test("simulateScenario: 契約年齢がシミュレーション終了年齢以上だとエラー", () => {

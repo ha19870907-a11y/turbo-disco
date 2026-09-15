@@ -120,38 +120,44 @@
     };
   }
 
-  // firstYearCostRate・ongoingCostRate・coiLoadingFactor・maintenanceFeeMonthly・
-  // mgmtFeeAnnualRateは、実際のソニー生命設計書2件の解約返戻金表から最小二乗フィット
-  // により逆算した値。
+  // policyCostRate・surrenderChargeRate・coiLoadingFactor・maintenanceFeeMonthly・
+  // mgmtFeeAnnualRateは、実際のソニー生命設計書2件の解約返戻金表に対する最小二乗
+  // フィットにより逆算した値。
   //   ・設計書A: 契約年齢40歳・死亡保障1,000万円・年払278,040円、運用利回り-3/0/3%、13年分
   //   ・設計書B: 契約年齢30歳・死亡保障1,000万円・年払182,400円・払込満了70歳、
   //             運用利回り-3/0/3/6%、40年分（払込満了〜満期までの推移を含む）
   // 契約者の性別はいずれの設計書からも判別できないため、暫定的に男性の死亡率カーブを
-  // 前提にフィットしている。より情報量の多い設計書B（40年×4シナリオ）を優先して
-  // 校正しており、初年度は払込保険料の4割強、2年目以降も毎年1〜2割程度が保険関係費用
-  // として継続的に控除される構造で、設計書Bの解約返戻金をRMSE約5万円（多くの年で
-  // 相対誤差2〜3%程度）で再現できる。ただし設計書A・Bを単一のモデルで同時に精度良く
-  // 再現することはできず（実際の商品世代・年齢帯によって費用構造が異なる可能性が高い）、
-  // また両設計書とも初年度末の解約返戻金がほぼ0円になる急激な落ち込みは、本モデルの
-  // 「毎年一定率を控除する」仕組みだけでは完全には再現できていない（初年度のみ数万円
-  // 単位の乖離が残る）。これは実際には特別勘定価格そのものではなく、初年度ほど大きい
-  // 別建ての解約控除（解約時のみ差し引かれ、死亡保険金や危険保険料の計算基礎となる
-  // 特別勘定価格そのものは減らさない仕組み）が存在する可能性を示唆しているが、公式の
-  // 費用表がない以上これ以上の特定はできない。資産運用関係費用（mgmtFeeAnnualRate）
-  // は、開示された運用利回りシナリオに対しフィットした結果ごく小さい値（0.1%台）に
-  // 収束したため、実際の設計書の「運用利回り」は特別勘定の運用報酬控除後の実質値で
-  // ある可能性が高い。本ツールでは特別勘定（運用先）ごとの費用差を提示する機能を
-  // 残すため、UI上で特別勘定を選択すると、この既定値は選択したファンドの想定費用率
-  // （SPECIAL_ACCOUNTS参照）に置き換えられ、シナリオ利回りとは別枠の控除として働く
-  // （＝やや保守的な試算になる）。
+  // 前提にフィットしている。
+  //
+  // 別途入手したソニー生命の公式資料「変額虎の巻」（諸費用について）の記載により、
+  // 費用の構造は以下の2段階であることが判明した。
+  //   1. 積立金（＝特別勘定価格。危険保険料・死亡保険金の計算基礎となる「真の」残高）
+  //      は、毎回の保険料払込時に控除される費用（本ツールのpolicyCostRate）と、
+  //      積立金から毎月控除される危険保険料・契約関係費、および運用実績（資産運用
+  //      関係費用控除後）によって決まる。
+  //   2. 解約返戻金（解約時に実際に受け取れる金額）は、積立金からさらに「解約控除
+  //      費用」を差し引いたもの。解約控除費用は、保険料払込年月数が10年未満の場合
+  //      にのみ発生し、10年でゼロになる（保険料払込期間がそれより短く完了している
+  //      場合は発生しない）。ただし正確な逓減スケジュールは非公開のため、本ツールは
+  //      10年でゼロになる線形逓減と仮定している。
+  // この2段階モデルで設計書A・Bを同時にフィットし直したところ、単一モデルでの
+  // 再現性が大幅に改善した（全体のRMSEが従来の約5万円から約2万円に、初年度の
+  // 解約返戻金がほぼ0円になる急落もほぼ再現できるようになった）。
+  // 資産運用関係費用（mgmtFeeAnnualRate）は、開示された運用利回りシナリオに対し
+  // フィットした結果ごく小さい値（0.1%台）に収束し、これは「変額虎の巻」に記載の
+  // 実際の特別勘定運営費用＋信託報酬（大半が0.1〜0.6%程度、日本成長株式型のみ
+  // 約1.0%）ともおおむね整合する。本ツールでは特別勘定（運用先）ごとの費用差を
+  // 提示する機能を残すため、UI上で特別勘定を選択すると、この既定値は選択した
+  // ファンドの実際の費用率（SPECIAL_ACCOUNTS参照、いずれも「変額虎の巻」2026年
+  // 6月末現在の実績値）に置き換えられる。
   const DEFAULT_ASSUMPTIONS = {
     pricingAnnualRate: 0.01, // 予定利率（保険料算出用）
     expenseLoadingRate: 0.15, // 付加保険料率
-    mgmtFeeAnnualRate: 0.0014, // 資産運用関係費用（年率、特別勘定から控除）
-    maintenanceFeeMonthly: 680, // 契約関係費（月額、円）
-    firstYearCostRate: 0.44, // 契約初期費用率（第1保険年度の払込保険料に対する割合）
-    ongoingCostRate: 0.17, // 保険関係費率（第2保険年度以降、毎年の払込保険料に対する割合）
-    coiLoadingFactor: 0.35, // 危険保険料（保険関係費用）に対する割増係数
+    mgmtFeeAnnualRate: 0.0013, // 資産運用関係費用（年率、特別勘定から控除）
+    maintenanceFeeMonthly: 800, // 契約関係費（月額、円）
+    policyCostRate: 0.18, // 保険関係費率（毎回の払込保険料に対する割合、積立金から控除）
+    surrenderChargeRate: 0.019, // 解約控除率（死亡保障額に対する割合。保険料払込10年未満の解約時のみ、年数に応じて線形に逓減）
+    coiLoadingFactor: 0.24, // 危険保険料に対する割増係数
   };
 
   const RETURN_SCENARIOS = [
@@ -160,19 +166,29 @@
     { key: "r6", label: "年率6%", rate: 0.06 },
   ];
 
-  // 特別勘定（運用先）のプリセット。資産運用関係費用（年率）はイメージしやすいよう
-  // 資産クラスごとに一般的な水準感で設定した独自の仮定であり、特定商品の実際の
-  // 費用率ではない。"custom" を選んだ場合は呼び出し側で任意の値を指定する。
+  // 特別勘定（運用先）のプリセット。ソニー生命公式資料「変額虎の巻」
+  // （2026年6月末現在）に記載の、各特別勘定の特別勘定運営費用＋投資信託の
+  // 信託報酬（いずれも年率・税込）の実績値。監査報酬など変動費用は含まない。
+  // "custom" を選んだ場合は呼び出し側で任意の値を指定する。
   const SPECIAL_ACCOUNTS = [
-    { key: "balanced", label: "バランス型", mgmtFeeAnnualRate: 0.018 },
-    { key: "domestic_stock", label: "国内株式型", mgmtFeeAnnualRate: 0.02 },
-    { key: "global_stock", label: "世界株式型", mgmtFeeAnnualRate: 0.022 },
-    { key: "bond", label: "債券型", mgmtFeeAnnualRate: 0.012 },
-    { key: "money", label: "短期金融市場型（MMF等）", mgmtFeeAnnualRate: 0.008 },
+    { key: "stock", label: "株式型（日本株式）", mgmtFeeAnnualRate: 0.0111 / 100 + 0.0825 / 100 },
+    { key: "growth_stock", label: "日本成長株式型", mgmtFeeAnnualRate: 0.0087 / 100 + 0.968 / 100 },
+    { key: "global_core_stock", label: "世界コア株式型", mgmtFeeAnnualRate: 0.0087 / 100 + 0.22 / 100 },
+    { key: "global_stock", label: "世界株式型", mgmtFeeAnnualRate: 0.0087 / 100 + 0.594 / 100 },
+    { key: "bond", label: "債券型", mgmtFeeAnnualRate: 0.0087 / 100 + 0.0825 / 100 },
+    { key: "global_bond", label: "世界債券型", mgmtFeeAnnualRate: 0.0141 / 100 + 0.143 / 100 },
+    { key: "diversified", label: "総合型", mgmtFeeAnnualRate: 0.0127 / 100 + 0.1265 / 100 },
+    { key: "money_market", label: "短期金融市場型", mgmtFeeAnnualRate: 0.0087 / 100 },
     { key: "custom", label: "カスタム設定", mgmtFeeAnnualRate: null },
   ];
 
+  // 解約控除年数（この年数分の保険料払込が完了するまで解約控除費用がかかる）。
+  const SURRENDER_CHARGE_YEARS = 10;
+
   // 1シナリオ分の年次推移をシミュレーションする。
+  // accountValue（積立金＝特別勘定価格）は危険保険料・死亡保険金の計算基礎となる
+  // 「真の」残高。surrenderValue（解約返戻金）は、そこから保険料払込10年未満の
+  // 解約時にのみかかる解約控除費用をさらに差し引いた、実際に解約時に受け取れる金額。
   function simulateScenario({
     issueAge,
     gender,
@@ -182,8 +198,8 @@
     annualReturnRate,
     mgmtFeeAnnualRate = DEFAULT_ASSUMPTIONS.mgmtFeeAnnualRate,
     maintenanceFeeMonthly = DEFAULT_ASSUMPTIONS.maintenanceFeeMonthly,
-    firstYearCostRate = DEFAULT_ASSUMPTIONS.firstYearCostRate,
-    ongoingCostRate = DEFAULT_ASSUMPTIONS.ongoingCostRate,
+    policyCostRate = DEFAULT_ASSUMPTIONS.policyCostRate,
+    surrenderChargeRate = DEFAULT_ASSUMPTIONS.surrenderChargeRate,
     coiLoadingFactor = DEFAULT_ASSUMPTIONS.coiLoadingFactor,
     simEndAge = SIM_END_AGE,
   }) {
@@ -198,6 +214,7 @@
     const monthlyGrossGrowth = Math.pow(1 + annualReturnRate, 1 / 12);
     const monthlyFeeDrag = Math.pow(1 + mgmtFeeAnnualRate, 1 / 12);
     const monthlyNetGrowthFactor = monthlyGrossGrowth / monthlyFeeDrag;
+    const surrenderChargeBase = sumAssured * surrenderChargeRate;
 
     let accountValue = 0;
     let cumulativePremium = 0;
@@ -206,6 +223,7 @@
     const rows = [];
 
     for (let age = issueAge; age < simEndAge; age += 1) {
+      const policyYear = age - issueAge + 1;
       const payingThisYear = payToAge === null || payToAge === undefined ? true : age < payToAge;
       const qxAnnual = annualMortalityRate(age, gender);
       const qxMonthly = monthlyMortalityRate(qxAnnual);
@@ -216,7 +234,6 @@
       let maintenanceFeeThisYear = 0;
       let mgmtFeeThisYear = 0;
       let investmentGainThisYear = 0;
-      const policyCostRate = age === issueAge ? firstYearCostRate : ongoingCostRate;
 
       for (let m = 0; m < 12; m += 1) {
         if (lapsed) break;
@@ -241,7 +258,7 @@
 
         if (accountValue < 0) {
           if (!payingThisYear) {
-            // 払込満了後、特別勘定残高が保険関係費用を賄えず消滅＝失効とみなす。
+            // 払込満了後、積立金が保険関係費用を賄えず消滅＝失効とみなす。
             accountValue = 0;
             lapsed = true;
             lapseAge = age + m / 12;
@@ -262,6 +279,14 @@
       }
 
       const deathBenefit = lapsed ? 0 : Math.max(sumAssured, accountValue);
+      // 解約控除費用：保険料払込年数が10年未満、かつ払込期間が完了していない場合のみ、
+      // 経過年数に応じて線形に逓減（10年目でゼロ）。正確な逓減スケジュールは非公開のため、
+      // 線形逓減という単純化を置いている。
+      const surrenderCharge =
+        !lapsed && payingThisYear && policyYear < SURRENDER_CHARGE_YEARS
+          ? (surrenderChargeBase * (SURRENDER_CHARGE_YEARS - policyYear)) / (SURRENDER_CHARGE_YEARS - 1)
+          : 0;
+      const surrenderValue = lapsed ? 0 : Math.max(accountValue - surrenderCharge, 0);
       rows.push({
         age,
         premiumThisYear,
@@ -271,6 +296,7 @@
         maintenanceFeeThisYear,
         investmentGainThisYear,
         accountValue,
+        surrenderValue,
         deathBenefit,
         lapsed,
       });
@@ -287,6 +313,7 @@
             maintenanceFeeThisYear: 0,
             investmentGainThisYear: 0,
             accountValue: 0,
+            surrenderValue: 0,
             deathBenefit: 0,
             lapsed: true,
           });
