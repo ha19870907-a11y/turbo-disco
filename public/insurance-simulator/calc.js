@@ -120,24 +120,38 @@
     };
   }
 
-  // initialCostRate・coiLoadingFactor・maintenanceFeeMonthlyは、実際のソニー生命
-  // 設計書（契約年齢40歳・死亡保障1,000万円・年払278,040円のケースの解約返戻金表、
-  // 運用利回り-3%/0%/3%・13年分）から最小二乗フィットにより逆算した値。
-  // 契約者の性別は設計書からは判別できないため、暫定的に男性の死亡率カーブを前提に
-  // フィットしている。フィット後のRMSEは約2万円（各年の解約返戻金の1〜2%程度）で、
-  // 特に契約初期費用は初年度の払込保険料の8割超が控除されている（＝解約返戻金が
-  // 初年度末でほぼ0円になる）ことが強く示唆された。資産運用関係費用は、開示された
-  // 運用利回りシナリオに対しフィットした結果ほぼ0に収束したため、実際の設計書の
-  // 「運用利回り」は特別勘定の運用報酬控除後の実質値である可能性が高い。本ツールでは
-  // 特別勘定（運用先）ごとの費用差を提示する機能を残すため、資産運用関係費用は
-  // シナリオの利回りとは別枠の控除として維持している（＝やや保守的な試算になる）。
+  // firstYearCostRate・ongoingCostRate・coiLoadingFactor・maintenanceFeeMonthly・
+  // mgmtFeeAnnualRateは、実際のソニー生命設計書2件の解約返戻金表から最小二乗フィット
+  // により逆算した値。
+  //   ・設計書A: 契約年齢40歳・死亡保障1,000万円・年払278,040円、運用利回り-3/0/3%、13年分
+  //   ・設計書B: 契約年齢30歳・死亡保障1,000万円・年払182,400円・払込満了70歳、
+  //             運用利回り-3/0/3/6%、40年分（払込満了〜満期までの推移を含む）
+  // 契約者の性別はいずれの設計書からも判別できないため、暫定的に男性の死亡率カーブを
+  // 前提にフィットしている。より情報量の多い設計書B（40年×4シナリオ）を優先して
+  // 校正しており、初年度は払込保険料の4割強、2年目以降も毎年1〜2割程度が保険関係費用
+  // として継続的に控除される構造で、設計書Bの解約返戻金をRMSE約5万円（多くの年で
+  // 相対誤差2〜3%程度）で再現できる。ただし設計書A・Bを単一のモデルで同時に精度良く
+  // 再現することはできず（実際の商品世代・年齢帯によって費用構造が異なる可能性が高い）、
+  // また両設計書とも初年度末の解約返戻金がほぼ0円になる急激な落ち込みは、本モデルの
+  // 「毎年一定率を控除する」仕組みだけでは完全には再現できていない（初年度のみ数万円
+  // 単位の乖離が残る）。これは実際には特別勘定価格そのものではなく、初年度ほど大きい
+  // 別建ての解約控除（解約時のみ差し引かれ、死亡保険金や危険保険料の計算基礎となる
+  // 特別勘定価格そのものは減らさない仕組み）が存在する可能性を示唆しているが、公式の
+  // 費用表がない以上これ以上の特定はできない。資産運用関係費用（mgmtFeeAnnualRate）
+  // は、開示された運用利回りシナリオに対しフィットした結果ごく小さい値（0.1%台）に
+  // 収束したため、実際の設計書の「運用利回り」は特別勘定の運用報酬控除後の実質値で
+  // ある可能性が高い。本ツールでは特別勘定（運用先）ごとの費用差を提示する機能を
+  // 残すため、UI上で特別勘定を選択すると、この既定値は選択したファンドの想定費用率
+  // （SPECIAL_ACCOUNTS参照）に置き換えられ、シナリオ利回りとは別枠の控除として働く
+  // （＝やや保守的な試算になる）。
   const DEFAULT_ASSUMPTIONS = {
     pricingAnnualRate: 0.01, // 予定利率（保険料算出用）
     expenseLoadingRate: 0.15, // 付加保険料率
-    mgmtFeeAnnualRate: 0.02, // 資産運用関係費用（年率、特別勘定から控除）
-    maintenanceFeeMonthly: 100, // 契約関係費（月額、円）
-    initialCostRate: 0.85, // 契約初期費用率（第1保険年度の払込保険料に対する割合）
-    coiLoadingFactor: 1.95, // 危険保険料（保険関係費用）に対する割増係数
+    mgmtFeeAnnualRate: 0.0014, // 資産運用関係費用（年率、特別勘定から控除）
+    maintenanceFeeMonthly: 680, // 契約関係費（月額、円）
+    firstYearCostRate: 0.44, // 契約初期費用率（第1保険年度の払込保険料に対する割合）
+    ongoingCostRate: 0.17, // 保険関係費率（第2保険年度以降、毎年の払込保険料に対する割合）
+    coiLoadingFactor: 0.35, // 危険保険料（保険関係費用）に対する割増係数
   };
 
   const RETURN_SCENARIOS = [
@@ -168,7 +182,8 @@
     annualReturnRate,
     mgmtFeeAnnualRate = DEFAULT_ASSUMPTIONS.mgmtFeeAnnualRate,
     maintenanceFeeMonthly = DEFAULT_ASSUMPTIONS.maintenanceFeeMonthly,
-    initialCostRate = DEFAULT_ASSUMPTIONS.initialCostRate,
+    firstYearCostRate = DEFAULT_ASSUMPTIONS.firstYearCostRate,
+    ongoingCostRate = DEFAULT_ASSUMPTIONS.ongoingCostRate,
     coiLoadingFactor = DEFAULT_ASSUMPTIONS.coiLoadingFactor,
     simEndAge = SIM_END_AGE,
   }) {
@@ -197,9 +212,11 @@
 
       let premiumThisYear = 0;
       let coiThisYear = 0;
+      let policyCostThisYear = 0;
       let maintenanceFeeThisYear = 0;
       let mgmtFeeThisYear = 0;
       let investmentGainThisYear = 0;
+      const policyCostRate = age === issueAge ? firstYearCostRate : ongoingCostRate;
 
       for (let m = 0; m < 12; m += 1) {
         if (lapsed) break;
@@ -209,10 +226,9 @@
           premiumThisYear += monthlyPremium;
           cumulativePremium += monthlyPremium;
 
-          if (age === issueAge) {
-            const initialCost = monthlyPremium * initialCostRate;
-            accountValue -= initialCost;
-          }
+          const policyCost = monthlyPremium * policyCostRate;
+          policyCostThisYear += policyCost;
+          accountValue -= policyCost;
         }
 
         maintenanceFeeThisYear += maintenanceFeeMonthly;
@@ -251,6 +267,7 @@
         premiumThisYear,
         cumulativePremium,
         coiThisYear,
+        policyCostThisYear,
         maintenanceFeeThisYear,
         investmentGainThisYear,
         accountValue,
@@ -266,6 +283,7 @@
             premiumThisYear: 0,
             cumulativePremium,
             coiThisYear: 0,
+            policyCostThisYear: 0,
             maintenanceFeeThisYear: 0,
             investmentGainThisYear: 0,
             accountValue: 0,

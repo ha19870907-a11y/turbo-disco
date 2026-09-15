@@ -88,7 +88,8 @@
     const expenseLoadingRate = Number(document.getElementById("expenseLoading").value) / 100;
     const mgmtFeeAnnualRate = readMgmtFeeAnnualRate();
     const maintenanceFeeMonthly = Number(document.getElementById("maintenanceFee").value);
-    const initialCostRate = Number(document.getElementById("initialCost").value) / 100;
+    const firstYearCostRate = Number(document.getElementById("firstYearCost").value) / 100;
+    const ongoingCostRate = Number(document.getElementById("ongoingCost").value) / 100;
     const coiLoadingFactor = Number(document.getElementById("coiLoading").value) / 100;
 
     if (!Number.isFinite(issueAge) || issueAge < 0 || issueAge > 90) {
@@ -113,7 +114,8 @@
       expenseLoadingRate,
       mgmtFeeAnnualRate,
       maintenanceFeeMonthly,
-      initialCostRate,
+      firstYearCostRate,
+      ongoingCostRate,
       coiLoadingFactor,
     };
   }
@@ -274,6 +276,7 @@
   function renderCostSummary(scenario) {
     const rows = scenario.result.rows;
     const totalCoi = rows.reduce((sum, r) => sum + r.coiThisYear, 0);
+    const totalPolicyCost = rows.reduce((sum, r) => sum + r.policyCostThisYear, 0);
     const totalMaintenance = rows.reduce((sum, r) => sum + r.maintenanceFeeThisYear, 0);
     const totalGain = rows.reduce((sum, r) => sum + r.investmentGainThisYear, 0);
     const finalRow = rows[rows.length - 1];
@@ -281,7 +284,8 @@
     const box = document.getElementById("cost-summary");
     box.innerHTML = "";
     const items = [
-      ["累計危険保険料（保険関係費用の主要部分）", yen(totalCoi)],
+      ["累計危険保険料", yen(totalCoi)],
+      ["累計保険関係費（初年度・毎年の費用）", yen(totalPolicyCost)],
       ["累計契約関係費", yen(totalMaintenance)],
       ["累計運用損益（資産運用関係費用控除後）", yen(totalGain)],
       [`${finalRow.age}歳時点の特別勘定価格`, yen(finalRow.accountValue)],
@@ -309,6 +313,7 @@
         <td>${yen(r.premiumThisYear)}</td>
         <td>${yen(r.cumulativePremium)}</td>
         <td>${yen(r.coiThisYear)}</td>
+        <td>${yen(r.policyCostThisYear)}</td>
         <td>${yen(r.maintenanceFeeThisYear)}</td>
         <td>${yen(r.accountValue)}</td>
         <td>${yen(r.deathBenefit)}</td>
