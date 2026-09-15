@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>変額保険シミュレーション</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="app-header">
+  <h1>変額保険（終身型）シミュレーション</h1>
+  <p>契約年齢・性別・死亡保障額・保険料払込期間から、保険関係費用を考慮した特別勘定価格の推移を試算します。</p>
+</header>
+
+<main>
+  <section class="card">
+    <div class="notice">
+      <strong>ご利用にあたっての注意</strong><br />
+      本ツールは変額保険（終身型）の一般的な仕組み（危険保険料・保険関係費・資産運用関係費用の控除と特別勘定
+      での運用）をモデル化した独自の概算シミュレーションです。費用の前提（詳細設定）は、実際のソニー生命の
+      設計書2件（契約年齢40歳・年払278,040円のケースと、契約年齢30歳・年払182,400円・払込満了70歳のケース、
+      いずれも死亡保障1,000万円）の解約返戻金表と、公式資料「変額虎の巻」に記載の費用の仕組みの説明に基づいて
+      算出しています。同資料により、積立金（＝死亡保険金や危険保険料の計算基礎となる「真の」残高）とは別に、
+      保険料払込10年未満で解約する場合にのみ「解約控除費用」がかかる（10年でゼロになる）ことが判明したため、
+      本ツールも積立金と解約返戻金（解約控除費用を反映した実際の受取額）を分けて表示しています。ただし解約控除
+      費用の正確な逓減スケジュールは非公開のため、10年でゼロになる線形逓減という単純化を置いています。
+      特別勘定（運用先）の一覧・費用率（特別勘定運営費用＋信託報酬）は同資料の2026年6月末現在の実績値を
+      使用していますが、変更される場合があります。月払保険料は、契約年齢35歳・男性・死亡保障1,000万円・
+      65歳払込満了の公表例（月払23,000円）と比較して約6%の差にとどまっており、概算として一定の妥当性が
+      あることを確認していますが、性別・年齢・払込期間などの条件が変われば差は変動します。契約者の性別など
+      設計書から読み取れない条件は仮定を置いており、加入年齢・保障額・払込期間・商品世代が異なれば費用の
+      実際の水準も変わります。死亡率は公表されている標準的な水準を参考にした近似値であり、特定の保険会社
+      （ソニー生命を含む）の公式な保険料率・設計書と完全には一致しません。また、変額保険には終身型のほか
+      満期のある有期型・定期型もあり、有期型の満期保険金には最低保証がないなど仕組みが異なりますが、本ツール
+      は終身型のみを対象としています。実際の加入検討にあたっては、必ず生命保険会社・営業担当者からの正式な
+      設計書をご確認ください。
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>1. 契約条件の入力</h2>
+    <form id="sim-form">
+      <div class="form-grid">
+        <div class="field">
+          <label for="issueAge">契約年齢</label>
+          <input type="number" id="issueAge" min="0" max="85" step="1" value="35" required />
+        </div>
+        <div class="field">
+          <label>性別</label>
+          <div class="radio-row">
+            <label><input type="radio" name="gender" value="male" checked /> 男性</label>
+            <label><input type="radio" name="gender" value="female" /> 女性</label>
+          </div>
+        </div>
+        <div class="field">
+          <label for="sumAssuredMan">死亡保障額（万円）</label>
+          <input type="number" id="sumAssuredMan" min="100" step="100" value="1000" required />
+        </div>
+        <div class="field">
+          <label for="payPeriod">保険料払込期間</label>
+          <select id="payPeriod">
+            <option value="60">60歳払込満了</option>
+            <option value="65">65歳払込満了</option>
+            <option value="70">70歳払込満了</option>
+            <option value="whole" selected>終身払込</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="specialAccount">特別勘定（運用先）</label>
+          <select id="specialAccount"></select>
+        </div>
+        <div class="field" id="customMgmtFeeField" hidden>
+          <label for="customMgmtFee">資産運用関係費用（カスタム・年率%）</label>
+          <input type="number" id="customMgmtFee" min="0" max="10" step="0.1" value="2.0" />
+        </div>
+      </div>
+
+      <div class="field" style="margin-top:16px;">
+        <label>運用利回りシナリオ（チャート・年次詳細に表示する利回りを選択）</label>
+        <div class="scenario-select" id="scenario-select">
+          <label class="scenario-check"><input type="checkbox" id="scn-r0" checked /> 0%</label>
+          <label class="scenario-check"><input type="checkbox" id="scn-r3" checked /> 3%（標準）</label>
+          <label class="scenario-check"><input type="checkbox" id="scn-r6" checked /> 6%</label>
+          <label class="scenario-check">
+            <input type="checkbox" id="scn-custom" />
+            カスタム:
+            <input type="number" id="scn-custom-rate" step="0.1" value="9.0" class="scenario-custom-input" /> %
+          </label>
+        </div>
+      </div>
+
+      <details class="advanced">
+        <summary>詳細設定（費用・利率の前提を変更する）</summary>
+        <div class="form-grid">
+          <div class="field">
+            <label for="pricingRate">予定利率（保険料算出用・年率%）</label>
+            <input type="number" id="pricingRate" min="0" max="5" step="0.1" value="1.0" />
+          </div>
+          <div class="field">
+            <label for="expenseLoading">付加保険料率（%）</label>
+            <input type="number" id="expenseLoading" min="0" max="50" step="1" value="15" />
+          </div>
+          <div class="field">
+            <label for="maintenanceFee">契約関係費（月額・円）</label>
+            <input type="number" id="maintenanceFee" min="0" step="10" value="800" />
+          </div>
+          <div class="field">
+            <label for="policyCost">保険関係費率（毎回の払込保険料に対する%）</label>
+            <input type="number" id="policyCost" min="0" max="100" step="1" value="18" />
+          </div>
+          <div class="field">
+            <label for="surrenderCharge">解約控除率（死亡保障額に対する%・10年で逓減）</label>
+            <input type="number" id="surrenderCharge" min="0" max="20" step="0.1" value="1.9" />
+          </div>
+          <div class="field">
+            <label for="coiLoading">危険保険料割増係数（%）</label>
+            <input type="number" id="coiLoading" min="0" max="300" step="1" value="24" />
+          </div>
+        </div>
+      </details>
+
+      <button type="submit" class="primary-btn">シミュレーション実行</button>
+      <div class="error-box" id="error-box"></div>
+    </form>
+  </section>
+
+  <section id="results">
+    <section class="card">
+      <h2>2. 算出された保険料</h2>
+      <div class="premium-summary">
+        <div class="stat">
+          <div class="label">月払保険料（概算）</div>
+          <div class="value" id="out-monthly">-</div>
+        </div>
+        <div class="stat">
+          <div class="label">年払換算</div>
+          <div class="value small" id="out-annual">-</div>
+        </div>
+        <div class="stat">
+          <div class="label">選択した特別勘定（運用先）</div>
+          <div class="value small" id="out-special-account">-</div>
+        </div>
+        <div class="stat">
+          <div class="label">払込満了までの払込累計（見込み）</div>
+          <div class="value small" id="out-total-paid">-</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>3. 特別勘定価格・死亡保険金額の推移（選択した運用利回りシナリオ）</h2>
+      <div class="chart-legend" id="chart-legend"></div>
+      <div class="chart-wrap">
+        <svg id="chart" class="chart" width="900" height="360" viewBox="0 0 900 360"></svg>
+      </div>
+      <div id="lapse-warnings"></div>
+    </section>
+
+    <section class="card">
+      <h2>4. シナリオ別の年次詳細</h2>
+      <div class="scenario-tabs" id="scenario-tabs"></div>
+      <div class="cost-summary" id="cost-summary"></div>
+      <div class="table-wrap">
+        <table id="detail-table">
+          <thead>
+            <tr>
+              <th>年齢</th>
+              <th>その年の払込保険料</th>
+              <th>払込累計</th>
+              <th>危険保険料</th>
+              <th>保険関係費</th>
+              <th>契約関係費</th>
+              <th>積立金（特別勘定価格）</th>
+              <th>解約返戻金（年末）</th>
+              <th>返戻率</th>
+              <th>死亡保険金額（年末）</th>
+            </tr>
+          </thead>
+          <tbody id="detail-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+  </section>
+</main>
+
+<footer class="disclaimer">
+  死亡率は簡易な近似モデル（Gompertz–Makeham型）による独自試算であり、公式の生命表・保険料率表ではありません。
+  運用実績（特別勘定の資産価格）は市場動向により変動し、元本を割り込む場合があります。
+  払込満了後は特別勘定残高から保険関係費用が控除され続けるため、運用実績が芳しくない場合は残高が枯渇し、
+  保障が失効する可能性があります（本シミュレーションではその場合を「失効」として表示しています）。
+</footer>
+
+<script src="calc.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
