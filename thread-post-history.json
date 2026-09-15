@@ -284,5 +284,18 @@
     "angle": "対象者",
     "threadId": "17959895598203358",
     "postedAt": "2026-09-15T03:28:52.356Z"
+  },
+  {
+    "date": "2026-09-15",
+    "dayKey": "tue",
+    "slotIndex": 2,
+    "time": "20:30",
+    "label": "あなたならどうする？系",
+    "templateId": "TPL-054",
+    "genre": "出産",
+    "category": "共感",
+    "angle": "冒頭",
+    "threadId": "18132067039677354",
+    "postedAt": "2026-09-15T11:39:48.367Z"
   }
 ]
