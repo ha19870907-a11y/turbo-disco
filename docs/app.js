@@ -9,6 +9,8 @@ const state = {
   pollTimer: null,
   stadiumPollTimer: null,
   loadSeq: 0,
+  currentRaceKey: null, // 表示中のレース(日付+場+レース番号)を識別する。同一レースの
+  // 30秒ごとの自動更新ではloadSeqも進むため、過去実績取得の中断判定にはこちらを使う。
 };
 
 const STADIUM_RETRY_MS = 60000; // その日のデータがまだ無い場合、これくらいの間隔で自動的に再試行する
@@ -106,6 +108,9 @@ function showPanel(name) {
   if (name !== "stadiums" && state.stadiumPollTimer) {
     clearInterval(state.stadiumPollTimer);
     state.stadiumPollTimer = null;
+  }
+  if (name !== "detail") {
+    state.currentRaceKey = null;
   }
 }
 
@@ -296,19 +301,21 @@ async function loadHistory(racers) {
     btn.disabled = true;
     btn.textContent = "取得中… (0/" + DEFAULT_LOOKBACK_DAYS + "日)";
   }
-  const seq = state.loadSeq; // 現在表示中のレースを離れたら結果を破棄する
+  // 同一レースの30秒ごとの自動更新ではこの値は変わらないため、その間に取得が
+  // 完了しても結果を破棄しない。別のレース/日付/画面に移動した場合のみ破棄する。
+  const raceKey = state.currentRaceKey;
   try {
     const days = await fetchRecentDays(state.date, DEFAULT_LOOKBACK_DAYS, (done, total) => {
       if (btn) btn.textContent = `取得中… (${done}/${total}日)`;
     });
-    if (seq !== state.loadSeq) return;
+    if (raceKey !== state.currentRaceKey) return;
     if (days.length === 0) {
       el.historyBox.innerHTML = `<h3>過去実績・得意コース</h3><div class="note">過去データを取得できませんでした。</div>`;
       return;
     }
     renderHistoryResults(racers, days);
   } catch (err) {
-    if (seq !== state.loadSeq) return;
+    if (raceKey !== state.currentRaceKey) return;
     el.historyBox.innerHTML = `<h3>過去実績・得意コース</h3><div class="note">取得に失敗しました: ${err.message}</div>`;
   }
 }
@@ -418,7 +425,7 @@ function renderResult(result) {
     return;
   }
   const rows = result.racers
-    .map((r) => `<tr><td>${r.place_number_source}</td><td>${wakuBadge(r.entry_number)}</td><td>${r.name}</td></tr>`)
+    .map((r) => `<tr><td>${r.place_number_source ?? "-"}</td><td>${wakuBadge(r.entry_number)}</td><td>${r.name ?? "-"}</td></tr>`)
     .join("");
   const trifectaPayout = result.payouts?.trifecta?.[0];
   el.resultBox.innerHTML = `
@@ -433,6 +440,7 @@ function renderResult(result) {
 
 async function loadRaceDetail() {
   showPanel("detail");
+  state.currentRaceKey = `${state.date}:${state.stadium}:${state.race}`;
   el.racerTableWrap.innerHTML = `<div class="empty-state">読み込み中…</div>`;
   el.weatherBox.innerHTML = "";
   el.historyBox.innerHTML = "";

@@ -44,7 +44,11 @@ self.addEventListener("activate", (event) => {
 });
 
 function isExternalDataRequest(url) {
-  return url.hostname === "turnmark.github.io" || url.hostname === "raw.githubusercontent.com";
+  return (
+    url.hostname === "turnmark.github.io" ||
+    url.hostname === "boatraceopenapi.github.io" ||
+    url.hostname === "raw.githubusercontent.com"
+  );
 }
 
 self.addEventListener("fetch", (event) => {

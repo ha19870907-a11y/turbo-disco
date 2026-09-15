@@ -178,7 +178,7 @@ export function buildRaceDetail(dayData, stadium, raceNumber) {
     result: hasRealResult(race)
       ? {
           techniqueText: race.result.technique_number_source,
-          racers: Object.values(race.result.racers).sort((a, b) => a.place_number - b.place_number),
+          racers: Object.values(race.result.racers).sort((a, b) => (a.place_number ?? 99) - (b.place_number ?? 99)),
           payouts: race.result.payouts,
         }
       : null,
