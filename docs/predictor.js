@@ -9,6 +9,53 @@
 // 単独の説明変数としては最も強いため、コース確定後は大きめの重みを与える。
 export const COURSE_WIN_RATE = { 1: 55, 2: 14, 3: 12, 4: 10, 5: 6, 6: 3 };
 
+// 場番号(stadium_number)ごとの1コース1着率（%）の目安値。
+// 淡水・静水面の場（大村・徳山・下関・びわこ・住之江・尼崎など）はインの決着率が高く、
+// 汽水・潮位差の大きい場（戸田・江戸川・鳴門・平和島など）はインが弱く荒れやすい傾向がある。
+// 各種公開統計（艇国データバンク等）で公表されている水準の目安であり、シーズン・集計期間に
+// よって変動するため、あくまで参考値として扱う。
+export const STADIUM_COURSE1_RATE = {
+  1: 55, // 桐生
+  2: 43, // 戸田
+  3: 44, // 江戸川
+  4: 49, // 平和島
+  5: 52, // 多摩川
+  6: 52, // 浜名湖
+  7: 55, // 蒲郡
+  8: 51, // 常滑
+  9: 51, // 津
+  10: 51, // 三国
+  11: 58, // びわこ
+  12: 57, // 住之江
+  13: 57, // 尼崎
+  14: 49, // 鳴門
+  15: 51, // 丸亀
+  16: 54, // 児島
+  17: 50, // 宮島
+  18: 62, // 徳山
+  19: 61, // 下関
+  20: 54, // 若松
+  21: 51, // 芦屋
+  22: 54, // 福岡
+  23: 55, // 唐津
+  24: 63, // 大村
+};
+
+// 場ごとの2〜6コースの内訳統計までは公開データから精度良く得られないため、
+// 全国平均の2〜6コースの分布形状を保ったまま、その場の1コース1着率に合わせて
+// 比例配分する。1コースが強い場ほど2〜6コースの取り分は相対的に小さくなる。
+function courseWinRateForStadium(stadiumNumber) {
+  const course1Rate = STADIUM_COURSE1_RATE[stadiumNumber];
+  if (!course1Rate) return COURSE_WIN_RATE;
+  const nationalRemaining = 100 - COURSE_WIN_RATE[1];
+  const remaining = 100 - course1Rate;
+  const rate = { 1: course1Rate };
+  for (let c = 2; c <= 6; c++) {
+    rate[c] = (COURSE_WIN_RATE[c] / nationalRemaining) * remaining;
+  }
+  return rate;
+}
+
 // 競艇はイン(1コース)の決着率が突出して高く、選手・モーター成績が多少劣っていても
 // 進入コースの優位性が上回るケースが大半のため、コース関連の重みを他の指標の合計より
 // 大きく取ることで「大外の好成績艇がイン逃げを過大に上回る」誤判定を避けている。
@@ -67,6 +114,7 @@ export function predictRace(race) {
   const hasPreview = !!(preview && preview.racers);
   const rough = isRoughWeather(preview);
   const courseWeight = rough ? WEIGHTS.course * 0.7 : WEIGHTS.course;
+  const courseWinRate = courseWinRateForStadium(race.stadium_number);
 
   const raw = {
     nationalWinRate: [],
@@ -116,16 +164,16 @@ export function predictRace(race) {
       WEIGHTS.boatTop2 * n.boatTop2[i];
 
     if (hasPreview) {
-      const coursePoint = courseNumber ? COURSE_WIN_RATE[courseNumber] ?? 3 : 3;
-      score += courseWeight * (coursePoint / COURSE_WIN_RATE[1]);
+      const coursePoint = courseNumber ? courseWinRate[courseNumber] ?? 3 : 3;
+      score += courseWeight * (coursePoint / courseWinRate[1]);
       score += WEIGHTS.previewStartTiming * n.startTiming[i];
       score += WEIGHTS.exhibitionTime * n.exhibitionTime[i];
       score += WEIGHTS.tiltAdjustment * n.tiltAdjustment[i];
     } else {
       score += WEIGHTS.avgStartTiming * n.avgStartTiming[i];
       // 直前情報が無い段階では枠番をそのまま暫定コースとして軽めに加点
-      const coursePoint = COURSE_WIN_RATE[Number(key)] ?? 3;
-      score += (courseWeight * 0.5) * (coursePoint / COURSE_WIN_RATE[1]);
+      const coursePoint = courseWinRate[Number(key)] ?? 3;
+      score += (courseWeight * 0.5) * (coursePoint / courseWinRate[1]);
     }
 
     return {
