@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<title>補助金・助成金を無料で探す｜法人・個人事業主・フリーランス対応</title>
+<meta name="description" content="事業形態・地域・従業員数・売上規模などの条件から、法人・個人事業主・フリーランス・創業予定の方が利用できる可能性のある補助金・助成金・公的支援制度を無料で検索できます。" />
+<link rel="canonical" href="https://ha19870907-a11y.github.io/turbo-disco/subsidy/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="支援制度ナビ" />
+<meta property="og:title" content="補助金・助成金を無料で探す｜法人・個人事業主・フリーランス対応" />
+<meta property="og:description" content="事業形態・地域・従業員数・売上規模などの条件から、利用できる可能性のある補助金・助成金・公的支援制度を無料で検索できます。" />
+<meta property="og:url" content="https://ha19870907-a11y.github.io/turbo-disco/subsidy/" />
+<meta name="twitter:card" content="summary" />
+<link rel="stylesheet" href="style.css?v=4" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "支援制度ナビ",
+  "url": "https://ha19870907-a11y.github.io/turbo-disco/subsidy/",
+  "description": "事業形態・地域・従業員数・売上規模などの条件から、利用できる可能性のある補助金・助成金・公的支援制度を無料で検索できるサービスです。"
+}
+</script>
+</head>
+<body>
+<nav class="site-nav" aria-label="サイト内ナビゲーション">
+  <a href="index.html" class="site-nav-logo">支援制度ナビ</a>
+  <div class="site-nav-links">
+    <a href="index.html">補助金を探す</a>
+    <a href="articles.html">お役立ち記事</a>
+  </div>
+</nav>
+<header class="page-header">
+  <p class="eyebrow">支援制度ナビ</p>
+  <h1>あなたの事業に使える<br />補助金・助成金を無料で探す</h1>
+  <p class="hero-sub">法人・個人事業主・フリーランス・創業予定の方に対応</p>
+  <p class="lead">
+    事業形態・地域・従業員数・売上規模などの条件から、
+    <a href="https://www.jgrants-portal.go.jp/" target="_blank" rel="noopener">jGrants（国の補助金電子申請システム）</a>
+    に登録されている、現在利用できる可能性のある補助金・助成金や公的な支援制度を検索できます。
+  </p>
+  <ul class="pain-points">
+    <li>「自分の会社で使える制度が分からない」</li>
+    <li>「補助金を調べる時間がない」</li>
+    <li>「どんな支援制度があるのか知りたい」</li>
+  </ul>
+  <p class="reassurance">という方のための無料検索ツールです。個人事業主・フリーランス向けの制度も検索できます。</p>
+  <a href="#profile-form" class="btn-hero">無料で補助金を探す</a>
+  <p class="trust-note">
+    ※本サービスは簡易的な情報検索・参考判定を行うものであり、補助金等の採択・交付を保証するものではありません。
+    申請前には必ず各制度の公式情報をご確認ください。詳しくは<a href="about-service.html">このサイトについて</a>をご覧ください。
+  </p>
+  <p id="data-info" class="hint">読み込み中...</p>
+</header>
+
+<main>
+  <section class="card" aria-labelledby="profile-heading">
+    <h2 id="profile-heading">事業の情報を入力</h2>
+    <form id="profile-form">
+      <div class="field">
+        <span class="field-label">事業形態</span>
+        <div class="radio-row">
+          <label><input type="radio" name="orgType" value="個人事業主" checked /> 個人事業主</label>
+          <label><input type="radio" name="orgType" value="法人" /> 法人</label>
+          <label><input type="radio" name="orgType" value="フリーランス" /> フリーランス</label>
+          <label><input type="radio" name="orgType" value="創業予定" /> 創業予定</label>
+          <label><input type="radio" name="orgType" value="その他" /> その他</label>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="prefecture">都道府県</label>
+          <select id="prefecture" name="prefecture">
+            <option value="">全国（指定しない）</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="city">市区町村（任意）</label>
+          <input type="text" id="city" name="city" placeholder="例: 渋谷区" autocomplete="off" />
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="employees">従業員数（任意）</label>
+          <select id="employees" name="employees">
+            <option value="">未回答</option>
+          </select>
+          <p class="hint">個人事業主・フリーランスの方は「0人」を選べます。</p>
+        </div>
+        <div class="field">
+          <label for="industry">事業分野（任意）</label>
+          <select id="industry" name="industry">
+            <option value="">指定しない</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="revenueBucket">年間売上（目安・任意）</label>
+        <select id="revenueBucket" name="revenueBucket"></select>
+      </div>
+
+      <div class="field">
+        <span class="field-label">気になるテーマ（任意・複数選択可）</span>
+        <div id="purpose-tags" class="tag-row" role="group" aria-label="テーマで絞り込む"></div>
+      </div>
+
+      <div class="field">
+        <span class="field-label">現在のお困りごと・予定（任意・複数選択可）</span>
+        <div id="concern-list" class="concern-list" role="group" aria-label="お困りごと・予定"></div>
+        <p class="hint">選んでいただくと、検索結果とあわせて相談先の案内を出す際の参考にします。</p>
+      </div>
+
+      <details class="field-details">
+        <summary>売上が減っているかどうかも調べる（任意・詳しく入力する場合）</summary>
+        <div class="field-row">
+          <div class="field">
+            <label for="revenue" id="revenue-label">今年度の所得（万円）</label>
+            <input type="number" id="revenue" name="revenue" min="0" step="1" placeholder="例: 500" />
+          </div>
+          <div class="field">
+            <label for="prevRevenue" id="prev-revenue-label">前年度の所得（万円）</label>
+            <input type="number" id="prevRevenue" name="prevRevenue" min="0" step="1" placeholder="例: 700" />
+          </div>
+        </div>
+        <p class="hint">
+          両方入力すると、前年からの減少率を計算し、売上減少を要件とする資金繰り支援制度（セーフティネット保証など）を
+          あわせて案内します（下の「売上減少に関連する制度」欄・「こんな支援もあります」欄）。上の「年間売上（目安）」とは
+          別の項目で、金額の絞り込みには使用しません。
+        </p>
+      </details>
+
+      <div class="field">
+        <label class="checkbox-row">
+          <input type="checkbox" id="acceptingOnly" name="acceptingOnly" checked />
+          現在募集中の制度のみ表示する
+        </label>
+      </div>
+
+      <button type="submit" class="btn-primary">この条件で検索する</button>
+    </form>
+  </section>
+
+  <section class="card" id="diagnosis-section" hidden aria-live="polite">
+    <h2>あなたの会社の支援制度診断</h2>
+    <ul id="diagnosis-list" class="diagnosis-list"></ul>
+    <p class="hint">※これは簡易的な参考判定であり、制度の利用を保証するものではありません（<a href="how-it-works.html">判定方法について</a>）。</p>
+  </section>
+
+  <section class="card" id="results-section" aria-live="polite">
+    <h2>あなたにおすすめの支援制度</h2>
+    <div id="status" class="status"></div>
+    <p class="hint">おすすめ度は入力情報と制度情報をもとにした参考判定です。実際の申請可否を保証するものではありません（<a href="how-it-works.html">判定方法について</a>）。</p>
+    <ul id="results-list" class="results-list"></ul>
+  </section>
+
+  <section class="card" id="consult-section" hidden>
+    <h2>補助金について専門家に相談したい方へ</h2>
+    <p class="hint">
+      補助金・助成金の申請や、会計・税務・労務・資金調達について専門家への相談を希望する方には、外部の相談サービスをご案内しています。
+      検索結果だけでは判断が難しい場合や、
+    </p>
+    <ul class="consult-reasons">
+      <li>自社が対象になるか詳しく確認したい</li>
+      <li>申請方法について相談したい</li>
+      <li>補助金以外の資金調達方法も検討したい</li>
+      <li>補助金を受け取った後の会計・税務処理について専門家に相談したい</li>
+    </ul>
+    <p class="hint">
+      といった場合にご利用いただけます。ご入力いただいた内容から、参考になりそうな相談先を表示しています。
+      相談は任意です。利用しなくても、補助金・助成金の検索機能はすべてご利用いただけます。
+    </p>
+    <p class="ad-disclosure hint">
+      <span class="ad-badge">広告</span>
+      以下は外部の専門家紹介サービスへのリンクです。リンク先を利用した場合、当サイトが紹介料等を受け取ることがあります。
+      詳しくは<a href="advertising.html">広告について</a>をご覧ください。
+    </p>
+    <div id="consult-list" class="consult-list"></div>
+  </section>
+
+  <section class="card" id="other-results-section" hidden aria-live="polite">
+    <h2>その他の支援制度</h2>
+    <p class="hint">条件が一部一致する制度です。あわせてご確認ください。</p>
+    <ul id="other-results-list" class="results-list"></ul>
+  </section>
+
+  <section class="card" id="decline-section" hidden aria-live="polite">
+    <h2>売上減少に関連する制度（参考）</h2>
+    <p id="decline-note" class="hint"></p>
+    <ul id="decline-list" class="results-list"></ul>
+  </section>
+
+  <details class="card collapsible-section" id="reference-section">
+    <summary><h2>補助金・助成金：全国規模の代表的な制度（参考）</h2></summary>
+    <p class="hint">
+      商工会議所・商工会や中小企業庁などが実施する、全国向けの主な補助金の例です。金額・締切は公募回ごとに変わるため、
+      名称で検索し、必ず実施団体の公式サイト・最新の公募要領で内容をご確認ください。
+    </p>
+    <ul id="reference-list" class="reference-list"></ul>
+  </details>
+
+  <details class="card collapsible-section" id="support-section">
+    <summary><h2>こんな支援もあります</h2></summary>
+    <p class="hint">
+      補助金・助成金（応募・採択されるとお金がもらえる制度）が見つからない場合でも、融資・信用保証・
+      経営相談・税制優遇など、jGrantsには基本的に掲載されない「支援制度」が使える場合があります。
+      金額・利率・要件は制度改定や指定期間によって変わるため、名称で検索し、必ず実施団体の公式サイト・
+      最新情報で内容をご確認ください。
+    </p>
+    <ul id="support-list" class="reference-list"></ul>
+  </details>
+
+  <section class="card note-card">
+    <h2>データについて・ご注意</h2>
+    <ul>
+      <li>
+        検索対象データは<a href="https://www.jgrants-portal.go.jp/" target="_blank" rel="noopener">jGrants</a>の公開APIから、
+        GitHub Actionsで1日1回サーバー側で取得し、このサイトに保存したものです（ブラウザからその都度APIを呼び出しているわけ
+        ではないため、最新の公募開始・締切から反映まで最大1日程度のずれが生じることがあります）。
+      </li>
+      <li>
+        複数の検索語でjGrants APIを検索してまとめているため、jGrantsに登録されている制度すべてを網羅しているわけではありません。
+        また、jGrantsには都道府県・市区町村が実施する補助金も一部登録されていますが、すべての自治体・商工会議所の制度を
+        網羅しているわけではありません。特にお住まいの市区町村や地域の商工会議所・商工会が独自に行っている制度は、
+        別途それぞれの公式サイトでの確認をおすすめします。
+      </li>
+      <li>
+        jGrantsは主に経済産業省・中小企業庁系の「補助金」を対象としており、厚生労働省系の「助成金」
+        （雇用調整助成金、キャリアアップ助成金など）は含まれません。
+      </li>
+      <li>この検索結果は申請の可否を保証するものではありません。応募要件・締切・提出書類は必ず公式情報でご確認ください。</li>
+      <li>掲載している情報は最新の情報と異なる場合があります。申請条件・募集期間・対象経費などは必ず公式情報をご確認ください。</li>
+      <li>専門家への相談・紹介については、各サービス提供会社の条件が適用されます。当ツールが相談内容や結果を保証するものではありません（専門家紹介リンクには「広告」表示を付けています。詳しくは<a href="advertising.html">広告について</a>）。</li>
+      <li>入力した情報はこの端末のブラウザ内にのみ保存され、外部には送信されません。専門家紹介のボタンをクリックした場合のみ、その先の紹介サービスのサイトへ移動します（クリックしただけで氏名・連絡先等が自動的に送信されることはありません）。</li>
+      <li>当サイトは行政機関ではありません。掲載制度の申請代行や採択保証は行っておらず、公的機関等が公開する情報をもとにした民間の情報提供サービスです。詳しくは<a href="about-service.html">このサイトについて</a>をご覧ください。</li>
+    </ul>
+  </section>
+</main>
+
+<footer class="page-footer">
+  <div class="footer-links">
+    <a href="articles.html">お役立ち記事</a>
+    <a href="how-it-works.html">おすすめ判定について</a>
+    <a href="about-service.html">このサイトについて</a>
+    <a href="about.html">運営者情報</a>
+    <a href="contact.html">お問い合わせ</a>
+    <a href="privacy.html">プライバシーポリシー</a>
+    <a href="terms.html">利用規約</a>
+    <a href="advertising.html">広告について</a>
+    <a href="changelog.html">更新履歴</a>
+  </div>
+  <p>データ提供: <a href="https://www.jgrants-portal.go.jp/" target="_blank" rel="noopener">jGrants（デジタル庁・中小企業庁）</a></p>
+</footer>
+
+<script src="data.js?v=2"></script>
+<script src="app.js?v=3"></script>
+</body>
+</html>

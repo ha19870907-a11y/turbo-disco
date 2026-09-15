@@ -12,7 +12,15 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob:; media-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none';" />
   <meta http-equiv="Referrer-Policy" content="no-referrer" />
 
-  <link rel="stylesheet" href="style.css" />
+  <!-- HTML本体（このファイル自体）がスマホのブラウザにキャッシュされ続けると、
+       app.js/style.cssの?v=番号を上げても、キャッシュされた古いHTMLが古い番号の
+       URLを参照し続けてしまい、更新が反映されない場合がある。念のためHTTP経由の
+       キャッシュも避けるよう明示しておく（対応状況はブラウザ依存の保険的対策）。 -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+
+  <link rel="stylesheet" href="style.css?v=35" />
 </head>
 <body>
   <header class="app-header">
@@ -22,7 +30,7 @@
 
   <main>
     <section class="panel">
-      <h2>0. テンプレートを選ぶ</h2>
+      <h2><span class="step-badge">1</span>テンプレートを選ぶ</h2>
       <div class="template-toggle">
         <label class="template-option">
           <input type="radio" name="template" value="standard" checked />
@@ -32,28 +40,44 @@
           <input type="radio" name="template" value="opening" />
           <span><strong>オープニング演出</strong><br />黒背景×ネオン、カウントダウンから入場までの疾走感ムービー</span>
         </label>
+        <label class="template-option">
+          <input type="radio" name="template" value="endroll" />
+          <span><strong>エンドロール</strong><br />本のページをめくるように、来賓の方々へのメッセージが1ページずつ流れるムービー</span>
+        </label>
+        <label class="template-option">
+          <input type="radio" name="template" value="profile" />
+          <span><strong>2人のプロフィール</strong><br />本のページをめくるように、お二人のプロフィールを紹介するムービー（5分以内目安）</span>
+        </label>
+        <label class="template-option">
+          <input type="radio" name="template" value="thanks" />
+          <span><strong>親への感謝ムービー</strong><br />本のページをめくるように、ご両親へのメッセージを届けるムービー（5分以内目安）</span>
+        </label>
       </div>
     </section>
 
     <section class="panel" id="draft-section">
-      <h2>📝 下書きの保存・復元</h2>
+      <h2><span class="step-icon">📝</span>下書きの保存・復元</h2>
       <p class="hint">
         写真・動画・入力した文章は、ブラウザを閉じたりページを再読み込みすると消えてしまいます。
         作業を中断する前にここで一時保存しておくと、次回このページを開いたときに続きから再開できます
-        （この端末のブラウザ内だけに保存され、外部には送信されません）。
+        （この端末のブラウザ内だけに保存され、外部には送信されません）。下書きは
+        「テンプレートを選ぶ」で選んだテンプレートごとに、それぞれ独立して保存されます
+        （例: オープニング演出とエンドロールを両方同時に作っていても、片方を保存しても
+        もう片方の下書きは上書きされません）。保存・復元・削除の操作は、常に今選んで
+        いるテンプレートに対して行われます。
       </p>
       <button id="save-draft-btn" class="ghost-btn" type="button">💾 今の内容を一時保存する</button>
       <button id="delete-draft-btn" class="ghost-btn hidden" type="button">🗑 保存した下書きを削除</button>
       <p id="draft-status" class="hint"></p>
       <div id="draft-restore-box" class="hidden">
-        <p class="hint">前回保存した下書きがあります（<span id="draft-saved-at"></span>）。</p>
+        <p class="hint">このテンプレートで前回保存した下書きがあります（<span id="draft-saved-at"></span>）。</p>
         <button id="restore-draft-btn" class="primary-btn" type="button">📂 下書きを復元する</button>
       </div>
     </section>
 
     <!-- スタンダード: 写真 -->
     <section class="panel" id="standard-photos-section">
-      <h2>1. 写真・動画を追加</h2>
+      <h2><span class="step-badge">2</span>写真・動画を追加</h2>
       <div id="dropzone" class="dropzone">
         <p>ここに写真・動画をドラッグ＆ドロップ<br />またはクリックして選択</p>
         <input id="file-input" type="file" accept="image/*,video/*" multiple hidden />
@@ -64,7 +88,7 @@
 
     <!-- スタンダード: タイトル設定 -->
     <section class="panel" id="standard-settings-section">
-      <h2>2. タイトル・演出設定</h2>
+      <h2><span class="step-badge">3</span>タイトル・演出設定</h2>
       <div class="form-grid">
         <label>新郎・新婦の名前
           <input id="title1" type="text" placeholder="例: 太郎" />
@@ -88,6 +112,9 @@
         <label>1枚あたりの表示時間（秒・写真のみ）
           <input id="photo-duration" type="number" min="1.5" max="10" step="0.5" value="4" />
         </label>
+        <label>写真の表示サイズ（%・余白付きで小さく表示）
+          <input id="photo-display-scale" type="number" min="30" max="100" step="5" value="100" />
+        </label>
         <label>切り替え効果
           <select id="transition-type">
             <option value="crossfade">クロスフェード</option>
@@ -95,18 +122,42 @@
             <option value="zoom">ズーム</option>
             <option value="wipe">ワイプ</option>
             <option value="flash">フラッシュ</option>
+            <option value="circle">円形ワイプ</option>
+            <option value="rotatezoom">回転ズーム</option>
+            <option value="blur">ぼかし</option>
             <option value="random">ランダム（写真ごとに変える）</option>
           </select>
         </label>
         <label>切り替えの長さ（秒）
           <input id="transition-duration" type="number" min="0.3" max="2" step="0.1" value="0.8" />
         </label>
+        <label>キャプションのデザイン
+          <select id="caption-style">
+            <option value="simple">シンプル（下部バー）</option>
+            <option value="elegant">エレガント（影付き文字）</option>
+            <option value="pop">ポップ（丸バッジ）</option>
+          </select>
+        </label>
+        <label>キャプションの文字サイズ（px）
+          <input id="caption-font-size" type="number" min="16" max="64" step="2" value="32" />
+        </label>
+        <label>キャプションの出し方
+          <select id="caption-fade">
+            <option value="fade">フェード</option>
+            <option value="slide">スライド＋フェード</option>
+            <option value="sparkle">キラキラ出現（左右から浮かび上がる）</option>
+            <option value="typewriter">タイプライター（1文字ずつ表示）</option>
+            <option value="bounce">バウンド（弾んで登場）</option>
+            <option value="zoomin">ズーム出現（拡大しながら登場）</option>
+            <option value="none">常に表示</option>
+          </select>
+        </label>
       </div>
     </section>
 
     <!-- オープニング演出: 設定 -->
     <section class="panel hidden" id="opening-section">
-      <h2>1. オープニング演出の設定</h2>
+      <h2><span class="step-badge">2</span>オープニング演出の設定</h2>
       <div class="form-grid">
         <label>新郎の名前（英字推奨）
           <input id="op-groom-name" type="text" placeholder="TARO" />
@@ -137,6 +188,9 @@
         <label>1枚あたりの表示時間（秒・写真のみ）
           <input id="op-photo-duration" type="number" min="0.4" max="3" step="0.1" value="1" />
         </label>
+        <label>写真の表示サイズ（%・余白付きで小さく表示）
+          <input id="op-photo-display-scale" type="number" min="30" max="100" step="5" value="100" />
+        </label>
         <label>切り替え効果
           <select id="op-transition-type">
             <option value="flash">フラッシュ（おすすめ）</option>
@@ -144,11 +198,35 @@
             <option value="slide">スライド</option>
             <option value="zoom">ズーム</option>
             <option value="wipe">ワイプ</option>
+            <option value="circle">円形ワイプ</option>
+            <option value="rotatezoom">回転ズーム</option>
+            <option value="blur">ぼかし</option>
             <option value="random">ランダム（写真ごとに変える）</option>
           </select>
         </label>
         <label>切り替えの長さ（秒）
           <input id="op-transition-duration" type="number" min="0.15" max="1" step="0.05" value="0.3" />
+        </label>
+        <label>キャプションのデザイン
+          <select id="op-caption-style">
+            <option value="simple">シンプル（下部バー）</option>
+            <option value="elegant">エレガント（影付き文字）</option>
+            <option value="pop">ポップ（丸バッジ）</option>
+          </select>
+        </label>
+        <label>キャプションの文字サイズ（px）
+          <input id="op-caption-font-size" type="number" min="16" max="64" step="2" value="32" />
+        </label>
+        <label>キャプションの出し方
+          <select id="op-caption-fade">
+            <option value="fade">フェード</option>
+            <option value="slide">スライド＋フェード</option>
+            <option value="sparkle">キラキラ出現（左右から浮かび上がる）</option>
+            <option value="typewriter">タイプライター（1文字ずつ表示）</option>
+            <option value="bounce">バウンド（弾んで登場）</option>
+            <option value="zoomin">ズーム出現（拡大しながら登場）</option>
+            <option value="none">常に表示</option>
+          </select>
         </label>
       </div>
       <p class="hint">
@@ -161,7 +239,7 @@
 
     <!-- オープニング演出: 写真（パートごと） -->
     <section class="panel hidden" id="opening-photos-section">
-      <h2>2. 写真・動画を追加（パートごと）</h2>
+      <h2><span class="step-badge">3</span>写真・動画を追加（パートごと）</h2>
       <p class="hint">各パートに写真・動画をまとめて追加できます。動画は「使用秒数」欄でムービー内で使う長さ（最大15秒）を調整できます。動画自体の音声は収録されません（BGMのみ収録）。</p>
 
       <h3>新郎パート</h3>
@@ -186,8 +264,261 @@
       <div id="together-grid" class="photo-grid"></div>
     </section>
 
-    <section class="panel">
-      <h2>3. ムービーを作成</h2>
+    <!-- エンドロール: 設定 -->
+    <section class="panel hidden" id="endroll-section">
+      <h2><span class="step-badge">2</span>エンドロールの設定</h2>
+      <div class="form-grid">
+        <label>新郎・新婦の名前
+          <input id="endroll-title1" type="text" placeholder="例: 太郎" />
+        </label>
+        <label>（連名にする場合）
+          <input id="endroll-title2" type="text" placeholder="例: 花子" />
+        </label>
+        <label>日付・会場など（任意）
+          <input id="endroll-date-text" type="text" placeholder="例: 2026.10.10" />
+        </label>
+        <label>紙の色味
+          <select id="endroll-theme">
+            <option value="pink">ピンク×ゴールド</option>
+            <option value="navy">ネイビー×ゴールド</option>
+            <option value="green">グリーン×アイボリー</option>
+          </select>
+        </label>
+        <label>見出し1行目
+          <input id="endroll-header-line1" type="text" placeholder="Thank You" />
+        </label>
+        <label>見出し2行目（任意）
+          <input id="endroll-header-line2" type="text" placeholder="例: 支えてくださった皆様へ" />
+        </label>
+        <label>ページを開いておく時間
+          <select id="endroll-speed">
+            <option value="slow">遅い（じっくり読める）</option>
+            <option value="normal" selected>標準</option>
+            <option value="fast">速い</option>
+          </select>
+        </label>
+      </div>
+      <p class="hint">
+        最初にお二人の名前のタイトルカードが表示された後、見出しのページに続けて、
+        本のページをめくるように来賓の方々へのメッセージが1ページずつ表示されます。
+        お名前とメッセージは1人ずつ順番にタイピングされるように表示されます
+        （タイピングの速さは「ページを開いておく時間」の設定に合わせて変わります）。
+      </p>
+    </section>
+
+    <!-- エンドロール: ページの写真 -->
+    <section class="panel hidden" id="endroll-photos-section">
+      <h2><span class="step-badge">3</span>ページに使う写真を追加（任意）</h2>
+      <div id="endroll-dropzone" class="dropzone">
+        <p>ここに写真をドラッグ＆ドロップ<br />またはクリックして選択</p>
+        <input id="endroll-file-input" type="file" accept="image/*,video/*" multiple hidden />
+      </div>
+      <p class="hint">
+        追加すると、グループ（見出し）ごとのページで、写真がページ全体の背景として
+        表示されます（写真全体が見切れないよう縦横比を保って表示し、余る部分は同じ写真を
+        ぼかして埋めます）。各写真の「背景にするグループ」欄に、来賓メッセージの
+        「グループ」欄と同じ名前（例: 新郎友人）を入れておくと、そのグループのページ
+        （つづきページも含む）にその写真が使われます。同じグループ名の写真を複数枚
+        追加すると、そのグループのページ数に応じて均等に振り分けられ、1ページに
+        複数枚割り当たった場合はそのページの中で順番に切り替わるスライドショーに
+        なります（人数が少なくグループのページが1ページしかない場合も、その1ページの
+        中で複数枚が順番に使われます）。各写真の「表示秒数」欄で、スライドショーに
+        なったときのその写真1枚分の表示時間を個別に調整できます（空欄の場合は
+        「ページを開いておく時間」の設定に応じた既定の長さになります）。空欄のままの
+        写真は、専用の写真が無いグループの最初のページに順番に自動で割り当てられます。
+        追加しない場合は紙の質感の背景のページになります。ここでのキャプション・
+        詳細設定（文字サイズ・エフェクト・表示サイズ）はページには使用されません。
+      </p>
+      <div id="endroll-photo-grid" class="photo-grid"></div>
+    </section>
+
+    <!-- エンドロール: 来賓メッセージ -->
+    <section class="panel hidden" id="endroll-messages-section">
+      <h2><span class="step-badge">4</span>来賓へのメッセージを追加</h2>
+      <p class="hint">
+        お一人ずつ、お名前とメッセージを入力してください（メッセージは任意）。「グループ」欄に
+        「新郎友人」「新婦友人」「ご親族」などと直接入力すると、同じグループ名の行は
+        （並び順に関係なく）まとめられ、そのグループ名が見出しとして表示されます。
+        ページの順番は、グループ名が最初に登場した行の順序になります。
+        1ページには最大4人まで入り、5人目以降は自動で「（つづき）」ページに分かれます。
+        グループ欄が空欄の行は、同じく空欄の行同士でまとめて見出しなしのページになります。
+      </p>
+      <div id="guest-message-list" class="guest-message-list"></div>
+      <button id="add-guest-message-btn" class="ghost-btn" type="button">＋ メッセージを追加</button>
+    </section>
+
+    <!-- 2人のプロフィール: 設定 -->
+    <section class="panel hidden" id="profile-section">
+      <h2><span class="step-badge">2</span>プロフィールムービーの設定</h2>
+      <div class="form-grid">
+        <label>新郎・新婦の名前
+          <input id="profile-title1" type="text" placeholder="例: 太郎" />
+        </label>
+        <label>（連名にする場合）
+          <input id="profile-title2" type="text" placeholder="例: 花子" />
+        </label>
+        <label>日付・会場など（任意）
+          <input id="profile-date-text" type="text" placeholder="例: 2026.10.10" />
+        </label>
+        <label>紙の色味
+          <select id="profile-theme">
+            <option value="pink">ピンク×ゴールド</option>
+            <option value="navy">ネイビー×ゴールド</option>
+            <option value="green">グリーン×アイボリー</option>
+          </select>
+        </label>
+        <label>見出し1行目
+          <input id="profile-header-line1" type="text" placeholder="Profile" />
+        </label>
+        <label>見出し2行目（任意）
+          <input id="profile-header-line2" type="text" placeholder="例: 私たちのプロフィール" />
+        </label>
+        <label>ページを開いておく時間
+          <select id="profile-speed">
+            <option value="slow">遅い（じっくり読める）</option>
+            <option value="normal" selected>標準</option>
+            <option value="fast">速い</option>
+          </select>
+        </label>
+      </div>
+      <p class="hint">
+        エンドロールと同じ、本のページをめくるような演出のプロフィールムービーです。
+        最初にお二人の名前のタイトルカードが表示された後、見出しのページに続けて、
+        質問と回答が1ページずつ表示されます。質問と回答は1つずつ順番にタイピング
+        されるように表示されます（タイピングの速さは「ページを開いておく時間」の
+        設定に合わせて変わります）。5分以内に収めたい場合は、次の「プロフィール項目
+        を追加」で20〜30項目程度を目安にしてください（項目の文章量によって変わります）。
+      </p>
+    </section>
+
+    <!-- 2人のプロフィール: ページの写真 -->
+    <section class="panel hidden" id="profile-photos-section">
+      <h2><span class="step-badge">3</span>ページに使う写真を追加（任意）</h2>
+      <div id="profile-dropzone" class="dropzone">
+        <p>ここに写真をドラッグ＆ドロップ<br />またはクリックして選択</p>
+        <input id="profile-file-input" type="file" accept="image/*,video/*" multiple hidden />
+      </div>
+      <p class="hint">
+        追加すると、グループ（見出し）ごとのページで、写真がページ全体の背景として
+        表示されます（写真全体が見切れないよう縦横比を保って表示し、余る部分は同じ写真を
+        ぼかして埋めます）。各写真の「背景にするグループ」欄に、プロフィール項目の
+        「グループ」欄と同じ名前（例: 新郎）を入れておくと、そのグループのページ
+        （つづきページも含む）にその写真が使われます。同じグループ名の写真を複数枚
+        追加すると、そのグループのページ数に応じて均等に振り分けられ、1ページに
+        複数枚割り当たった場合はそのページの中で順番に切り替わるスライドショーに
+        なります。各写真の「表示秒数」欄で、スライドショーになったときのその写真
+        1枚分の表示時間を個別に調整できます（空欄の場合は「ページを開いておく時間」の
+        設定に応じた既定の長さになります）。空欄のままの写真は、専用の写真が無い
+        グループの最初のページに順番に自動で割り当てられます。追加しない場合は紙の
+        質感の背景のページになります。ここでのキャプション・詳細設定（文字サイズ・
+        エフェクト・表示サイズ）はページには使用されません。
+      </p>
+      <div id="profile-photo-grid" class="photo-grid"></div>
+    </section>
+
+    <!-- 2人のプロフィール: 項目 -->
+    <section class="panel hidden" id="profile-entries-section">
+      <h2><span class="step-badge">4</span>プロフィール項目を追加</h2>
+      <p class="hint">
+        質問と回答を1組ずつ入力してください（回答は任意）。「グループ」欄に
+        「新郎」「新婦」などと直接入力すると、同じグループ名の行は（並び順に関係なく）
+        まとめられ、そのグループ名が見出しとして表示されます。ページの順番は、
+        グループ名が最初に登場した行の順序になります。1ページには最大4項目まで入り、
+        5項目目以降は自動で「（つづき）」ページに分かれます。グループ欄が空欄の行は、
+        同じく空欄の行同士でまとめて見出しなしのページになります。
+      </p>
+      <div id="profile-entry-list" class="guest-message-list"></div>
+      <button id="add-profile-entry-btn" class="ghost-btn" type="button">＋ プロフィール項目を追加</button>
+    </section>
+
+    <!-- 親への感謝ムービー: 設定 -->
+    <section class="panel hidden" id="thanks-section">
+      <h2><span class="step-badge">2</span>感謝ムービーの設定</h2>
+      <div class="form-grid">
+        <label>新郎・新婦の名前
+          <input id="thanks-title1" type="text" placeholder="例: 太郎" />
+        </label>
+        <label>（連名にする場合）
+          <input id="thanks-title2" type="text" placeholder="例: 花子" />
+        </label>
+        <label>日付・会場など（任意）
+          <input id="thanks-date-text" type="text" placeholder="例: 2026.10.10" />
+        </label>
+        <label>紙の色味
+          <select id="thanks-theme">
+            <option value="pink">ピンク×ゴールド</option>
+            <option value="navy">ネイビー×ゴールド</option>
+            <option value="green">グリーン×アイボリー</option>
+          </select>
+        </label>
+        <label>見出し1行目
+          <input id="thanks-header-line1" type="text" placeholder="Thank You" />
+        </label>
+        <label>見出し2行目（任意）
+          <input id="thanks-header-line2" type="text" placeholder="例: 育ててくれてありがとう" />
+        </label>
+        <label>ページを開いておく時間
+          <select id="thanks-speed">
+            <option value="slow">遅い（じっくり読める）</option>
+            <option value="normal" selected>標準</option>
+            <option value="fast">速い</option>
+          </select>
+        </label>
+      </div>
+      <p class="hint">
+        エンドロールと同じ、本のページをめくるような演出の感謝ムービーです。
+        最初にお二人の名前のタイトルカードが表示された後、見出しのページに続けて、
+        ご両親へのメッセージが1ページずつ表示されます。見出しとメッセージは1つずつ
+        順番にタイピングされるように表示されます（タイピングの速さは「ページを
+        開いておく時間」の設定に合わせて変わります）。5分以内に収めたい場合は、
+        次の「メッセージを追加」で20〜30件程度を目安にしてください（メッセージの
+        文章量によって変わります）。
+      </p>
+    </section>
+
+    <!-- 親への感謝ムービー: ページの写真 -->
+    <section class="panel hidden" id="thanks-photos-section">
+      <h2><span class="step-badge">3</span>ページに使う写真を追加（任意）</h2>
+      <div id="thanks-dropzone" class="dropzone">
+        <p>ここに写真をドラッグ＆ドロップ<br />またはクリックして選択</p>
+        <input id="thanks-file-input" type="file" accept="image/*,video/*" multiple hidden />
+      </div>
+      <p class="hint">
+        追加すると、グループ（見出し）ごとのページで、写真がページ全体の背景として
+        表示されます（写真全体が見切れないよう縦横比を保って表示し、余る部分は同じ写真を
+        ぼかして埋めます）。各写真の「背景にするグループ」欄に、メッセージの
+        「グループ」欄と同じ名前（例: 新郎から）を入れておくと、そのグループのページ
+        （つづきページも含む）にその写真が使われます。同じグループ名の写真を複数枚
+        追加すると、そのグループのページ数に応じて均等に振り分けられ、1ページに
+        複数枚割り当たった場合はそのページの中で順番に切り替わるスライドショーに
+        なります。各写真の「表示秒数」欄で、スライドショーになったときのその写真
+        1枚分の表示時間を個別に調整できます（空欄の場合は「ページを開いておく時間」の
+        設定に応じた既定の長さになります）。空欄のままの写真は、専用の写真が無い
+        グループの最初のページに順番に自動で割り当てられます。追加しない場合は紙の
+        質感の背景のページになります。ここでのキャプション・詳細設定（文字サイズ・
+        エフェクト・表示サイズ）はページには使用されません。
+      </p>
+      <div id="thanks-photo-grid" class="photo-grid"></div>
+    </section>
+
+    <!-- 親への感謝ムービー: メッセージ -->
+    <section class="panel hidden" id="thanks-entries-section">
+      <h2><span class="step-badge">4</span>メッセージを追加</h2>
+      <p class="hint">
+        見出しとメッセージを入力してください（どちらも任意）。「グループ」欄に
+        「新郎から」「新婦から」などと直接入力すると、同じグループ名の行は
+        （並び順に関係なく）まとめられ、そのグループ名が見出しとして表示されます。
+        ページの順番は、グループ名が最初に登場した行の順序になります。1ページには
+        最大4件まで入り、5件目以降は自動で「（つづき）」ページに分かれます。
+        グループ欄が空欄の行は、同じく空欄の行同士でまとめて見出しなしのページに
+        なります。
+      </p>
+      <div id="thanks-entry-list" class="guest-message-list"></div>
+      <button id="add-thanks-entry-btn" class="ghost-btn" type="button">＋ メッセージを追加</button>
+    </section>
+
+    <section class="panel panel-cta">
+      <h2><span class="step-icon">🎬</span>ムービーを作成</h2>
       <p id="duration-estimate" class="hint"></p>
       <button id="create-btn" class="primary-btn" type="button">ムービーを作成（音声なし）</button>
       <div id="progress-box" class="progress-box hidden">
@@ -206,11 +537,18 @@
           正しく送れません。iPhoneの場合は動画を<strong>長押しして「ビデオを保存」</strong>を選んでカメラロールに
           保存してから、LINEアプリの「+」から動画を選んで送ってください。
         </p>
+        <p class="hint">
+          💿 CD-RやDVD-Rに書き込みたい場合は、「ダウンロード」した動画ファイルを、パソコンのディスク書き込み
+          機能（Windowsの書き込み機能やMacの「ディスクユーティリティ」など）でディスクに書き込んでください
+          （このページから直接ディスクへ書き込むことはできません）。パソコンで再生するデータディスクとしては
+          そのまま書き込めますが、一般的な据え置き型のDVDプレーヤーなどではこのファイル形式（MP4/WebM）を
+          再生できないことが多く、その場合は市販のDVD作成ソフトで「ビデオDVD」として作り直す必要があります。
+        </p>
       </div>
     </section>
 
-    <section id="bgm-section" class="panel disabled">
-      <h2>4. BGMを追加</h2>
+    <section id="bgm-section" class="panel panel-cta disabled">
+      <h2><span class="step-icon">🎵</span>BGMを追加</h2>
       <p class="hint">先に音声なしムービーを作成すると、この欄が使えるようになります。動画と同じ長さで書き出し直します。複数曲を選ぶと選んだ順にクロスフェードしながら再生し、動画の長さに足りない分は自動で繰り返します（末尾はフェードアウトします）。</p>
       <p class="hint">
         スマホで音楽ファイルを選ぶ画面がうまく開かない場合は、LINEなど他のアプリ内で開いたリンクではなく、
@@ -259,6 +597,13 @@
           正しく送れません。iPhoneの場合は動画を<strong>長押しして「ビデオを保存」</strong>を選んでカメラロールに
           保存してから、LINEアプリの「+」から動画を選んで送ってください。
         </p>
+        <p class="hint">
+          💿 CD-RやDVD-Rに書き込みたい場合は、「ダウンロード」した動画ファイルを、パソコンのディスク書き込み
+          機能（Windowsの書き込み機能やMacの「ディスクユーティリティ」など）でディスクに書き込んでください
+          （このページから直接ディスクへ書き込むことはできません）。パソコンで再生するデータディスクとしては
+          そのまま書き込めますが、一般的な据え置き型のDVDプレーヤーなどではこのファイル形式（MP4/WebM）を
+          再生できないことが多く、その場合は市販のDVD作成ソフトで「ビデオDVD」として作り直す必要があります。
+        </p>
       </div>
     </section>
   </main>
@@ -272,6 +617,6 @@
     </p>
   </footer>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=36"></script>
 </body>
 </html>

@@ -24,7 +24,7 @@ const INTRO_DUR = 3.2;
 const OUTRO_DUR = 3.2;
 const FADE = 0.6;
 const ZOOM_AMOUNT = 0.16;
-const TRANSITION_TYPES = ["crossfade", "slide", "zoom", "wipe", "flash"];
+const TRANSITION_TYPES = ["crossfade", "slide", "zoom", "wipe", "flash", "circle", "rotatezoom", "blur"];
 const AUDIO_CROSSFADE_SEC = 1.2;
 
 // 入力ファイルに対する上限（悪意あるファイルやサイズの大きすぎるファイルで
@@ -42,6 +42,13 @@ const DEFAULT_VIDEO_CLIP_SECONDS = 5;
 const BEAT_ANALYSIS_MAX_SECONDS = 60; // テンポ検出に使う先頭部分の長さ（テンポは曲を通して一定と仮定）
 const BEAT_MIN_BPM = 80;
 const BEAT_MAX_BPM = 180;
+
+const MAX_GUEST_MESSAGES = 100;
+const MAX_GUEST_NAME_LENGTH = 30;
+const MAX_GUEST_GROUP_LENGTH = 20;
+const MAX_GUEST_MESSAGE_LENGTH = 200;
+// 「遅い/標準/速い」に対応する、ページ表示時間・切り替え時間への倍率。
+const ENDROLL_SPEED_MAP = { slow: 1.35, normal: 1, fast: 0.75 };
 
 const state = {
   bgmFiles: [], // { id, file }
@@ -61,6 +68,44 @@ const els = {
   standardSettingsSection: document.getElementById("standard-settings-section"),
   openingSection: document.getElementById("opening-section"),
   openingPhotosSection: document.getElementById("opening-photos-section"),
+  endrollSection: document.getElementById("endroll-section"),
+  endrollPhotosSection: document.getElementById("endroll-photos-section"),
+  endrollMessagesSection: document.getElementById("endroll-messages-section"),
+  endrollDropzone: document.getElementById("endroll-dropzone"),
+  endrollFileInput: document.getElementById("endroll-file-input"),
+  endrollPhotoGrid: document.getElementById("endroll-photo-grid"),
+
+  profileSection: document.getElementById("profile-section"),
+  profilePhotosSection: document.getElementById("profile-photos-section"),
+  profileEntriesSection: document.getElementById("profile-entries-section"),
+  profileDropzone: document.getElementById("profile-dropzone"),
+  profileFileInput: document.getElementById("profile-file-input"),
+  profilePhotoGrid: document.getElementById("profile-photo-grid"),
+  profileTitle1: document.getElementById("profile-title1"),
+  profileTitle2: document.getElementById("profile-title2"),
+  profileDateText: document.getElementById("profile-date-text"),
+  profileTheme: document.getElementById("profile-theme"),
+  profileHeaderLine1: document.getElementById("profile-header-line1"),
+  profileHeaderLine2: document.getElementById("profile-header-line2"),
+  profileSpeed: document.getElementById("profile-speed"),
+  profileEntryList: document.getElementById("profile-entry-list"),
+  addProfileEntryBtn: document.getElementById("add-profile-entry-btn"),
+
+  thanksSection: document.getElementById("thanks-section"),
+  thanksPhotosSection: document.getElementById("thanks-photos-section"),
+  thanksEntriesSection: document.getElementById("thanks-entries-section"),
+  thanksDropzone: document.getElementById("thanks-dropzone"),
+  thanksFileInput: document.getElementById("thanks-file-input"),
+  thanksPhotoGrid: document.getElementById("thanks-photo-grid"),
+  thanksTitle1: document.getElementById("thanks-title1"),
+  thanksTitle2: document.getElementById("thanks-title2"),
+  thanksDateText: document.getElementById("thanks-date-text"),
+  thanksTheme: document.getElementById("thanks-theme"),
+  thanksHeaderLine1: document.getElementById("thanks-header-line1"),
+  thanksHeaderLine2: document.getElementById("thanks-header-line2"),
+  thanksSpeed: document.getElementById("thanks-speed"),
+  thanksEntryList: document.getElementById("thanks-entry-list"),
+  addThanksEntryBtn: document.getElementById("add-thanks-entry-btn"),
 
   dropzone: document.getElementById("dropzone"),
   fileInput: document.getElementById("file-input"),
@@ -71,8 +116,12 @@ const els = {
   endMessage: document.getElementById("end-message"),
   themeSelect: document.getElementById("theme-select"),
   photoDuration: document.getElementById("photo-duration"),
+  photoDisplayScale: document.getElementById("photo-display-scale"),
   transitionType: document.getElementById("transition-type"),
   transitionDuration: document.getElementById("transition-duration"),
+  captionStyle: document.getElementById("caption-style"),
+  captionFontSize: document.getElementById("caption-font-size"),
+  captionFade: document.getElementById("caption-fade"),
 
   opGroomName: document.getElementById("op-groom-name"),
   opGroomSub1: document.getElementById("op-groom-sub1"),
@@ -82,8 +131,22 @@ const els = {
   opBrideSub2: document.getElementById("op-bride-sub2"),
   opNeonColor: document.getElementById("op-neon-color"),
   opPhotoDuration: document.getElementById("op-photo-duration"),
+  opPhotoDisplayScale: document.getElementById("op-photo-display-scale"),
   opTransitionType: document.getElementById("op-transition-type"),
   opTransitionDuration: document.getElementById("op-transition-duration"),
+  opCaptionStyle: document.getElementById("op-caption-style"),
+  opCaptionFontSize: document.getElementById("op-caption-font-size"),
+  opCaptionFade: document.getElementById("op-caption-fade"),
+
+  endrollTitle1: document.getElementById("endroll-title1"),
+  endrollTitle2: document.getElementById("endroll-title2"),
+  endrollDateText: document.getElementById("endroll-date-text"),
+  endrollTheme: document.getElementById("endroll-theme"),
+  endrollHeaderLine1: document.getElementById("endroll-header-line1"),
+  endrollHeaderLine2: document.getElementById("endroll-header-line2"),
+  endrollSpeed: document.getElementById("endroll-speed"),
+  guestMessageList: document.getElementById("guest-message-list"),
+  addGuestMessageBtn: document.getElementById("add-guest-message-btn"),
 
   groomDropzone: document.getElementById("groom-dropzone"),
   groomFileInput: document.getElementById("groom-file-input"),
@@ -127,9 +190,44 @@ const els = {
   canvas: document.getElementById("render-canvas"),
 };
 
+// 数値入力欄の値をパースする。`Number(value) || fallback` だと、ユーザーが
+// 有効な範囲外の値として0を入力した場合に「未入力」と区別できず、後続の
+// クランプ処理より先にfallback（既定値）へ置き換わってしまう（例:
+// 最小値30・既定値100の欄に0を入力すると、本来は30にクランプされるべき
+// ところ100に戻ってしまう）。空欄・非数値のときだけfallbackを使う。
+function numOr(value, fallback) {
+  if (typeof value === "string" && value.trim() === "") return fallback;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 function getTemplate() {
   const checked = document.querySelector('input[name="template"]:checked');
   return checked ? checked.value : "standard";
+}
+
+// エンドロール／2人のプロフィール／親への感謝ムービーは、いずれも「本のページを
+// めくる」同じ演出エンジン（buildEndRollPages/computeEndRollTimeline/drawEndRollPage
+// など）を使い回す。この3テンプレートで共通の設定オブジェクトの形を1か所にまとめ、
+// 各テンプレート固有の入力欄・データだけを引数で渡す（フィールド名は歴史的経緯で
+// endroll*のままだが、内部実装の詳細でありどのテンプレートでも同じ意味で使われる）。
+function buildRollSettings({ template, titleEl1, titleEl2, dateEl, themeEl, headerLine1El, headerLine1Fallback, headerLine2El, speedEl, entries, photos }) {
+  const speedMultiplier = ENDROLL_SPEED_MAP[speedEl.value] || ENDROLL_SPEED_MAP.normal;
+  return {
+    template,
+    title1: titleEl1.value.trim(),
+    title2: titleEl2.value.trim(),
+    dateText: dateEl.value.trim(),
+    theme: THEMES[themeEl.value] || THEMES.pink,
+    endrollThemeKey: themeEl.value || "pink",
+    transitionType: "pageflip",
+    transitionDuration: Math.min(Math.max(0.9 * speedMultiplier, 0.5), 1.3),
+    endrollHeaderLine1: headerLine1El.value.trim() || headerLine1Fallback,
+    endrollHeaderLine2: headerLine2El.value.trim(),
+    endrollSpeed: speedMultiplier,
+    guestMessages: entries,
+    endrollPhotos: photos,
+  };
 }
 
 function getSettings() {
@@ -138,9 +236,13 @@ function getSettings() {
     return {
       template,
       theme: NEON_THEMES[els.opNeonColor.value] || NEON_THEMES.pink,
-      photoDuration: Math.min(Math.max(Number(els.opPhotoDuration.value) || 1, 0.4), 3),
+      photoDuration: Math.min(Math.max(numOr(els.opPhotoDuration.value, 1), 0.4), 3),
+      photoDisplayScale: Math.min(Math.max(numOr(els.opPhotoDisplayScale.value, 100), 30), 100),
       transitionType: els.opTransitionType.value || "flash",
-      transitionDuration: Math.min(Math.max(Number(els.opTransitionDuration.value) || 0.3, 0.15), 1),
+      transitionDuration: Math.min(Math.max(numOr(els.opTransitionDuration.value, 0.3), 0.15), 1),
+      captionStyle: els.opCaptionStyle.value || "simple",
+      captionFontSize: Math.min(Math.max(numOr(els.opCaptionFontSize.value, 32), 16), 64),
+      captionFade: els.opCaptionFade.value || "fade",
       groomName: (els.opGroomName.value || "GROOM").trim().toUpperCase(),
       groomSub1: els.opGroomSub1.value.trim(),
       groomSub2: els.opGroomSub2.value.trim(),
@@ -152,6 +254,51 @@ function getSettings() {
       togetherPhotos: togetherGroup.photos,
     };
   }
+  if (template === "endroll") {
+    return buildRollSettings({
+      template,
+      titleEl1: els.endrollTitle1,
+      titleEl2: els.endrollTitle2,
+      dateEl: els.endrollDateText,
+      themeEl: els.endrollTheme,
+      headerLine1El: els.endrollHeaderLine1,
+      headerLine1Fallback: "Thank You",
+      headerLine2El: els.endrollHeaderLine2,
+      speedEl: els.endrollSpeed,
+      entries: guestMessageManager.entries,
+      photos: endrollGroup.photos,
+    });
+  }
+  if (template === "profile") {
+    return buildRollSettings({
+      template,
+      titleEl1: els.profileTitle1,
+      titleEl2: els.profileTitle2,
+      dateEl: els.profileDateText,
+      themeEl: els.profileTheme,
+      headerLine1El: els.profileHeaderLine1,
+      headerLine1Fallback: "Profile",
+      headerLine2El: els.profileHeaderLine2,
+      speedEl: els.profileSpeed,
+      entries: profileEntryManager.entries,
+      photos: profileGroup.photos,
+    });
+  }
+  if (template === "thanks") {
+    return buildRollSettings({
+      template,
+      titleEl1: els.thanksTitle1,
+      titleEl2: els.thanksTitle2,
+      dateEl: els.thanksDateText,
+      themeEl: els.thanksTheme,
+      headerLine1El: els.thanksHeaderLine1,
+      headerLine1Fallback: "Thank You",
+      headerLine2El: els.thanksHeaderLine2,
+      speedEl: els.thanksSpeed,
+      entries: thanksEntryManager.entries,
+      photos: thanksGroup.photos,
+    });
+  }
   return {
     template,
     title1: els.title1.value.trim(),
@@ -159,9 +306,13 @@ function getSettings() {
     dateText: els.dateText.value.trim(),
     endMessage: els.endMessage.value.trim() || "Thank You",
     theme: THEMES[els.themeSelect.value] || THEMES.pink,
-    photoDuration: Math.min(Math.max(Number(els.photoDuration.value) || 4, 1.5), 10),
+    photoDuration: Math.min(Math.max(numOr(els.photoDuration.value, 4), 1.5), 10),
+    photoDisplayScale: Math.min(Math.max(numOr(els.photoDisplayScale.value, 100), 30), 100),
     transitionType: els.transitionType.value || "crossfade",
-    transitionDuration: Math.min(Math.max(Number(els.transitionDuration.value) || 0.8, 0.3), 2),
+    transitionDuration: Math.min(Math.max(numOr(els.transitionDuration.value, 0.8), 0.3), 2),
+    captionStyle: els.captionStyle.value || "simple",
+    captionFontSize: Math.min(Math.max(numOr(els.captionFontSize.value, 32), 16), 64),
+    captionFade: els.captionFade.value || "fade",
     photos: standardGroup.photos,
   };
 }
@@ -246,7 +397,7 @@ function capImageSize(img) {
 // 写真の追加・並べ替え・キャプション入力・削除をまとめたUIコンポーネント。
 // スタンダードの単一グループと、オープニング演出の新郎/新婦/2人パートの
 // 3グループで同じロジックを使い回す。
-function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
+function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange, endrollGroupField = false }) {
   const group = { photos: [], nextId: 1 };
 
   function render() {
@@ -296,11 +447,11 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
 
       if (photo.kind === "video") {
         const clipLabel = document.createElement("label");
-        clipLabel.className = "video-clip-label";
+        clipLabel.className = "photo-field-label";
         clipLabel.textContent = "使用秒数";
         const clipInput = document.createElement("input");
         clipInput.type = "number";
-        clipInput.className = "video-clip-input";
+        clipInput.className = "photo-field-input";
         clipInput.min = "0.5";
         clipInput.max = String(Math.min(photo.naturalDuration, MAX_VIDEO_CLIP_SECONDS));
         clipInput.step = "0.5";
@@ -309,11 +460,40 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
         clipInput.title = `動画本編の長さ: 約${photo.naturalDuration.toFixed(1)}秒`;
         clipInput.addEventListener("input", () => {
           const maxAllowed = Math.min(photo.naturalDuration, MAX_VIDEO_CLIP_SECONDS);
-          photo.clipSeconds = Math.min(Math.max(Number(clipInput.value) || 1, 0.5), maxAllowed);
+          photo.clipSeconds = Math.min(Math.max(numOr(clipInput.value, 1), 0.5), maxAllowed);
           onChange();
         });
         clipLabel.appendChild(clipInput);
         item.appendChild(clipLabel);
+      } else {
+        // 動画を当てこむ際など、写真ごとに表示秒数を個別調整したい場合の上書き設定。
+        // エンドロールの背景写真の場合は、同じグループのページ内でスライドショーに
+        // なったときの、その写真1枚分の表示秒数（空欄なら既定の長さ）になる。
+        const durLabel = document.createElement("label");
+        durLabel.className = "photo-field-label";
+        durLabel.textContent = "表示秒数";
+        const durInput = document.createElement("input");
+        durInput.type = "number";
+        durInput.className = "photo-field-input";
+        durInput.min = "0.2";
+        durInput.max = "20";
+        durInput.step = "0.1";
+        durInput.placeholder = endrollGroupField ? "既定（自動）" : "共通";
+        durInput.value = photo.duration != null ? photo.duration : "";
+        durInput.draggable = false;
+        durInput.title = endrollGroupField
+          ? "空欄の場合は既定の長さ（「ページを開いておく時間」の設定に応じて自動）が使われます"
+          : "空欄の場合は共通設定（1枚あたりの表示時間）が使われます";
+        durInput.addEventListener("input", () => {
+          if (durInput.value.trim() === "") {
+            photo.duration = null;
+          } else {
+            photo.duration = Math.min(Math.max(numOr(durInput.value, 0.2), 0.2), 20);
+          }
+          onChange();
+        });
+        durLabel.appendChild(durInput);
+        item.appendChild(durLabel);
       }
 
       const captionInput = document.createElement("input");
@@ -327,6 +507,123 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
         photo.caption = captionInput.value;
       });
       item.appendChild(captionInput);
+
+      if (endrollGroupField) {
+        // この写真を、下の項目一覧の特定の「グループ」ページの背景専用にしたい場合の指定欄。
+        // 項目一覧のグループ欄と同じ名前を入れると、そのグループのページ（つづきページも
+        // 含む）すべての背景にこの写真が使われる（エンドロール／2人のプロフィール／
+        // 親への感謝ムービーのいずれでも同じ仕組みを使う）。空欄の写真は、専用の写真が
+        // 無いグループにこれまで通り順番に割り当てられる。
+        const bgGroupLabel = document.createElement("label");
+        bgGroupLabel.className = "photo-field-label";
+        bgGroupLabel.textContent = "背景にするグループ";
+        const bgGroupInput = document.createElement("input");
+        bgGroupInput.type = "text";
+        bgGroupInput.className = "photo-field-input";
+        bgGroupInput.placeholder = "未指定（順番に自動割り当て）";
+        bgGroupInput.maxLength = MAX_GUEST_GROUP_LENGTH;
+        bgGroupInput.value = photo.endrollGroup || "";
+        bgGroupInput.draggable = false;
+        bgGroupInput.title = "下の項目一覧の「グループ」欄と同じ名前を入れると、そのグループのページの背景にこの写真が使われます";
+        bgGroupInput.addEventListener("input", () => {
+          photo.endrollGroup = bgGroupInput.value;
+          onChange();
+        });
+        bgGroupLabel.appendChild(bgGroupInput);
+        item.appendChild(bgGroupLabel);
+      }
+
+      // 詳細設定（この写真だけの文字サイズ・エフェクト・表示サイズの上書き）。
+      // 空欄／「共通」のときは共通設定に従う。
+      const advanced = document.createElement("details");
+      advanced.className = "photo-advanced";
+      advanced.draggable = false;
+      const summary = document.createElement("summary");
+      summary.textContent = "詳細設定";
+      advanced.appendChild(summary);
+      const advancedFields = document.createElement("div");
+      advancedFields.className = "photo-advanced-fields";
+
+      const fontSizeLabel = document.createElement("label");
+      fontSizeLabel.className = "photo-field-label";
+      fontSizeLabel.textContent = "文字サイズ(px)";
+      const fontSizeInput = document.createElement("input");
+      fontSizeInput.type = "number";
+      fontSizeInput.className = "photo-field-input";
+      fontSizeInput.min = "16";
+      fontSizeInput.max = "64";
+      fontSizeInput.step = "2";
+      fontSizeInput.placeholder = "共通";
+      fontSizeInput.value = photo.captionFontSize != null ? photo.captionFontSize : "";
+      fontSizeInput.draggable = false;
+      fontSizeInput.title = "空欄の場合は共通設定（キャプションの文字サイズ）が使われます";
+      fontSizeInput.addEventListener("input", () => {
+        if (fontSizeInput.value.trim() === "") {
+          photo.captionFontSize = null;
+        } else {
+          photo.captionFontSize = Math.min(Math.max(numOr(fontSizeInput.value, 16), 16), 64);
+        }
+        onChange();
+      });
+      fontSizeLabel.appendChild(fontSizeInput);
+      advancedFields.appendChild(fontSizeLabel);
+
+      const fadeLabel = document.createElement("label");
+      fadeLabel.className = "photo-field-label";
+      fadeLabel.textContent = "文字のエフェクト";
+      const fadeSelect = document.createElement("select");
+      fadeSelect.className = "photo-field-input";
+      fadeSelect.draggable = false;
+      fadeSelect.title = "「共通」の場合は共通設定（キャプションの出し方）が使われます";
+      [
+        ["", "共通"],
+        ["fade", "フェード"],
+        ["slide", "スライド＋フェード"],
+        ["sparkle", "キラキラ出現"],
+        ["typewriter", "タイプライター"],
+        ["bounce", "バウンド"],
+        ["zoomin", "ズーム出現"],
+        ["none", "常に表示"],
+      ].forEach(([value, label]) => {
+        const opt = document.createElement("option");
+        opt.value = value;
+        opt.textContent = label;
+        fadeSelect.appendChild(opt);
+      });
+      fadeSelect.value = photo.captionFade || "";
+      fadeSelect.addEventListener("change", () => {
+        photo.captionFade = fadeSelect.value || null;
+        onChange();
+      });
+      fadeLabel.appendChild(fadeSelect);
+      advancedFields.appendChild(fadeLabel);
+
+      const sizeLabel = document.createElement("label");
+      sizeLabel.className = "photo-field-label";
+      sizeLabel.textContent = "写真の表示サイズ(%)";
+      const sizeInput = document.createElement("input");
+      sizeInput.type = "number";
+      sizeInput.className = "photo-field-input";
+      sizeInput.min = "30";
+      sizeInput.max = "100";
+      sizeInput.step = "5";
+      sizeInput.placeholder = "共通";
+      sizeInput.value = photo.displayScale != null ? photo.displayScale : "";
+      sizeInput.draggable = false;
+      sizeInput.title = "空欄の場合は共通設定（写真の表示サイズ）が使われます";
+      sizeInput.addEventListener("input", () => {
+        if (sizeInput.value.trim() === "") {
+          photo.displayScale = null;
+        } else {
+          photo.displayScale = Math.min(Math.max(numOr(sizeInput.value, 30), 30), 100);
+        }
+        onChange();
+      });
+      sizeLabel.appendChild(sizeInput);
+      advancedFields.appendChild(sizeLabel);
+
+      advanced.appendChild(advancedFields);
+      item.appendChild(advanced);
 
       item.addEventListener("dragstart", (e) => {
         e.dataTransfer.setData("text/plain", String(photo.id));
@@ -387,7 +684,17 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
         }
         try {
           const videoItem = await loadVideoItem(file);
-          group.photos.push({ id: group.nextId++, kind: "video", caption: "", file, ...videoItem });
+          group.photos.push({
+            id: group.nextId++,
+            kind: "video",
+            caption: "",
+            file,
+            captionFontSize: null,
+            captionFade: null,
+            displayScale: null,
+            endrollGroup: "",
+            ...videoItem,
+          });
           videoCount++;
         } catch (err) {
           skippedInvalid++;
@@ -403,7 +710,19 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
       try {
         const rawImg = await loadImage(url);
         const renderSource = capImageSize(rawImg);
-        group.photos.push({ id: group.nextId++, kind: "image", url, img: renderSource, file, caption: "" });
+        group.photos.push({
+          id: group.nextId++,
+          kind: "image",
+          url,
+          img: renderSource,
+          file,
+          caption: "",
+          duration: null,
+          captionFontSize: null,
+          captionFade: null,
+          displayScale: null,
+          endrollGroup: "",
+        });
       } catch (err) {
         skippedInvalid++;
         URL.revokeObjectURL(url);
@@ -462,6 +781,10 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
             kind: "video",
             caption: saved.caption || "",
             file,
+            captionFontSize: saved.captionFontSize != null ? saved.captionFontSize : null,
+            captionFade: saved.captionFade || null,
+            displayScale: saved.displayScale != null ? saved.displayScale : null,
+            endrollGroup: saved.endrollGroup || "",
             ...videoItem,
             clipSeconds: Math.min(saved.clipSeconds || videoItem.clipSeconds, maxAllowed),
           });
@@ -473,7 +796,19 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange }) {
         try {
           const rawImg = await loadImage(url);
           const renderSource = capImageSize(rawImg);
-          group.photos.push({ id: group.nextId++, kind: "image", url, img: renderSource, file, caption: saved.caption || "" });
+          group.photos.push({
+            id: group.nextId++,
+            kind: "image",
+            url,
+            img: renderSource,
+            file,
+            caption: saved.caption || "",
+            duration: saved.duration != null ? saved.duration : null,
+            captionFontSize: saved.captionFontSize != null ? saved.captionFontSize : null,
+            captionFade: saved.captionFade || null,
+            displayScale: saved.displayScale != null ? saved.displayScale : null,
+            endrollGroup: saved.endrollGroup || "",
+          });
         } catch (err) {
           URL.revokeObjectURL(url);
         }
@@ -512,17 +847,64 @@ const togetherGroup = createPhotoGroup({
   fileInputEl: els.togetherFileInput,
   onChange: () => updateDurationEstimate(),
 });
+const endrollGroup = createPhotoGroup({
+  gridEl: els.endrollPhotoGrid,
+  dropzoneEl: els.endrollDropzone,
+  fileInputEl: els.endrollFileInput,
+  onChange: () => updateDurationEstimate(),
+  endrollGroupField: true,
+});
+const profileGroup = createPhotoGroup({
+  gridEl: els.profilePhotoGrid,
+  dropzoneEl: els.profileDropzone,
+  fileInputEl: els.profileFileInput,
+  onChange: () => updateDurationEstimate(),
+  endrollGroupField: true,
+});
+const thanksGroup = createPhotoGroup({
+  gridEl: els.thanksPhotoGrid,
+  dropzoneEl: els.thanksDropzone,
+  fileInputEl: els.thanksFileInput,
+  onChange: () => updateDurationEstimate(),
+  endrollGroupField: true,
+});
 
 document.querySelectorAll('input[name="template"]').forEach((radio) => {
-  radio.addEventListener("change", updateTemplateVisibility);
+  radio.addEventListener("change", () => {
+    // ユーザーが自分でテンプレートを切り替えた時だけステータス表示をクリアする。
+    // updateTemplateVisibility()自体はrestoreDraftData()からも内部的に呼ばれる
+    // ため、そちらでクリアすると「復元中…」の表示が復元完了前に消えてしまう。
+    els.draftStatus.textContent = "";
+    updateTemplateVisibility();
+  });
 });
 
 function updateTemplateVisibility() {
-  const isOpening = getTemplate() === "opening";
-  els.standardPhotosSection.classList.toggle("hidden", isOpening);
-  els.standardSettingsSection.classList.toggle("hidden", isOpening);
+  const template = getTemplate();
+  const isStandard = template === "standard";
+  const isOpening = template === "opening";
+  const isEndroll = template === "endroll";
+  const isProfile = template === "profile";
+  const isThanks = template === "thanks";
+  els.standardPhotosSection.classList.toggle("hidden", !isStandard);
+  els.standardSettingsSection.classList.toggle("hidden", !isStandard);
   els.openingSection.classList.toggle("hidden", !isOpening);
   els.openingPhotosSection.classList.toggle("hidden", !isOpening);
+  els.endrollSection.classList.toggle("hidden", !isEndroll);
+  els.endrollPhotosSection.classList.toggle("hidden", !isEndroll);
+  els.endrollMessagesSection.classList.toggle("hidden", !isEndroll);
+  els.profileSection.classList.toggle("hidden", !isProfile);
+  els.profilePhotosSection.classList.toggle("hidden", !isProfile);
+  els.profileEntriesSection.classList.toggle("hidden", !isProfile);
+  els.thanksSection.classList.toggle("hidden", !isThanks);
+  els.thanksPhotosSection.classList.toggle("hidden", !isThanks);
+  els.thanksEntriesSection.classList.toggle("hidden", !isThanks);
+  // 下書きの有無はテンプレートごとに非同期(IndexedDB)で確認するため、確認が
+  // 終わるまでの一瞬、前のテンプレートの下書き情報（保存日時など）が誤って
+  // 表示され続けることがないよう、切り替えた瞬間にいったん隠しておく。
+  els.draftRestoreBox.classList.add("hidden");
+  els.deleteDraftBtn.classList.add("hidden");
+  refreshDraftUIForCurrentTemplate();
   updateDurationEstimate();
 }
 
@@ -537,7 +919,24 @@ function updateTemplateVisibility() {
   els.endMessage,
   els.opGroomName,
   els.opBrideName,
+  els.endrollTitle1,
+  els.endrollTitle2,
+  els.endrollDateText,
+  els.endrollHeaderLine1,
+  els.endrollHeaderLine2,
+  els.profileTitle1,
+  els.profileTitle2,
+  els.profileDateText,
+  els.profileHeaderLine1,
+  els.profileHeaderLine2,
+  els.thanksTitle1,
+  els.thanksTitle2,
+  els.thanksDateText,
+  els.thanksHeaderLine1,
+  els.thanksHeaderLine2,
 ].forEach((el) => el.addEventListener("input", updateDurationEstimate));
+
+[els.endrollSpeed, els.profileSpeed, els.thanksSpeed].forEach((el) => el.addEventListener("change", updateDurationEstimate));
 
 // --- BGM（複数曲）の追加・並べ替え ---
 
@@ -599,6 +998,192 @@ function renderBgmList() {
 function updateAddBgmButtonState() {
   els.addBgmBtn.disabled = state.bgmFiles.length === 0;
 }
+
+// --- 「本のページをめくる」演出3テンプレート共通: 項目一覧
+// （エンドロールの「お名前＋メッセージ」、2人のプロフィールの「質問＋回答」、
+// 親への感謝ムービーの「見出し＋メッセージ」は、どれも「グループ・1行目・
+// 2行目」という同じデータ形なので、1つの汎用コンポーネントを使い回す） ---
+
+function createEntryListManager({
+  listEl,
+  addBtnEl,
+  maxEntries,
+  entryNoun,
+  groupPlaceholder,
+  groupTitle,
+  namePlaceholder,
+  nameMaxLength,
+  messagePlaceholder,
+  messageMaxLength,
+  onChange,
+}) {
+  const manager = { entries: [], nextId: 1 };
+
+  function render() {
+    listEl.innerHTML = "";
+    manager.entries.forEach((entry, index) => {
+      const row = document.createElement("div");
+      row.className = "guest-row";
+      row.draggable = true;
+      row.dataset.id = String(entry.id);
+
+      const top = document.createElement("div");
+      top.className = "guest-row-top";
+
+      const badge = document.createElement("span");
+      badge.className = "guest-order";
+      badge.textContent = String(index + 1);
+      top.appendChild(badge);
+
+      // グループ名（任意）。同じグループ名の行が連続していると、
+      // その名前の見出しがまとめて1回だけ表示される（並び順はドラッグで調整）。
+      const groupInput = document.createElement("input");
+      groupInput.type = "text";
+      groupInput.className = "guest-group-input";
+      groupInput.placeholder = groupPlaceholder;
+      groupInput.maxLength = MAX_GUEST_GROUP_LENGTH;
+      groupInput.value = entry.group || "";
+      groupInput.draggable = false;
+      groupInput.title = groupTitle;
+      groupInput.addEventListener("input", () => {
+        entry.group = groupInput.value;
+        onChange();
+      });
+      top.appendChild(groupInput);
+
+      const nameInput = document.createElement("input");
+      nameInput.type = "text";
+      nameInput.className = "guest-name-input";
+      nameInput.placeholder = namePlaceholder;
+      nameInput.maxLength = nameMaxLength;
+      nameInput.value = entry.name || "";
+      nameInput.draggable = false;
+      nameInput.addEventListener("input", () => {
+        entry.name = nameInput.value;
+        onChange();
+      });
+      top.appendChild(nameInput);
+
+      const removeBtn = document.createElement("button");
+      removeBtn.className = "guest-remove";
+      removeBtn.type = "button";
+      removeBtn.textContent = "×";
+      removeBtn.addEventListener("click", () => {
+        manager.entries = manager.entries.filter((g) => g.id !== entry.id);
+        render();
+        onChange();
+      });
+      top.appendChild(removeBtn);
+
+      row.appendChild(top);
+
+      const messageInput = document.createElement("textarea");
+      messageInput.className = "guest-message-input";
+      messageInput.placeholder = messagePlaceholder;
+      messageInput.maxLength = messageMaxLength;
+      messageInput.rows = 2;
+      messageInput.value = entry.message || "";
+      messageInput.draggable = false;
+      messageInput.addEventListener("input", () => {
+        entry.message = messageInput.value;
+        onChange();
+      });
+      row.appendChild(messageInput);
+
+      row.addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("text/plain", String(entry.id));
+        e.dataTransfer.effectAllowed = "move";
+      });
+      row.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        row.classList.add("drag-over");
+      });
+      row.addEventListener("dragleave", () => row.classList.remove("drag-over"));
+      row.addEventListener("drop", (e) => {
+        e.preventDefault();
+        row.classList.remove("drag-over");
+        const draggedId = Number(e.dataTransfer.getData("text/plain"));
+        if (draggedId === entry.id) return;
+        const fromIndex = manager.entries.findIndex((g) => g.id === draggedId);
+        const toIndex = manager.entries.findIndex((g) => g.id === entry.id);
+        if (fromIndex < 0 || toIndex < 0) return;
+        const [moved] = manager.entries.splice(fromIndex, 1);
+        manager.entries.splice(toIndex, 0, moved);
+        render();
+      });
+
+      listEl.appendChild(row);
+    });
+  }
+
+  function addEntry() {
+    if (manager.entries.length >= maxEntries) {
+      alert(`${entryNoun}は最大${maxEntries}件まで追加できます`);
+      return;
+    }
+    manager.entries.push({ id: manager.nextId++, name: "", group: "", message: "" });
+    render();
+    onChange();
+  }
+
+  // 下書き復元用: 保存されていた項目一覧で現在の内容をすべて置き換える。
+  function restoreItems(saved) {
+    manager.entries = (saved || []).map((e) => ({
+      id: manager.nextId++,
+      name: e.name || "",
+      group: e.group || "",
+      message: e.message || "",
+    }));
+    render();
+  }
+
+  addBtnEl.addEventListener("click", addEntry);
+  manager.render = render;
+  manager.restoreItems = restoreItems;
+  return manager;
+}
+
+const guestMessageManager = createEntryListManager({
+  listEl: els.guestMessageList,
+  addBtnEl: els.addGuestMessageBtn,
+  maxEntries: MAX_GUEST_MESSAGES,
+  entryNoun: "メッセージ",
+  groupPlaceholder: "グループ（任意）",
+  groupTitle: "例: 新郎友人、新婦友人、ご親族など。同じグループ名の行はまとめて見出しが表示されます",
+  namePlaceholder: "お名前",
+  nameMaxLength: MAX_GUEST_NAME_LENGTH,
+  messagePlaceholder: "メッセージ（任意）",
+  messageMaxLength: MAX_GUEST_MESSAGE_LENGTH,
+  onChange: () => updateDurationEstimate(),
+});
+
+const profileEntryManager = createEntryListManager({
+  listEl: els.profileEntryList,
+  addBtnEl: els.addProfileEntryBtn,
+  maxEntries: MAX_GUEST_MESSAGES,
+  entryNoun: "プロフィール項目",
+  groupPlaceholder: "グループ（任意）",
+  groupTitle: "例: 新郎、新婦など。同じグループ名の行はまとめて見出しが表示されます",
+  namePlaceholder: "質問",
+  nameMaxLength: MAX_GUEST_NAME_LENGTH,
+  messagePlaceholder: "回答（任意）",
+  messageMaxLength: MAX_GUEST_MESSAGE_LENGTH,
+  onChange: () => updateDurationEstimate(),
+});
+
+const thanksEntryManager = createEntryListManager({
+  listEl: els.thanksEntryList,
+  addBtnEl: els.addThanksEntryBtn,
+  maxEntries: MAX_GUEST_MESSAGES,
+  entryNoun: "メッセージ",
+  groupPlaceholder: "グループ（任意）",
+  groupTitle: "例: 新郎から、新婦から など。同じグループ名の行はまとめて見出しが表示されます",
+  namePlaceholder: "見出し（任意）",
+  nameMaxLength: MAX_GUEST_NAME_LENGTH,
+  messagePlaceholder: "メッセージ（任意）",
+  messageMaxLength: MAX_GUEST_MESSAGE_LENGTH,
+  onChange: () => updateDurationEstimate(),
+});
 
 function addBgmFiles(fileList) {
   const incoming = Array.from(fileList).filter((f) => looksLikeType(f, "audio/", AUDIO_EXTENSIONS));
@@ -687,7 +1272,8 @@ function introLines(settings) {
 // 合わせた長さ（beatSyncDuration）で統一する。
 function mediaDuration(item, settings) {
   if (settings.beatSyncDuration) return settings.beatSyncDuration;
-  return item.kind === "video" ? item.clipSeconds : settings.photoDuration;
+  if (item.kind === "video") return item.clipSeconds;
+  return item.duration != null ? item.duration : settings.photoDuration;
 }
 
 function computeStandardTimeline(settings) {
@@ -764,23 +1350,203 @@ function computeOpeningTimeline(settings) {
   return finalizeTimeline(segments, settings.transitionDuration, duckIndices);
 }
 
+const ENDROLL_MAX_TEXT_WIDTH = CANVAS_W - 200;
+const ENDROLL_MAX_ENTRIES_PER_PAGE = 4; // 1ページに入れる来賓の人数
+const ENDROLL_NAME_GAP = 36;
+const ENDROLL_MESSAGE_LINE_HEIGHT = 26;
+const ENDROLL_ENTRY_GAP = 30;
+const ENDROLL_PAGE_GROUP_HEADING_GAP = 40;
+
+// タイピング演出（お名前→メッセージの順に1人ずつ1文字ずつ打ち込まれる）のペース。
+// settings.endrollSpeed（遅い/標準/速い）を掛けて全体の速さを調整する。
+const ENDROLL_TYPE_CHAR_SEC = 0.05; // 1文字あたりの基準タイピング時間
+const ENDROLL_TYPE_NAME_MIN_SEC = 0.45; // お名前が短くても一瞬で表示されないための最低時間
+const ENDROLL_TYPE_GAP_SEC = 0.25; // お名前とメッセージの間の間
+const ENDROLL_TYPE_INITIAL_DELAY = 0.35; // ページが開いてから1人目が打ち始まるまで
+const ENDROLL_TYPE_ENTRY_GAP = 0.3; // 1人分打ち終えてから次の人が始まるまで
+const ENDROLL_TYPE_FINAL_HOLD = 1.1; // 全員打ち終えてからページがめくれるまでの余韻
+
+// 各来賓のお名前・メッセージを1人ずつ順番にタイピングするためのスケジュール
+// （開始タイミングと所要時間）を計算する。ページの表示時間の算出と実際の描画の
+// 両方で使うため、必ずこの関数を通して同じ値を共有する。
+function computeEndRollTypingSchedule(entries, speed) {
+  let cursor = ENDROLL_TYPE_INITIAL_DELAY * speed;
+  return entries.map((entry) => {
+    const nameLen = (entry.name || "").length;
+    const messageLen = (entry.message || "").length;
+    const nameDur = nameLen > 0 ? Math.max(nameLen * ENDROLL_TYPE_CHAR_SEC, ENDROLL_TYPE_NAME_MIN_SEC) * speed : 0;
+    const gapDur = nameDur > 0 && messageLen > 0 ? ENDROLL_TYPE_GAP_SEC * speed : 0;
+    const messageDur = messageLen > 0 ? messageLen * ENDROLL_TYPE_CHAR_SEC * speed : 0;
+    const start = cursor;
+    cursor += nameDur + gapDur + messageDur + ENDROLL_TYPE_ENTRY_GAP * speed;
+    return { entry, start, nameDur, gapDur, messageDur };
+  });
+}
+
+// 来賓メッセージを「グループ」でまとめ、1ページにENDROLL_MAX_ENTRIES_PER_PAGE人まで
+// 入るように区切って、ページ（本のページに相当する単位）の配列にする。グループ名が
+// 同じ行は並び順に関係なく1つのグループとしてまとめる（初出のグループ順でページ化）。
+// 人数が多いグループは同じグループ内で複数ページに分割する（つづきページ）。
+function buildEndRollPages(settings) {
+  const order = [];
+  const buckets = new Map();
+  settings.guestMessages.forEach((entry) => {
+    const key = (entry.group || "").trim();
+    if (!buckets.has(key)) {
+      buckets.set(key, []);
+      order.push(key);
+    }
+    buckets.get(key).push(entry);
+  });
+
+  const pages = [];
+  const pagesByGroup = new Map();
+  order.forEach((groupName) => {
+    const entries = buckets.get(groupName);
+    const groupPages = [];
+    for (let i = 0; i < entries.length; i += ENDROLL_MAX_ENTRIES_PER_PAGE) {
+      const page = {
+        group: groupName,
+        isContinuation: i > 0,
+        entries: entries.slice(i, i + ENDROLL_MAX_ENTRIES_PER_PAGE),
+        photos: [],
+      };
+      pages.push(page);
+      groupPages.push(page);
+    }
+    pagesByGroup.set(groupName, groupPages);
+  });
+
+  // 写真ごとに「背景にするグループ」が指定されていれば、そのグループ名と一致する
+  // ページ（つづきページも含む）の背景に使う。同じグループ名の写真が複数あれば、
+  // そのグループのページ数に応じて均等に振り分け、1ページに複数枚割り当たった
+  // 場合はそのページの中でスライドショーのように順番に切り替わる（1ページしか
+  // ないグループでも、複数枚設定すればそのページ内で全部使われる）。ページ数の
+  // 方が写真の枚数より多い場合は、足りない分だけ先頭の写真に戻って繰り返す。
+  // グループ未指定の写真は、これまで通り順番に、専用の写真が無いグループの
+  // 最初のページにだけ割り当てる。
+  const photos = settings.endrollPhotos || [];
+  const targetedByGroup = new Map();
+  const untargeted = [];
+  photos.forEach((photo) => {
+    const key = (photo.endrollGroup || "").trim();
+    if (key) {
+      if (!targetedByGroup.has(key)) targetedByGroup.set(key, []);
+      targetedByGroup.get(key).push(photo);
+    } else {
+      untargeted.push(photo);
+    }
+  });
+
+  targetedByGroup.forEach((targetedList, groupName) => {
+    const groupPages = pagesByGroup.get(groupName) || [];
+    groupPages.forEach((page, j) => {
+      const assigned = targetedList.filter((_, idx) => idx % groupPages.length === j);
+      page.photos = assigned.length > 0 ? assigned : [targetedList[j % targetedList.length]];
+    });
+  });
+
+  let untargetedIndex = 0;
+  pages.forEach((page) => {
+    if (page.photos.length > 0) return; // 専用の写真が既に割り当て済み
+    if (!page.isContinuation && untargeted.length > 0) {
+      page.photos = [untargeted[untargetedIndex % untargeted.length]];
+      untargetedIndex++;
+    }
+  });
+
+  return pages;
+}
+
+const ENDROLL_PHOTO_DEFAULT_SLIDE_SEC = 3; // 背景写真の表示秒数が未設定の場合の既定の長さ（×speed）
+
+// ページに紐づく背景写真それぞれの表示秒数（個別に設定されていればその値、
+// 未設定なら既定値×speed）を配列で返す。ページの表示時間の算出と、実際の
+// スライドショー描画の両方で使うため、必ずこの関数を通して同じ値を共有する。
+function endRollPhotoSlideDurations(photos, speed) {
+  return (photos || []).map((p) => (p.duration != null ? p.duration : ENDROLL_PHOTO_DEFAULT_SLIDE_SEC * speed));
+}
+
+// 1ページに大量の背景写真（最大でMAX_PHOTOS枚、1枚あたり最大20秒）を割り当てると
+// 表示秒数の合計が際限なく伸びてしまうため、1ページあたりの上限として設ける
+// （動画全体が意図せず極端に長くなり、書き出しに失敗・長時間化するのを防ぐ）。
+const ENDROLL_PAGE_MAX_DURATION_SEC = 120;
+
+// ページの表示時間を、タイピング演出が最後まで打ち終わって少し余韻が残るのに
+// 十分な長さと、背景写真のスライドショーに必要な長さ（各写真の表示秒数の合計）の
+// 両方を満たすように算出する（ただし際限なく伸びないよう上限を設ける）。
+function computeEndRollPageDuration(page, settings) {
+  const speed = settings.endrollSpeed;
+  const schedule = computeEndRollTypingSchedule(page.entries, speed);
+  const last = schedule[schedule.length - 1];
+  const typingEnd = last ? last.start + last.nameDur + last.gapDur + last.messageDur : ENDROLL_TYPE_INITIAL_DELAY * speed;
+  const groupReadTime = page.group ? 0.6 * speed : 0;
+  const typingBasedDuration = Math.min(Math.max(typingEnd + groupReadTime + ENDROLL_TYPE_FINAL_HOLD * speed, 3), 20);
+  const slidesDuration = endRollPhotoSlideDurations(page.photos, speed).reduce((sum, d) => sum + d, 0);
+  return Math.min(Math.max(typingBasedDuration, slidesDuration), ENDROLL_PAGE_MAX_DURATION_SEC);
+}
+
+function computeEndRollTimeline(settings) {
+  const segments = [];
+  segments.push({ type: "title", duration: INTRO_DUR, lines: introLines(settings) });
+
+  const headerSeconds = (settings.endrollHeaderLine2 ? 3.5 : 2.5) * settings.endrollSpeed;
+  segments.push({
+    type: "endroll-page",
+    duration: Math.max(headerSeconds, 2.5),
+    isHeaderPage: true,
+    headerLine1: settings.endrollHeaderLine1,
+    headerLine2: settings.endrollHeaderLine2,
+  });
+
+  buildEndRollPages(settings).forEach((page) => {
+    segments.push({
+      type: "endroll-page",
+      duration: computeEndRollPageDuration(page, settings),
+      group: page.group,
+      isContinuation: page.isContinuation,
+      entries: page.entries,
+      photos: page.photos,
+    });
+  });
+
+  return finalizeTimeline(segments, settings.transitionDuration);
+}
+
+// 「本のページをめくる」演出を共有する3テンプレート（エンドロール／2人のプロフィール／
+// 親への感謝ムービー）。settings.templateがこのいずれかであれば、同じcomputeEndRollTimeline
+// 等の関数で処理する。
+const ROLL_TEMPLATES = ["endroll", "profile", "thanks"];
+
 function computeTimeline(settings) {
-  return settings.template === "opening" ? computeOpeningTimeline(settings) : computeStandardTimeline(settings);
+  if (settings.template === "opening") return computeOpeningTimeline(settings);
+  if (ROLL_TEMPLATES.includes(settings.template)) return computeEndRollTimeline(settings);
+  return computeStandardTimeline(settings);
 }
 
 function countPhotos(settings) {
   if (settings.template === "opening") {
     return settings.groomPhotos.length + settings.bridePhotos.length + settings.togetherPhotos.length;
   }
+  if (ROLL_TEMPLATES.includes(settings.template)) {
+    return settings.guestMessages.length;
+  }
   return settings.photos.length;
 }
+
+// ROLL_TEMPLATES各テンプレートの、項目数を表す言葉（想定の動画の長さの表示用）。
+const ROLL_ENTRY_NOUNS = { endroll: "来賓メッセージ", profile: "プロフィール項目", thanks: "メッセージ" };
 
 function updateDurationEstimate() {
   const settings = getSettings();
   const { total } = computeTimeline(settings);
   const mins = Math.floor(total / 60);
   const secs = Math.round(total % 60);
-  els.durationEstimate.textContent = `写真・動画 ${countPhotos(settings)}点 / 想定の動画の長さ: 約${mins > 0 ? mins + "分" : ""}${secs}秒`;
+  const rollNoun = ROLL_ENTRY_NOUNS[settings.template];
+  const countLabel = rollNoun
+    ? `${rollNoun} ${countPhotos(settings)}件・ページの写真 ${settings.endrollPhotos.length}枚`
+    : `写真・動画 ${countPhotos(settings)}点`;
+  els.durationEstimate.textContent = `${countLabel} / 想定の動画の長さ: 約${mins > 0 ? mins + "分" : ""}${secs}秒`;
 }
 
 // --- 描画 ---
@@ -844,32 +1610,214 @@ function drawTitleCard(ctx, seg, localT, settings) {
   ctx.restore();
 }
 
-function drawCaption(ctx, text, localT, duration, theme) {
-  const alpha = fadeAlpha(localT, duration, Math.min(FADE, duration / 2));
-  if (alpha <= 0) return;
+function roundRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function easeOutBack(x) {
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
+}
+
+// キャプションの見せ方（フェード/スライド＋フェード/キラキラ出現/タイプライター/
+// バウンド/ズーム出現/常に表示）に応じて、透明度・スライド量・拡大率・文字の
+// 表示割合（タイプライター用）を計算する。
+function captionMotion(localT, duration, fadeMode) {
+  const fadeLen = Math.min(FADE, duration / 2);
+  const inProgress = fadeLen > 0 ? Math.min(Math.max(localT / fadeLen, 0), 1) : 1;
+  const outProgress = fadeLen > 0 ? Math.min(Math.max((duration - localT) / fadeLen, 0), 1) : 1;
+  const edge = Math.min(inProgress, outProgress, 1);
+
+  if (fadeMode === "none") {
+    return { alpha: 1, offsetY: 0, scale: 1, reveal: 1 };
+  }
+  if (fadeMode === "slide") {
+    return { alpha: edge, offsetY: (1 - edge) * 26, scale: 1, reveal: 1 };
+  }
+  if (fadeMode === "sparkle") {
+    const ease = 1 - Math.pow(1 - inProgress, 3);
+    // フェードだけでなく、下から浮かび上がるように少し大きめのスライド量を使う。
+    return { alpha: edge, offsetY: (1 - ease) * 34, scale: 1, reveal: 1 };
+  }
+  if (fadeMode === "typewriter") {
+    // 1文字ずつ打ち込まれるように表示する（CapCutのタイプライター演出風）。
+    const revealDur = Math.min(1.2, Math.max(duration * 0.6, 0.01));
+    const reveal = Math.min(Math.max(localT / revealDur, 0), 1);
+    return { alpha: outProgress, offsetY: 0, scale: 1, reveal };
+  }
+  if (fadeMode === "bounce") {
+    // 弾むように少し飛び出してから収まる（CapCutのバウンド演出風）。
+    const scale = Math.max(0, easeOutBack(inProgress));
+    return { alpha: edge, offsetY: 0, scale, reveal: 1 };
+  }
+  if (fadeMode === "zoomin") {
+    // 小さい状態から滑らかに等倍まで拡大しながら現れる。
+    const scale = 0.5 + 0.5 * easeOutCubic(inProgress);
+    return { alpha: edge, offsetY: 0, scale, reveal: 1 };
+  }
+  return { alpha: fadeAlpha(localT, duration, fadeLen), offsetY: 0, scale: 1, reveal: 1 };
+}
+
+// 疑似乱数（0〜1）。パーティクルごとに同じシード値なら毎フレーム同じ値になる。
+function sparkleRandom(seed) {
+  const x = Math.sin(seed) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+// 十字＋中心の光点でできた、きらめく星形パーティクルを描画する。
+function drawSparkleStar(ctx, x, y, size, alpha) {
+  if (alpha <= 0.02) return;
   ctx.save();
   ctx.globalAlpha = alpha;
-
-  const barHeight = 92;
-  const y = CANVAS_H - barHeight;
-  const grad = ctx.createLinearGradient(0, y, 0, CANVAS_H);
-  grad.addColorStop(0, "rgba(0,0,0,0)");
-  grad.addColorStop(1, "rgba(0,0,0,0.62)");
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, y, CANVAS_W, barHeight);
-
-  ctx.fillStyle = "#ffffff";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.font = "500 32px serif";
-  ctx.fillText(text, CANVAS_W / 2, CANVAS_H - barHeight / 2 + 8, CANVAS_W - 80);
-
-  ctx.strokeStyle = theme.accent;
-  ctx.lineWidth = 2;
+  ctx.translate(x, y);
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = Math.max(1, size * 0.18);
   ctx.beginPath();
-  ctx.moveTo(CANVAS_W / 2 - 40, CANVAS_H - barHeight / 2 - 24);
-  ctx.lineTo(CANVAS_W / 2 + 40, CANVAS_H - barHeight / 2 - 24);
+  ctx.moveTo(-size, 0);
+  ctx.lineTo(size, 0);
+  ctx.moveTo(0, -size);
+  ctx.lineTo(0, size);
   ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, 0, size * 0.32, 0, Math.PI * 2);
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
+  ctx.restore();
+}
+
+// 文字の左右から星のパーティクルが飛んできて文字の周りできらめく演出。
+function drawSparkleOverlay(ctx, cx, cy, halfWidth, localT, duration) {
+  const fadeLen = Math.min(FADE, duration / 2);
+  const inProgress = fadeLen > 0 ? Math.min(Math.max(localT / fadeLen, 0), 1) : 1;
+  const count = 10;
+  const spread = Math.max(halfWidth, 60);
+  for (let i = 0; i < count; i++) {
+    const fromLeft = i % 2 === 0;
+    const seed = i * 12.9898 + 3.51;
+    const arriveAt = 0.15 + sparkleRandom(seed) * 0.6;
+    const arrive = arriveAt > 0 ? Math.min(inProgress / arriveAt, 1) : 1;
+    if (arrive <= 0) continue;
+    const startX = fromLeft
+      ? cx - spread - 200 - sparkleRandom(seed + 1) * 80
+      : cx + spread + 200 + sparkleRandom(seed + 1) * 80;
+    const targetX = cx + (sparkleRandom(seed + 2) - 0.5) * spread * 2;
+    const targetY = cy + (sparkleRandom(seed + 3) - 0.5) * 44;
+    const startY = targetY + (sparkleRandom(seed + 4) - 0.5) * 30;
+    const ease = 1 - Math.pow(1 - arrive, 3);
+    const px = startX + (targetX - startX) * ease;
+    const py = startY + (targetY - startY) * ease;
+    const twinkle = 0.35 + 0.65 * Math.abs(Math.sin(localT * (3 + sparkleRandom(seed + 5) * 3) + seed));
+    const alpha = arrive * twinkle;
+    const size = 5 + sparkleRandom(seed + 6) * 4;
+    drawSparkleStar(ctx, px, py, size, alpha);
+  }
+}
+
+function drawCaption(ctx, text, localT, duration, theme, style, fadeMode, fontSize) {
+  const { alpha, offsetY, scale, reveal } = captionMotion(localT, duration, fadeMode || "fade");
+  if (alpha <= 0) return;
+  const size = fontSize || 32;
+  // タイプライター演出用に表示する文字数を絞り込む（それ以外は常に全文表示）。
+  const revealedText = reveal >= 0.999 ? text : text.slice(0, Math.max(0, Math.round(text.length * reveal)));
+  if (revealedText === "") return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(0, offsetY);
+
+  let capCenterX = CANVAS_W / 2;
+  let capCenterY = CANVAS_H / 2;
+  let capHalfWidth = 100;
+
+  if (style === "elegant") {
+    // 背景バーなし。明朝体イタリック＋文字影＋下に細いアクセント線というシンプルな見せ方。
+    const fSize = size + 2;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `italic 400 ${fSize}px serif`;
+    capCenterY = CANVAS_H - 76;
+    capHalfWidth = Math.min(ctx.measureText(text).width, CANVAS_W - 100) / 2;
+    ctx.save();
+    ctx.translate(capCenterX, capCenterY);
+    ctx.scale(scale, scale);
+    ctx.shadowColor = "rgba(0,0,0,0.7)";
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(revealedText, 0, 0, CANVAS_W - 100);
+    ctx.restore();
+    ctx.strokeStyle = theme.accent;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(CANVAS_W / 2 - 50, CANVAS_H - 46);
+    ctx.lineTo(CANVAS_W / 2 + 50, CANVAS_H - 46);
+    ctx.stroke();
+  } else if (style === "pop") {
+    // テーマカラーの丸みを帯びたピル型バッジに太字白文字。
+    const fSize = Math.max(size - 2, 12);
+    ctx.font = `700 ${fSize}px sans-serif`;
+    const maxTextWidth = CANVAS_W - 120;
+    const textWidth = Math.min(ctx.measureText(text).width, maxTextWidth);
+    const paddingX = 28;
+    const pillW = Math.min(textWidth + paddingX * 2, CANVAS_W - 60);
+    const pillH = Math.round(fSize * 1.93);
+    const pillX = CANVAS_W / 2 - pillW / 2;
+    const pillY = CANVAS_H - 118;
+    capCenterX = CANVAS_W / 2;
+    capCenterY = pillY + pillH / 2;
+    capHalfWidth = pillW / 2;
+    ctx.fillStyle = theme.accent;
+    roundRectPath(ctx, pillX, pillY, pillW, pillH, pillH / 2);
+    ctx.fill();
+    ctx.save();
+    ctx.translate(capCenterX, capCenterY + 2);
+    ctx.scale(scale, scale);
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(revealedText, 0, 0, pillW - paddingX * 2);
+    ctx.restore();
+  } else {
+    // "simple"（既定）: 下から暗くなるグラデーションバー＋白文字＋アクセント下線。
+    const fSize = size;
+    const barHeight = Math.round(fSize * 2.875);
+    const y = CANVAS_H - barHeight;
+    const grad = ctx.createLinearGradient(0, y, 0, CANVAS_H);
+    grad.addColorStop(0, "rgba(0,0,0,0)");
+    grad.addColorStop(1, "rgba(0,0,0,0.62)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, y, CANVAS_W, barHeight);
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `500 ${fSize}px serif`;
+    capCenterX = CANVAS_W / 2;
+    capCenterY = CANVAS_H - barHeight / 2 + 8;
+    capHalfWidth = Math.min(ctx.measureText(text).width, CANVAS_W - 80) / 2;
+    ctx.save();
+    ctx.translate(capCenterX, capCenterY);
+    ctx.scale(scale, scale);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(revealedText, 0, 0, CANVAS_W - 80);
+    ctx.restore();
+
+    ctx.strokeStyle = theme.accent;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(CANVAS_W / 2 - 40, CANVAS_H - barHeight / 2 - 24);
+    ctx.lineTo(CANVAS_W / 2 + 40, CANVAS_H - barHeight / 2 - 24);
+    ctx.stroke();
+  }
+
+  if (fadeMode === "sparkle") {
+    drawSparkleOverlay(ctx, capCenterX, capCenterY, capHalfWidth, localT, duration);
+  }
+
   ctx.restore();
 }
 
@@ -896,19 +1844,29 @@ function drawPhoto(ctx, seg, localT, settings) {
   const { width: imgW, height: imgH } = intrinsicSize(img);
   const imgRatio = imgW / imgH;
   const canvasRatio = CANVAS_W / CANVAS_H;
+
+  // 写真ごとの表示サイズ上書き（未指定なら共通設定に従う）。
+  // 100%未満のときは、余白（テーマカラーの背景）付きで写真を小さく表示する。
+  const effScale = seg.photo.displayScale != null ? seg.photo.displayScale : settings.photoDisplayScale;
+  const scaleFrac = Math.min(Math.max(effScale || 100, 30), 100) / 100;
+  const frameW = CANVAS_W * scaleFrac;
+  const frameH = CANVAS_H * scaleFrac;
+  const frameX = (CANVAS_W - frameW) / 2;
+  const frameY = (CANVAS_H - frameH) / 2;
+
   let baseW, baseH;
   if (imgRatio > canvasRatio) {
-    baseH = CANVAS_H;
+    baseH = frameH;
     baseW = baseH * imgRatio;
   } else {
-    baseW = CANVAS_W;
+    baseW = frameW;
     baseH = baseW / imgRatio;
   }
   const drawW = baseW * scale;
   const drawH = baseH * scale;
 
-  const maxOffsetX = (drawW - CANVAS_W) / 2;
-  const maxOffsetY = (drawH - CANVAS_H) / 2;
+  const maxOffsetX = (drawW - frameW) / 2;
+  const maxOffsetY = (drawH - frameH) / 2;
 
   const directions = [
     [-1, -1],
@@ -921,18 +1879,48 @@ function drawPhoto(ctx, seg, localT, settings) {
   const offsetX = dx * maxOffsetX * panProgress;
   const offsetY = dy * maxOffsetY * panProgress;
 
-  ctx.fillStyle = "#000";
+  const bgGrad = ctx.createLinearGradient(0, 0, CANVAS_W, CANVAS_H);
+  bgGrad.addColorStop(0, settings.theme.bg1);
+  bgGrad.addColorStop(1, settings.theme.bg2);
+  ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(frameX, frameY, frameW, frameH);
+  ctx.clip();
   ctx.drawImage(
     img,
-    CANVAS_W / 2 - drawW / 2 + offsetX,
-    CANVAS_H / 2 - drawH / 2 + offsetY,
+    frameX + frameW / 2 - drawW / 2 + offsetX,
+    frameY + frameH / 2 - drawH / 2 + offsetY,
     drawW,
     drawH
   );
+  ctx.restore();
+
+  if (scaleFrac < 0.999) {
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,255,255,0.85)";
+    ctx.lineWidth = 4;
+    ctx.shadowColor = "rgba(0,0,0,0.35)";
+    ctx.shadowBlur = 18;
+    ctx.strokeRect(frameX, frameY, frameW, frameH);
+    ctx.restore();
+  }
 
   if (seg.photo.caption) {
-    drawCaption(ctx, seg.photo.caption, localT, seg.duration, settings.theme);
+    const effFontSize = seg.photo.captionFontSize != null ? seg.photo.captionFontSize : settings.captionFontSize;
+    const effFade = seg.photo.captionFade || settings.captionFade;
+    drawCaption(
+      ctx,
+      seg.photo.caption,
+      localT,
+      seg.duration,
+      settings.theme,
+      settings.captionStyle,
+      effFade,
+      effFontSize
+    );
   }
 }
 
@@ -1117,6 +2105,64 @@ function compositeTransition(ctx, canvasA, canvasB, progress, type) {
       }
       break;
     }
+    case "circle": {
+      // 中央から円形に広がりながら次の写真に切り替わる（CapCutの円形ワイプ風）
+      ctx.drawImage(canvasA, 0, 0);
+      const maxRadius = Math.hypot(CANVAS_W / 2, CANVAS_H / 2);
+      const radius = maxRadius * easeOutCubic(progress);
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(CANVAS_W / 2, CANVAS_H / 2, radius, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.drawImage(canvasB, 0, 0);
+      ctx.restore();
+      break;
+    }
+    case "rotatezoom": {
+      // 次の写真がわずかに回転しながらズームイン（CapCutのポップな回転演出風）
+      ctx.drawImage(canvasA, 0, 0);
+      ctx.save();
+      ctx.globalAlpha = progress;
+      ctx.translate(CANVAS_W / 2, CANVAS_H / 2);
+      ctx.rotate((1 - progress) * 0.35);
+      const scale = 0.7 + 0.3 * easeOutCubic(progress);
+      ctx.scale(scale, scale);
+      ctx.drawImage(canvasB, -CANVAS_W / 2, -CANVAS_H / 2);
+      ctx.restore();
+      break;
+    }
+    case "blur": {
+      // 山なりにぼかしながらクロスフェードする（CapCutのぼかしトランジション風）
+      const blurAmount = 16 * Math.sin(Math.min(Math.max(progress, 0), 1) * Math.PI);
+      ctx.save();
+      ctx.filter = blurAmount > 0.1 ? `blur(${blurAmount}px)` : "none";
+      ctx.globalAlpha = 1 - progress;
+      ctx.drawImage(canvasA, 0, 0);
+      ctx.globalAlpha = progress;
+      ctx.drawImage(canvasB, 0, 0);
+      ctx.filter = "none";
+      ctx.restore();
+      break;
+    }
+    case "pageflip": {
+      // 本のページをめくるような演出（エンドロール専用）。
+      // 次のページを先に敷いておき、現在のページを左端（本の綴じ目）を軸に
+      // 横方向へ縮めていくことで、ページが奥へめくれていくように見せる。
+      ctx.drawImage(canvasB, 0, 0);
+      const scaleX = Math.max(1 - progress, 0.001);
+      ctx.save();
+      ctx.scale(scaleX, 1);
+      ctx.drawImage(canvasA, 0, 0);
+      ctx.restore();
+
+      const shadowW = CANVAS_W * scaleX;
+      const grad = ctx.createLinearGradient(shadowW * 0.55, 0, shadowW, 0);
+      grad.addColorStop(0, "rgba(0,0,0,0)");
+      grad.addColorStop(1, `rgba(0,0,0,${0.5 * progress})`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, shadowW, CANVAS_H);
+      break;
+    }
     case "crossfade":
     default: {
       ctx.drawImage(canvasA, 0, 0);
@@ -1133,33 +2179,340 @@ function drawFrame(ctx, timeline, t, settings) {
   const { segments, startTimes, total } = timeline;
   t = Math.min(t, total);
 
+  // 「開始時刻 <= t」を満たす最後のセグメントが現在のセグメント。
+  // finalizeTimelineは切り替え時間の分だけ次のセグメントの開始時刻を早めているため、
+  // 1つ前のセグメントの本来の終了時刻（開始時刻+長さ）までは、まだ前のセグメントとの
+  // 重なり（トランジション）区間にいることになる。
   let activeIndex = 0;
   for (let i = 0; i < segments.length; i++) {
     if (startTimes[i] <= t) activeIndex = i;
   }
 
-  const seg = segments[activeIndex];
-  const localT = t - startTimes[activeIndex];
-  const hasNext = activeIndex < segments.length - 1;
-  const nextStart = hasNext ? startTimes[activeIndex + 1] : null;
-  const inTransition = hasNext && t >= nextStart;
+  const prevIndex = activeIndex - 1;
+  const prevEnd = prevIndex >= 0 ? startTimes[prevIndex] + segments[prevIndex].duration : -Infinity;
+  const inTransition = prevIndex >= 0 && t < prevEnd;
 
   if (!inTransition) {
-    drawSegment(ctx, seg, localT, settings);
+    const localT = t - startTimes[activeIndex];
+    drawSegment(ctx, segments[activeIndex], localT, settings);
   } else {
-    const nextSeg = segments[activeIndex + 1];
-    const progress = Math.min(Math.max((t - nextStart) / settings.transitionDuration, 0), 1);
+    const prevSeg = segments[prevIndex];
+    const curSeg = segments[activeIndex];
+    const prevLocalT = t - startTimes[prevIndex];
+    const curLocalT = t - startTimes[activeIndex];
+    const progress = Math.min(Math.max(curLocalT / settings.transitionDuration, 0), 1);
     transitionCtxA.clearRect(0, 0, CANVAS_W, CANVAS_H);
-    drawSegment(transitionCtxA, seg, localT, settings);
+    drawSegment(transitionCtxA, prevSeg, prevLocalT, settings);
     transitionCtxB.clearRect(0, 0, CANVAS_W, CANVAS_H);
-    drawSegment(transitionCtxB, nextSeg, t - nextStart, settings);
-    const type = pickTransitionType(settings, activeIndex);
+    drawSegment(transitionCtxB, curSeg, curLocalT, settings);
+    const type = pickTransitionType(settings, prevIndex);
     compositeTransition(ctx, transitionBufferA, transitionBufferB, progress, type);
   }
 
   if (settings.template !== "opening") {
     drawVignette(ctx, settings.theme.accent);
   }
+}
+
+// --- エンドロール（本のページをめくる演出）---
+
+function endRollPhotoImg(photo) {
+  return photo.kind === "video" ? photo.videoEl : photo.img;
+}
+
+// ページに動画を使う場合、そのページ（セグメント）で初めて描画されたときだけ
+// 先頭から再生を開始する。同じ動画が複数のページ（例: 人数が多く「つづき」
+// ページに分かれたグループの背景に、専用の動画が1本だけ指定されている場合）で
+// 使い回されることがあるため、「このページで開始済みか」をセグメント単位で
+// 記録し、ページが変わるたびに先頭から再生し直す（同じページ内の再描画では
+// 再生を続けたいので、seg（セグメントオブジェクト自体）を識別に使う）。
+function ensureEndRollVideoPlaying(photo, seg) {
+  if (photo.kind !== "video" || photo._bgStartedForSeg === seg) return;
+  photo._bgStartedForSeg = seg;
+  try {
+    photo.videoEl.currentTime = 0;
+  } catch (err) {
+    // seek前に呼ばれるブラウザもあるため失敗は無視する
+  }
+  photo.videoEl.play().catch(() => {
+    // 自動再生がブロックされても録画自体は続行する
+  });
+}
+
+// 指定した矩形いっぱいに、Ken Burns風のズーム/パンをかけながら写真・動画を描画する
+// （エンドロールのページ写真専用。キャプションや表示サイズ設定は考慮しない）。
+function drawCoverZoomPhoto(ctx, img, progress, variant, frameX, frameY, frameW, frameH) {
+  const zoomIn = variant % 2 === 0;
+  const scale = zoomIn ? 1 + ZOOM_AMOUNT * progress : 1 + ZOOM_AMOUNT * (1 - progress);
+  const { width: imgW, height: imgH } = intrinsicSize(img);
+  const imgRatio = imgW / imgH;
+  const frameRatio = frameW / frameH;
+  let baseW, baseH;
+  if (imgRatio > frameRatio) {
+    baseH = frameH;
+    baseW = baseH * imgRatio;
+  } else {
+    baseW = frameW;
+    baseH = baseW / imgRatio;
+  }
+  const drawW = baseW * scale;
+  const drawH = baseH * scale;
+  const maxOffsetX = (drawW - frameW) / 2;
+  const maxOffsetY = (drawH - frameH) / 2;
+  const directions = [
+    [-1, -1],
+    [1, 1],
+    [1, -1],
+    [-1, 1],
+  ];
+  const [dx, dy] = directions[variant % directions.length];
+  const panProgress = zoomIn ? progress : 1 - progress;
+  const offsetX = dx * maxOffsetX * panProgress;
+  const offsetY = dy * maxOffsetY * panProgress;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(frameX, frameY, frameW, frameH);
+  ctx.clip();
+  ctx.drawImage(
+    img,
+    frameX + frameW / 2 - drawW / 2 + offsetX,
+    frameY + frameH / 2 - drawH / 2 + offsetY,
+    drawW,
+    drawH
+  );
+  ctx.restore();
+}
+
+// テーマカラーごとの「紙」の色味（背景の紙色・ビネット・インク色・アクセント線）。
+// onPhotoTextは、写真を背景にしたページでインクの代わりに使う明るい文字色
+// （紙の色ではなく写真+暗幕の上に乗るため、はっきり読める明るいトーンにしてある）。
+const ENDROLL_PAPER_THEMES = {
+  pink: { paper1: "#faf3e6", paper2: "#efe0c7", ink: "#4a3527", accent: "#b8865b", onPhotoText: "#fdf6ec" },
+  navy: { paper1: "#f2ede0", paper2: "#e2d9c2", ink: "#2c2a3a", accent: "#5a5470", onPhotoText: "#f1eef8" },
+  green: { paper1: "#f5f1e2", paper2: "#e6ddbf", ink: "#33402c", accent: "#6b7d4f", onPhotoText: "#f2f6e6" },
+};
+
+// wrapTextと同じ折り返しアルゴリズムで行分割しつつ、各行の先頭が元のテキストの
+// 何文字目から始まるか（start）も一緒に返す。タイピング演出で「あと何文字まで
+// 見せるか（revealCount）」を各行にマッピングするために必要。
+function wrapTextWithOffsets(ctx, text, maxWidth) {
+  const paragraphs = String(text).split("\n");
+  const result = [];
+  let offset = 0;
+  paragraphs.forEach((para, pIdx) => {
+    if (para === "") {
+      result.push({ line: "", start: offset });
+    } else {
+      let line = "";
+      let lineStart = offset;
+      for (const ch of para) {
+        const test = line + ch;
+        if (line !== "" && ctx.measureText(test).width > maxWidth) {
+          result.push({ line, start: lineStart });
+          lineStart += line.length;
+          line = ch;
+        } else {
+          line = test;
+        }
+      }
+      if (line) result.push({ line, start: lineStart });
+    }
+    offset += para.length;
+    if (pIdx < paragraphs.length - 1) offset += 1; // 消費される"\n"の分
+  });
+  return result;
+}
+
+// 写真の縦横比を保ったまま、写真全体が見切れないようにフレーム内に収めて描画する
+// （drawCoverZoomPhotoの「はみ出た分を切り取って埋める」のとは逆に、余る分は
+// 何も描かない＝呼び出し側で背景を別に埋めておく前提）。
+function drawContainPhoto(ctx, img, frameX, frameY, frameW, frameH) {
+  const { width: imgW, height: imgH } = intrinsicSize(img);
+  const imgRatio = imgW / imgH;
+  const frameRatio = frameW / frameH;
+  let drawW, drawH;
+  if (imgRatio > frameRatio) {
+    drawW = frameW;
+    drawH = drawW / imgRatio;
+  } else {
+    drawH = frameH;
+    drawW = drawH * imgRatio;
+  }
+  ctx.drawImage(img, frameX + (frameW - drawW) / 2, frameY + (frameH - drawH) / 2, drawW, drawH);
+}
+
+// 背景用の写真を1枚、指定した不透明度で描画する。写真が見切れないよう、まず
+// 拡大＆ぼかした同じ写真でページ全体を埋め、その上に写真全体（縦横比そのまま）を
+// 重ねて表示する。
+function drawEndRollPhotoLayer(ctx, photo, alpha, seg) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ensureEndRollVideoPlaying(photo, seg);
+  const img = endRollPhotoImg(photo);
+  ctx.save();
+  ctx.filter = "blur(24px)";
+  drawCoverZoomPhoto(ctx, img, 0.5, 0, 0, 0, CANVAS_W, CANVAS_H);
+  ctx.restore();
+  drawContainPhoto(ctx, img, 0, 0, CANVAS_W, CANVAS_H);
+  ctx.restore();
+}
+
+const ENDROLL_PHOTO_CROSSFADE_SEC = 0.6; // 背景写真が複数ある場合の切り替わりのクロスフェード時間
+
+// ページに紐づく背景写真（1枚〜複数枚）を描画する。複数枚ある場合は、ページの
+// 表示時間を均等に分けて1枚ずつ順番に表示し、切り替わり時はクロスフェードする
+// （1ページしかないグループに複数枚設定した場合の簡易スライドショー）。
+function drawEndRollPhotoBackground(ctx, photos, localT, speed, seg) {
+  if (photos.length === 0) return;
+  if (photos.length === 1) {
+    drawEndRollPhotoLayer(ctx, photos[0], 1, seg);
+    return;
+  }
+  const slideDurs = endRollPhotoSlideDurations(photos, speed);
+  let idx = 0;
+  let slideStart = 0;
+  while (idx < slideDurs.length - 1 && localT >= slideStart + slideDurs[idx]) {
+    slideStart += slideDurs[idx];
+    idx++;
+  }
+  const slideDur = slideDurs[idx];
+  const elapsedInSlide = localT - slideStart;
+  drawEndRollPhotoLayer(ctx, photos[idx], 1, seg);
+  if (idx < photos.length - 1) {
+    const fade = Math.min(ENDROLL_PHOTO_CROSSFADE_SEC, slideDur * 0.4);
+    if (fade > 0 && elapsedInSlide > slideDur - fade) {
+      const alpha = (elapsedInSlide - (slideDur - fade)) / fade;
+      drawEndRollPhotoLayer(ctx, photos[idx + 1], alpha, seg);
+    }
+  }
+}
+
+// エンドロールの1ページ分を描画する。見出しページは中央にお礼のメッセージを表示。
+// 通常ページは、写真があればページ全体を写真の背景にし（なければ本のページの
+// ような紙の質感の背景）、グループ見出し・来賓の名前とメッセージを、お名前→
+// メッセージの順に1人ずつ1文字ずつタイピングされるように表示する
+// （ページ間の動きはcompositeTransitionの"pageflip"が担当する）。
+function drawEndRollPage(ctx, seg, localT, settings) {
+  const paper = ENDROLL_PAPER_THEMES[settings.endrollThemeKey] || ENDROLL_PAPER_THEMES.pink;
+  const photos = (!seg.isHeaderPage && seg.photos) || [];
+  const hasPhotoBg = photos.length > 0;
+
+  if (hasPhotoBg) {
+    drawEndRollPhotoBackground(ctx, photos, localT, settings.endrollSpeed, seg);
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  } else {
+    const grad = ctx.createLinearGradient(0, 0, CANVAS_W, CANVAS_H);
+    grad.addColorStop(0, paper.paper1);
+    grad.addColorStop(1, paper.paper2);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+    const vign = ctx.createRadialGradient(
+      CANVAS_W / 2,
+      CANVAS_H / 2,
+      CANVAS_H * 0.3,
+      CANVAS_W / 2,
+      CANVAS_H / 2,
+      CANVAS_H * 0.78
+    );
+    vign.addColorStop(0, "rgba(0,0,0,0)");
+    vign.addColorStop(1, "rgba(0,0,0,0.12)");
+    ctx.fillStyle = vign;
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  }
+
+  ctx.save();
+  ctx.strokeStyle = hasPhotoBg ? "rgba(255,255,255,0.55)" : paper.accent;
+  ctx.globalAlpha = 0.55;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(30, 30, CANVAS_W - 60, CANVAS_H - 60);
+  ctx.restore();
+
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  if (seg.isHeaderPage) {
+    ctx.font = "700 46px serif";
+    ctx.fillStyle = paper.ink;
+    ctx.fillText(seg.headerLine1, CANVAS_W / 2, CANVAS_H / 2 - (seg.headerLine2 ? 26 : 0));
+    if (seg.headerLine2) {
+      ctx.font = "300 26px serif";
+      ctx.fillText(seg.headerLine2, CANVAS_W / 2, CANVAS_H / 2 + 30);
+    }
+    ctx.restore();
+    return;
+  }
+
+  const textColor = hasPhotoBg ? paper.onPhotoText : paper.ink;
+  let y = 90;
+
+  if (seg.group) {
+    ctx.font = "700 32px serif";
+    ctx.fillStyle = textColor;
+    ctx.fillText(seg.group + (seg.isContinuation ? "（つづき）" : ""), CANVAS_W / 2, y);
+    y += 22;
+    ctx.strokeStyle = paper.accent;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(CANVAS_W / 2 - 70, y);
+    ctx.lineTo(CANVAS_W / 2 + 70, y);
+    ctx.stroke();
+    y += ENDROLL_PAGE_GROUP_HEADING_GAP;
+  } else {
+    y += 20;
+  }
+
+  const schedule = computeEndRollTypingSchedule(seg.entries, settings.endrollSpeed);
+
+  schedule.forEach(({ entry, start, nameDur, gapDur, messageDur }) => {
+    const elapsed = localT - start;
+
+    let revealedName = "";
+    if (entry.name) {
+      if (elapsed <= 0) {
+        revealedName = "";
+      } else if (nameDur <= 0) {
+        revealedName = entry.name;
+      } else {
+        const frac = Math.min(elapsed / nameDur, 1);
+        revealedName = entry.name.slice(0, Math.ceil(entry.name.length * frac));
+      }
+    }
+    ctx.font = "600 26px serif";
+    ctx.fillStyle = paper.accent;
+    if (revealedName) ctx.fillText(revealedName, CANVAS_W / 2, y);
+    y += ENDROLL_NAME_GAP;
+
+    ctx.font = "300 20px serif";
+    ctx.fillStyle = textColor;
+    const fullLines = entry.message ? wrapTextWithOffsets(ctx, entry.message, ENDROLL_MAX_TEXT_WIDTH) : [];
+
+    let revealCount = 0;
+    if (entry.message) {
+      const messageElapsed = elapsed - nameDur - gapDur;
+      if (messageElapsed <= 0) {
+        revealCount = 0;
+      } else if (messageDur <= 0) {
+        revealCount = entry.message.length;
+      } else {
+        const frac = Math.min(messageElapsed / messageDur, 1);
+        revealCount = Math.ceil(entry.message.length * frac);
+      }
+    }
+
+    fullLines.forEach(({ line, start: lineStart }) => {
+      const shownLen = Math.max(0, Math.min(line.length, revealCount - lineStart));
+      const shown = line.slice(0, shownLen);
+      if (shown) ctx.fillText(shown, CANVAS_W / 2, y);
+      y += ENDROLL_MESSAGE_LINE_HEIGHT;
+    });
+    y += ENDROLL_ENTRY_GAP;
+  });
+
+  ctx.restore();
 }
 
 function drawSegment(ctx, seg, localT, settings) {
@@ -1169,6 +2522,8 @@ function drawSegment(ctx, seg, localT, settings) {
     drawImpactCard(ctx, seg, localT, settings);
   } else if (seg.type === "countdown-number") {
     drawCountdownNumber(ctx, seg, localT, settings);
+  } else if (seg.type === "endroll-page") {
+    drawEndRollPage(ctx, seg, localT, settings);
   } else {
     drawPhoto(ctx, seg, localT, settings);
   }
@@ -1302,11 +2657,15 @@ async function detectBeats(file) {
 
 // 選んだ曲を順番に、動画の長さを満たすまで繰り返し並べたスケジュールを作る。
 // 曲の切り替わり・ループのつなぎ目にはAUDIO_CROSSFADE_SEC分の重なりを持たせる。
+// ループ回数の上限は、極端に短いBGMファイルが選ばれた場合の無限ループ防止用の
+// 安全弁（曲の長さがほぼ0の場合はループ内のbreakで即座に抜ける）であり、
+// 動画自体が長い場合にBGMが最後まで敷き詰められなくなることがないよう、
+// 現実的にありえる動画の長さに対して十分大きい値にしてある。
 function buildAudioSchedule(infos, totalDuration) {
   const schedule = [];
   let t = 0;
   let i = 0;
-  while (t < totalDuration && schedule.length < 500) {
+  while (t < totalDuration && schedule.length < 20000) {
     const info = infos[i % infos.length];
     const crossfade = Math.min(AUDIO_CROSSFADE_SEC, info.duration / 2);
     schedule.push({ url: info.url, duration: info.duration, crossfade, start: t });
@@ -1425,7 +2784,7 @@ async function setupAudioPlaylist(audioFiles, totalDuration, audioDucks = []) {
 async function renderVideo({ audioFiles, beatSyncCutDuration, onProgress } = {}) {
   let settings = getSettings();
   if (countPhotos(settings) === 0) {
-    throw new Error("写真・動画を1つ以上追加してください");
+    throw new Error("写真・動画・メッセージを1つ以上追加してください");
   }
   if (beatSyncCutDuration) {
     settings = {
@@ -1497,6 +2856,18 @@ async function renderVideo({ audioFiles, beatSyncCutDuration, onProgress } = {})
         // 何もしない（サムネイル表示が先頭フレームに戻らないだけ）
       }
     }
+    if (seg.type === "endroll-page" && seg.photos) {
+      seg.photos.forEach((photo) => {
+        if (photo.kind !== "video") return;
+        photo.videoEl.pause();
+        photo._bgStartedForSeg = null;
+        try {
+          photo.videoEl.currentTime = 0;
+        } catch (err) {
+          // 何もしない（サムネイル表示が先頭フレームに戻らないだけ）
+        }
+      });
+    }
   });
   return blob;
 }
@@ -1538,7 +2909,6 @@ function fixVideoDuration(videoEl) {
 
 const DRAFT_DB_NAME = "wedding-movie-draft-db";
 const DRAFT_STORE_NAME = "drafts";
-const DRAFT_KEY = "current";
 
 function openDraftDB() {
   return new Promise((resolve, reject) => {
@@ -1551,31 +2921,35 @@ function openDraftDB() {
   });
 }
 
+// 下書きはテンプレート（スタンダード／オープニング演出／エンドロール／2人の
+// プロフィール／親への感謝ムービー）ごとに、それぞれ独立した保存枠を持つ
+// （IndexedDBのキーをテンプレート名そのものにする）。1つのテンプレートで保存
+// しても、他のテンプレートの下書きは上書きされない。
 async function saveDraftToDB(data) {
   const db = await openDraftDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(DRAFT_STORE_NAME, "readwrite");
-    tx.objectStore(DRAFT_STORE_NAME).put(data, DRAFT_KEY);
+    tx.objectStore(DRAFT_STORE_NAME).put(data, data.template);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
 }
 
-async function loadDraftFromDB() {
+async function loadDraftFromDB(template) {
   const db = await openDraftDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(DRAFT_STORE_NAME, "readonly");
-    const req = tx.objectStore(DRAFT_STORE_NAME).get(DRAFT_KEY);
+    const req = tx.objectStore(DRAFT_STORE_NAME).get(template);
     req.onsuccess = () => resolve(req.result || null);
     req.onerror = () => reject(req.error);
   });
 }
 
-async function deleteDraftFromDB() {
+async function deleteDraftFromDB(template) {
   const db = await openDraftDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(DRAFT_STORE_NAME, "readwrite");
-    tx.objectStore(DRAFT_STORE_NAME).delete(DRAFT_KEY);
+    tx.objectStore(DRAFT_STORE_NAME).delete(template);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
@@ -1591,6 +2965,11 @@ function collectGroupDraftItems(group) {
       fileType: p.file.type,
       caption: p.caption || "",
       clipSeconds: p.kind === "video" ? p.clipSeconds : undefined,
+      duration: p.kind === "image" ? p.duration : undefined,
+      captionFontSize: p.captionFontSize,
+      captionFade: p.captionFade,
+      displayScale: p.displayScale,
+      endrollGroup: p.endrollGroup || "",
     }));
 }
 
@@ -1605,6 +2984,7 @@ function collectDraftData() {
       endMessage: els.endMessage.value,
       theme: els.themeSelect.value,
       photoDuration: els.photoDuration.value,
+      photoDisplayScale: els.photoDisplayScale.value,
       transitionType: els.transitionType.value,
       transitionDuration: els.transitionDuration.value,
       opGroomName: els.opGroomName.value,
@@ -1615,22 +2995,56 @@ function collectDraftData() {
       opBrideSub2: els.opBrideSub2.value,
       opNeonColor: els.opNeonColor.value,
       opPhotoDuration: els.opPhotoDuration.value,
+      opPhotoDisplayScale: els.opPhotoDisplayScale.value,
       opTransitionType: els.opTransitionType.value,
       opTransitionDuration: els.opTransitionDuration.value,
+      captionStyle: els.captionStyle.value,
+      captionFontSize: els.captionFontSize.value,
+      captionFade: els.captionFade.value,
+      opCaptionStyle: els.opCaptionStyle.value,
+      opCaptionFontSize: els.opCaptionFontSize.value,
+      opCaptionFade: els.opCaptionFade.value,
       beatSyncEnabled: els.beatSyncEnabled.checked,
       beatSyncInterval: els.beatSyncInterval.value,
+      endrollTitle1: els.endrollTitle1.value,
+      endrollTitle2: els.endrollTitle2.value,
+      endrollDateText: els.endrollDateText.value,
+      endrollTheme: els.endrollTheme.value,
+      endrollHeaderLine1: els.endrollHeaderLine1.value,
+      endrollHeaderLine2: els.endrollHeaderLine2.value,
+      endrollSpeed: els.endrollSpeed.value,
+      profileTitle1: els.profileTitle1.value,
+      profileTitle2: els.profileTitle2.value,
+      profileDateText: els.profileDateText.value,
+      profileTheme: els.profileTheme.value,
+      profileHeaderLine1: els.profileHeaderLine1.value,
+      profileHeaderLine2: els.profileHeaderLine2.value,
+      profileSpeed: els.profileSpeed.value,
+      thanksTitle1: els.thanksTitle1.value,
+      thanksTitle2: els.thanksTitle2.value,
+      thanksDateText: els.thanksDateText.value,
+      thanksTheme: els.thanksTheme.value,
+      thanksHeaderLine1: els.thanksHeaderLine1.value,
+      thanksHeaderLine2: els.thanksHeaderLine2.value,
+      thanksSpeed: els.thanksSpeed.value,
     },
     groups: {
       standard: collectGroupDraftItems(standardGroup),
       groom: collectGroupDraftItems(groomGroup),
       bride: collectGroupDraftItems(brideGroup),
       together: collectGroupDraftItems(togetherGroup),
+      endroll: collectGroupDraftItems(endrollGroup),
+      profile: collectGroupDraftItems(profileGroup),
+      thanks: collectGroupDraftItems(thanksGroup),
     },
     bgmFiles: state.bgmFiles.map((t) => ({
       blob: t.file,
       fileName: t.file.name,
       fileType: t.file.type,
     })),
+    guestMessages: guestMessageManager.entries.map((g) => ({ name: g.name, group: g.group, message: g.message })),
+    profileEntries: profileEntryManager.entries.map((g) => ({ name: g.name, group: g.group, message: g.message })),
+    thanksEntries: thanksEntryManager.entries.map((g) => ({ name: g.name, group: g.group, message: g.message })),
   };
 }
 
@@ -1642,6 +3056,7 @@ async function restoreDraftData(data) {
   els.endMessage.value = f.endMessage || "";
   els.themeSelect.value = f.theme || "pink";
   els.photoDuration.value = f.photoDuration || 4;
+  els.photoDisplayScale.value = f.photoDisplayScale || 100;
   els.transitionType.value = f.transitionType || "crossfade";
   els.transitionDuration.value = f.transitionDuration || 0.8;
   els.opGroomName.value = f.opGroomName || "";
@@ -1652,12 +3067,40 @@ async function restoreDraftData(data) {
   els.opBrideSub2.value = f.opBrideSub2 || "";
   els.opNeonColor.value = f.opNeonColor || "pink";
   els.opPhotoDuration.value = f.opPhotoDuration || 1;
+  els.opPhotoDisplayScale.value = f.opPhotoDisplayScale || 100;
   els.opTransitionType.value = f.opTransitionType || "flash";
   els.opTransitionDuration.value = f.opTransitionDuration || 0.3;
+  els.captionStyle.value = f.captionStyle || "simple";
+  els.captionFontSize.value = f.captionFontSize || 32;
+  els.captionFade.value = f.captionFade || "fade";
+  els.opCaptionStyle.value = f.opCaptionStyle || "simple";
+  els.opCaptionFontSize.value = f.opCaptionFontSize || 32;
+  els.opCaptionFade.value = f.opCaptionFade || "fade";
   els.beatSyncEnabled.checked = !!f.beatSyncEnabled;
   els.beatSyncInterval.value = f.beatSyncInterval || 2;
+  els.endrollTitle1.value = f.endrollTitle1 || "";
+  els.endrollTitle2.value = f.endrollTitle2 || "";
+  els.endrollDateText.value = f.endrollDateText || "";
+  els.endrollTheme.value = f.endrollTheme || "pink";
+  els.endrollHeaderLine1.value = f.endrollHeaderLine1 || "";
+  els.endrollHeaderLine2.value = f.endrollHeaderLine2 || "";
+  els.endrollSpeed.value = f.endrollSpeed || "normal";
+  els.profileTitle1.value = f.profileTitle1 || "";
+  els.profileTitle2.value = f.profileTitle2 || "";
+  els.profileDateText.value = f.profileDateText || "";
+  els.profileTheme.value = f.profileTheme || "pink";
+  els.profileHeaderLine1.value = f.profileHeaderLine1 || "";
+  els.profileHeaderLine2.value = f.profileHeaderLine2 || "";
+  els.profileSpeed.value = f.profileSpeed || "normal";
+  els.thanksTitle1.value = f.thanksTitle1 || "";
+  els.thanksTitle2.value = f.thanksTitle2 || "";
+  els.thanksDateText.value = f.thanksDateText || "";
+  els.thanksTheme.value = f.thanksTheme || "pink";
+  els.thanksHeaderLine1.value = f.thanksHeaderLine1 || "";
+  els.thanksHeaderLine2.value = f.thanksHeaderLine2 || "";
+  els.thanksSpeed.value = f.thanksSpeed || "normal";
 
-  const templateValue = data.template === "opening" ? "opening" : "standard";
+  const templateValue = ["opening", "endroll", "profile", "thanks"].includes(data.template) ? data.template : "standard";
   const templateRadio = document.querySelector(`input[name="template"][value="${templateValue}"]`);
   if (templateRadio) templateRadio.checked = true;
   updateTemplateVisibility();
@@ -1666,6 +3109,9 @@ async function restoreDraftData(data) {
   await groomGroup.restoreItems((data.groups && data.groups.groom) || []);
   await brideGroup.restoreItems((data.groups && data.groups.bride) || []);
   await togetherGroup.restoreItems((data.groups && data.groups.together) || []);
+  await endrollGroup.restoreItems((data.groups && data.groups.endroll) || []);
+  await profileGroup.restoreItems((data.groups && data.groups.profile) || []);
+  await thanksGroup.restoreItems((data.groups && data.groups.thanks) || []);
 
   state.bgmFiles = (data.bgmFiles || []).map((b) => ({
     id: state.nextBgmId++,
@@ -1673,6 +3119,10 @@ async function restoreDraftData(data) {
   }));
   renderBgmList();
   updateAddBgmButtonState();
+
+  guestMessageManager.restoreItems(data.guestMessages || []);
+  profileEntryManager.restoreItems(data.profileEntries || []);
+  thanksEntryManager.restoreItems(data.thanksEntries || []);
 
   updateDurationEstimate();
 }
@@ -1709,9 +3159,16 @@ function updateShareButton(blob, filename, btnEl, hintEl) {
   };
 }
 
+const ROLL_EMPTY_ALERT = {
+  endroll: "来賓へのメッセージを1件以上追加してください",
+  profile: "プロフィール項目を1件以上追加してください",
+  thanks: "メッセージを1件以上追加してください",
+};
+
 els.createBtn.addEventListener("click", async () => {
-  if (countPhotos(getSettings()) === 0) {
-    alert("写真・動画を1つ以上追加してください");
+  const initialSettings = getSettings();
+  if (countPhotos(initialSettings) === 0) {
+    alert(ROLL_EMPTY_ALERT[initialSettings.template] || "写真・動画を1つ以上追加してください");
     return;
   }
   els.createBtn.disabled = true;
@@ -1797,6 +3254,65 @@ els.addBgmBtn.addEventListener("click", async () => {
 });
 
 // --- 下書きUIの配線 ---
+// 下書きはテンプレートごとに独立して保存されるため、保存・復元・削除ボタンは
+// 常に「今選んでいるテンプレート」に対して働く。テンプレートを切り替えるたびに
+// （updateTemplateVisibility経由で）refreshDraftUIForCurrentTemplateを呼び直し、
+// その時点のテンプレートに保存済みの下書きがあるかどうかを表示に反映する。
+
+const TEMPLATE_LABELS = {
+  standard: "スタンダード",
+  opening: "オープニング演出",
+  endroll: "エンドロール",
+  profile: "2人のプロフィール",
+  thanks: "親への感謝ムービー",
+};
+
+// 以前のバージョンでは下書きを固定キー"current"に1件だけ保存していた。
+// テンプレートごとの保存に移行するにあたり、そのまま放置すると既存の下書きが
+// 見えなくなってしまうため、初回起動時に1度だけそのテンプレートの保存枠へ
+// 移し替える（移行先に既に下書きがある場合は上書きしない）。
+async function migrateLegacyDraft() {
+  if (!window.indexedDB) return;
+  try {
+    const legacy = await loadDraftFromDB("current");
+    if (!legacy) return;
+    const template = legacy.template || "standard";
+    const existing = await loadDraftFromDB(template);
+    if (!existing) {
+      await saveDraftToDB(legacy);
+    }
+    await deleteDraftFromDB("current");
+  } catch (err) {
+    // 移行に失敗しても、下書き機能自体は使えるように諦める
+  }
+}
+
+// テンプレートを素早く連続で切り替えると、IndexedDBへの問い合わせが複数同時に
+// 発生し、後に発行した問い合わせの結果が先に発行した問い合わせより先に返ってくる
+// ことがある（順序の逆転）。この番号を使って「自分が最新の呼び出しか」を確認し、
+// 古い呼び出しの結果が後から画面に反映されて古いテンプレートの情報を誤って
+// 表示してしまわないようにする。
+let draftUIRefreshToken = 0;
+
+async function refreshDraftUIForCurrentTemplate() {
+  if (!window.indexedDB) return;
+  const token = ++draftUIRefreshToken;
+  const template = getTemplate();
+  try {
+    const data = await loadDraftFromDB(template);
+    if (token !== draftUIRefreshToken) return; // 途中でさらに新しい呼び出しが発生した
+    if (data) {
+      els.draftRestoreBox.classList.remove("hidden");
+      els.draftSavedAt.textContent = new Date(data.savedAt).toLocaleString("ja-JP");
+      els.deleteDraftBtn.classList.remove("hidden");
+    } else {
+      els.draftRestoreBox.classList.add("hidden");
+      els.deleteDraftBtn.classList.add("hidden");
+    }
+  } catch (err) {
+    // IndexedDBが使えない/壊れている環境では下書き機能を静かに諦める
+  }
+}
 
 if (!window.indexedDB) {
   els.draftSection.classList.add("hidden");
@@ -1807,8 +3323,9 @@ if (!window.indexedDB) {
     try {
       const data = collectDraftData();
       await saveDraftToDB(data);
-      els.draftStatus.textContent = `保存しました（${new Date(data.savedAt).toLocaleString("ja-JP")}）`;
-      els.deleteDraftBtn.classList.remove("hidden");
+      const label = TEMPLATE_LABELS[data.template] || data.template;
+      els.draftStatus.textContent = `「${label}」の下書きを保存しました（${new Date(data.savedAt).toLocaleString("ja-JP")}）`;
+      await refreshDraftUIForCurrentTemplate();
     } catch (err) {
       els.draftStatus.textContent = `保存に失敗しました: ${err.message || err}`;
     } finally {
@@ -1817,23 +3334,24 @@ if (!window.indexedDB) {
   });
 
   els.deleteDraftBtn.addEventListener("click", async () => {
-    if (!confirm("保存した下書きを削除しますか？")) return;
+    const label = TEMPLATE_LABELS[getTemplate()] || getTemplate();
+    if (!confirm(`「${label}」の下書きを削除しますか？`)) return;
     try {
-      await deleteDraftFromDB();
+      await deleteDraftFromDB(getTemplate());
       els.draftStatus.textContent = "下書きを削除しました";
-      els.deleteDraftBtn.classList.add("hidden");
-      els.draftRestoreBox.classList.add("hidden");
+      await refreshDraftUIForCurrentTemplate();
     } catch (err) {
       els.draftStatus.textContent = `削除に失敗しました: ${err.message || err}`;
     }
   });
 
   els.restoreDraftBtn.addEventListener("click", async () => {
-    if (!confirm("現在の内容を上書きして、保存した下書きを復元しますか？")) return;
+    const label = TEMPLATE_LABELS[getTemplate()] || getTemplate();
+    if (!confirm(`現在の内容を上書きして、「${label}」の下書きを復元しますか？`)) return;
     els.restoreDraftBtn.disabled = true;
     els.draftStatus.textContent = "復元中…";
     try {
-      const data = await loadDraftFromDB();
+      const data = await loadDraftFromDB(getTemplate());
       if (!data) {
         els.draftStatus.textContent = "下書きが見つかりませんでした";
         return;
@@ -1848,16 +3366,8 @@ if (!window.indexedDB) {
   });
 
   (async () => {
-    try {
-      const data = await loadDraftFromDB();
-      if (data) {
-        els.draftRestoreBox.classList.remove("hidden");
-        els.draftSavedAt.textContent = new Date(data.savedAt).toLocaleString("ja-JP");
-        els.deleteDraftBtn.classList.remove("hidden");
-      }
-    } catch (err) {
-      // IndexedDBが使えない/壊れている環境では下書き機能を静かに諦める
-    }
+    await migrateLegacyDraft();
+    refreshDraftUIForCurrentTemplate();
   })();
 }
 

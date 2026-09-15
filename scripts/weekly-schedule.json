@@ -1,0 +1,37 @@
+{
+  "mon": [
+    { "time": "07:00", "label": "今週チェックしたい制度", "categories": ["保存版", "知らないと損"], "genres": null },
+    { "time": "12:15", "label": "制度の詳しい解説", "categories": ["属性別", "比較"], "genres": null },
+    { "time": "20:30", "label": "クイズ", "categories": ["クイズ"], "genres": null }
+  ],
+  "tue": [
+    { "time": "07:00", "label": "知らないと損する制度", "categories": ["知らないと損"], "genres": null },
+    { "time": "12:15", "label": "会社員向け制度", "categories": null, "genres": ["会社員"] },
+    { "time": "20:30", "label": "あなたならどうする？系", "categories": ["共感"], "genres": null }
+  ],
+  "wed": [
+    { "time": "07:00", "label": "子育て支援", "categories": null, "genres": ["子育て支援", "児童手当", "保育"] },
+    { "time": "12:15", "label": "住宅・引っ越し関連", "categories": null, "genres": ["住宅"] },
+    { "time": "20:30", "label": "制度比較", "categories": ["比較"], "genres": null }
+  ],
+  "thu": [
+    { "time": "07:00", "label": "給付金", "categories": null, "genres": ["給付金"] },
+    { "time": "12:15", "label": "補助金", "categories": null, "genres": ["補助金"] },
+    { "time": "20:30", "label": "クイズ", "categories": ["クイズ"], "genres": null }
+  ],
+  "fri": [
+    { "time": "07:00", "label": "今週の制度TOP3", "categories": ["保存版"], "genres": null },
+    { "time": "12:15", "label": "年収・所得関連", "categories": null, "genres": ["所得・税"] },
+    { "time": "20:30", "label": "保存版", "categories": ["保存版"], "genres": null }
+  ],
+  "sat": [
+    { "time": "09:00", "label": "家族向け制度", "categories": null, "genres": ["家族向け", "子育て支援", "ひとり親"] },
+    { "time": "13:00", "label": "地域別制度", "categories": null, "genres": ["地域別"] },
+    { "time": "20:30", "label": "コメントを促す投稿", "categories": ["コメント誘導"], "genres": null }
+  ],
+  "sun": [
+    { "time": "09:00", "label": "週間まとめ", "categories": ["保存版"], "genres": null },
+    { "time": "13:00", "label": "来週チェックする制度", "categories": ["保存版", "知らないと損"], "genres": null },
+    { "time": "20:30", "label": "保存版＋フォロー誘導", "categories": ["保存版", "コメント誘導"], "genres": null }
+  ]
+}
