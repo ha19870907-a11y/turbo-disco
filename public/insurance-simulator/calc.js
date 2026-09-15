@@ -130,10 +130,21 @@
   };
 
   const RETURN_SCENARIOS = [
-    { key: "r-3", label: "年率-3%", rate: -0.03 },
     { key: "r0", label: "年率0%", rate: 0.0 },
     { key: "r3", label: "年率3%（標準）", rate: 0.03 },
     { key: "r6", label: "年率6%", rate: 0.06 },
+  ];
+
+  // 特別勘定（運用先）のプリセット。資産運用関係費用（年率）はイメージしやすいよう
+  // 資産クラスごとに一般的な水準感で設定した独自の仮定であり、特定商品の実際の
+  // 費用率ではない。"custom" を選んだ場合は呼び出し側で任意の値を指定する。
+  const SPECIAL_ACCOUNTS = [
+    { key: "balanced", label: "バランス型", mgmtFeeAnnualRate: 0.018 },
+    { key: "domestic_stock", label: "国内株式型", mgmtFeeAnnualRate: 0.02 },
+    { key: "global_stock", label: "世界株式型", mgmtFeeAnnualRate: 0.022 },
+    { key: "bond", label: "債券型", mgmtFeeAnnualRate: 0.012 },
+    { key: "money", label: "短期金融市場型（MMF等）", mgmtFeeAnnualRate: 0.008 },
+    { key: "custom", label: "カスタム設定", mgmtFeeAnnualRate: null },
   ];
 
   // 1シナリオ分の年次推移をシミュレーションする。
@@ -258,9 +269,13 @@
     return { rows, lapsed, lapseAge, finalAccountValue: rows.length ? rows[rows.length - 1].accountValue : 0 };
   }
 
-  // 標準的な4つの運用シナリオ（-3%/0%/3%/6%）についてまとめて計算する。
-  function simulateAllScenarios(params) {
-    return RETURN_SCENARIOS.map((scenario) => ({
+  // 指定された運用シナリオ（{key,label,rate}の配列）についてまとめて計算する。
+  // scenarios を省略した場合は標準の3パターン（0%/3%/6%）を使う。
+  function simulateAllScenarios(params, scenarios = RETURN_SCENARIOS) {
+    if (!Array.isArray(scenarios) || scenarios.length === 0) {
+      throw new Error("運用シナリオを1つ以上指定してください");
+    }
+    return scenarios.map((scenario) => ({
       ...scenario,
       result: simulateScenario({ ...params, annualReturnRate: scenario.rate }),
     }));
@@ -271,6 +286,7 @@
     SIM_END_AGE,
     DEFAULT_ASSUMPTIONS,
     RETURN_SCENARIOS,
+    SPECIAL_ACCOUNTS,
     annualMortalityRate,
     monthlyMortalityRate,
     computeNetPremiumRate,

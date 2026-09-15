@@ -2,10 +2,10 @@
   "use strict";
 
   const SCENARIO_COLORS = {
-    "r-3": "#f87171",
     r0: "#ff9d3d",
     r3: "#4fd1c5",
     r6: "#4ade80",
+    custom: "#f87171",
   };
 
   const yen = (n) => `${Math.round(n).toLocaleString("ja-JP")}円`;
@@ -13,10 +13,69 @@
   const form = document.getElementById("sim-form");
   const errorBox = document.getElementById("error-box");
   const resultsSection = document.getElementById("results");
+  const specialAccountSelect = document.getElementById("specialAccount");
+  const customMgmtFeeField = document.getElementById("customMgmtFeeField");
 
   let lastScenarioResults = null;
   let lastParams = null;
   let activeScenarioKey = "r3";
+
+  function initSpecialAccountOptions() {
+    InsuranceCalc.SPECIAL_ACCOUNTS.forEach((account) => {
+      const opt = document.createElement("option");
+      opt.value = account.key;
+      opt.textContent = account.key === "custom"
+        ? account.label
+        : `${account.label}（資産運用関係費用 年率${(account.mgmtFeeAnnualRate * 100).toFixed(1)}%）`;
+      specialAccountSelect.appendChild(opt);
+    });
+    specialAccountSelect.value = "balanced";
+    updateCustomMgmtFeeVisibility();
+  }
+
+  function updateCustomMgmtFeeVisibility() {
+    customMgmtFeeField.hidden = specialAccountSelect.value !== "custom";
+  }
+
+  specialAccountSelect.addEventListener("change", updateCustomMgmtFeeVisibility);
+
+  function readMgmtFeeAnnualRate() {
+    const account = InsuranceCalc.SPECIAL_ACCOUNTS.find((a) => a.key === specialAccountSelect.value);
+    if (!account) throw new Error("特別勘定を選択してください");
+    if (account.key === "custom") {
+      const rate = Number(document.getElementById("customMgmtFee").value) / 100;
+      if (!Number.isFinite(rate) || rate < 0) {
+        throw new Error("カスタムの資産運用関係費用を正しく入力してください");
+      }
+      return rate;
+    }
+    return account.mgmtFeeAnnualRate;
+  }
+
+  function readReturnScenarios() {
+    const scenarios = [];
+    if (document.getElementById("scn-r0").checked) {
+      scenarios.push({ key: "r0", label: "年率0%", rate: 0 });
+    }
+    if (document.getElementById("scn-r3").checked) {
+      scenarios.push({ key: "r3", label: "年率3%（標準）", rate: 0.03 });
+    }
+    if (document.getElementById("scn-r6").checked) {
+      scenarios.push({ key: "r6", label: "年率6%", rate: 0.06 });
+    }
+    if (document.getElementById("scn-custom").checked) {
+      const rateInput = document.getElementById("scn-custom-rate").value;
+      const rate = Number(rateInput) / 100;
+      if (!Number.isFinite(rate)) {
+        throw new Error("カスタム運用利回りを正しく入力してください");
+      }
+      scenarios.push({ key: "custom", label: `カスタム（年率${rateInput}%）`, rate });
+    }
+    if (scenarios.length === 0) {
+      throw new Error("運用利回りシナリオを1つ以上選択してください");
+    }
+    return scenarios;
+  }
 
   function readParams() {
     const issueAge = Number(document.getElementById("issueAge").value);
@@ -27,7 +86,7 @@
 
     const pricingAnnualRate = Number(document.getElementById("pricingRate").value) / 100;
     const expenseLoadingRate = Number(document.getElementById("expenseLoading").value) / 100;
-    const mgmtFeeAnnualRate = Number(document.getElementById("mgmtFee").value) / 100;
+    const mgmtFeeAnnualRate = readMgmtFeeAnnualRate();
     const maintenanceFeeMonthly = Number(document.getElementById("maintenanceFee").value);
     const initialCostRate = Number(document.getElementById("initialCost").value) / 100;
     const coiLoadingFactor = Number(document.getElementById("coiLoading").value) / 100;
@@ -62,6 +121,10 @@
   function renderPremiumSummary(params, premium) {
     document.getElementById("out-monthly").textContent = yen(premium.monthlyPremium);
     document.getElementById("out-annual").textContent = yen(premium.annualPremium);
+
+    const account = InsuranceCalc.SPECIAL_ACCOUNTS.find((a) => a.key === specialAccountSelect.value);
+    document.getElementById("out-special-account").textContent =
+      `${account.label}（資産運用関係費用 年率${(params.mgmtFeeAnnualRate * 100).toFixed(2)}%）`;
 
     const endAge = params.payToAge !== null ? params.payToAge : InsuranceCalc.SIM_END_AGE;
     const years = endAge - params.issueAge;
@@ -259,14 +322,18 @@
     errorBox.textContent = "";
     try {
       const params = readParams();
+      const scenarios = readReturnScenarios();
       const premium = InsuranceCalc.computeSuggestedMonthlyPremium(params);
-      const scenarioResults = InsuranceCalc.simulateAllScenarios({
-        ...params,
-        monthlyPremium: premium.monthlyPremium,
-      });
+      const scenarioResults = InsuranceCalc.simulateAllScenarios(
+        { ...params, monthlyPremium: premium.monthlyPremium },
+        scenarios
+      );
 
       lastParams = params;
       lastScenarioResults = scenarioResults;
+      if (!scenarioResults.some((s) => s.key === activeScenarioKey)) {
+        activeScenarioKey = scenarioResults[0].key;
+      }
 
       renderPremiumSummary(params, premium);
       buildChart(params, scenarioResults);
@@ -281,4 +348,6 @@
       resultsSection.classList.remove("visible");
     }
   });
+
+  initSpecialAccountOptions();
 })();

@@ -169,7 +169,7 @@ test("simulateScenario: 不正な月払保険料はエラーになる", () => {
   );
 });
 
-test("simulateAllScenarios: 4シナリオすべてが返る", () => {
+test("simulateAllScenarios: 既定では0%/3%/6%の3シナリオが返る", () => {
   const results = simulateAllScenarios({
     issueAge: 35,
     gender: "female",
@@ -177,11 +177,46 @@ test("simulateAllScenarios: 4シナリオすべてが返る", () => {
     payToAge: 65,
     monthlyPremium: 12000,
   });
-  assert.equal(results.length, 4);
+  assert.equal(results.length, 3);
+  assert.deepEqual(results.map((r) => r.key), ["r0", "r3", "r6"]);
   for (const r of results) {
     assert.ok(Array.isArray(r.result.rows));
     assert.ok(r.result.rows.length > 0);
   }
+});
+
+test("simulateAllScenarios: カスタムシナリオを含む任意のリストを指定できる", () => {
+  const customScenarios = [
+    { key: "r0", label: "年率0%", rate: 0 },
+    { key: "r3", label: "年率3%", rate: 0.03 },
+    { key: "r6", label: "年率6%", rate: 0.06 },
+    { key: "custom", label: "カスタム(年率9%)", rate: 0.09 },
+  ];
+  const results = simulateAllScenarios(
+    {
+      issueAge: 35,
+      gender: "female",
+      sumAssured: 10000000,
+      payToAge: 65,
+      monthlyPremium: 12000,
+    },
+    customScenarios
+  );
+  assert.equal(results.length, 4);
+  const custom = results.find((r) => r.key === "custom");
+  const r6 = results.find((r) => r.key === "r6");
+  const lastCustom = custom.result.rows[custom.result.rows.length - 1].accountValue;
+  const lastR6 = r6.result.rows[r6.result.rows.length - 1].accountValue;
+  assert.ok(lastCustom > lastR6, "9%シナリオは6%シナリオより特別勘定価格が大きいはず");
+});
+
+test("simulateAllScenarios: 空のシナリオリストはエラーになる", () => {
+  assert.throws(() =>
+    simulateAllScenarios(
+      { issueAge: 35, gender: "female", sumAssured: 10000000, payToAge: 65, monthlyPremium: 12000 },
+      []
+    )
+  );
 });
 
 test("simulateScenario: 契約年齢がシミュレーション終了年齢以上だとエラー", () => {
