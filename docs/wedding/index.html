@@ -566,11 +566,32 @@
         Safari／Chromeで直接このページを開いているかご確認ください（アプリ内ブラウザではファイル選択が
         正しく動作しないことがあります）。
       </p>
+      <h3 id="bgm-common-heading">BGM</h3>
       <div id="bgm-dropzone" class="dropzone bgm-dropzone">
         <p>ここに音楽ファイルをドラッグ＆ドロップ（複数可）<br />またはクリックして選択</p>
         <input id="bgm-input" type="file" multiple hidden />
       </div>
       <div id="bgm-list" class="bgm-list"></div>
+
+      <div id="opening-bgm-parts" class="hidden">
+        <p class="hint">
+          「オープニング演出」テンプレートでは、新郎パート・新婦パートだけ専用のBGMに切り替えられます。
+          空欄のままにしたパートは、上のBGMがそのまま流れます。
+        </p>
+        <h3>新郎パート専用BGM（任意）</h3>
+        <div id="groom-bgm-dropzone" class="dropzone bgm-dropzone">
+          <p>ここに音楽ファイルをドラッグ＆ドロップ（複数可）<br />またはクリックして選択</p>
+          <input id="groom-bgm-input" type="file" multiple hidden />
+        </div>
+        <div id="groom-bgm-list" class="bgm-list"></div>
+
+        <h3>新婦パート専用BGM（任意）</h3>
+        <div id="bride-bgm-dropzone" class="dropzone bgm-dropzone">
+          <p>ここに音楽ファイルをドラッグ＆ドロップ（複数可）<br />またはクリックして選択</p>
+          <input id="bride-bgm-input" type="file" multiple hidden />
+        </div>
+        <div id="bride-bgm-list" class="bgm-list"></div>
+      </div>
 
       <div class="beat-sync-box">
         <label class="checkbox-label">
@@ -588,6 +609,9 @@
           リストの先頭のBGMのテンポを解析し、写真・動画の表示時間をそのテンポに自動で合わせます
           （動画の「使用秒数」設定は上書きされます）。テンポ検出は完全ではないため、曲によっては
           ズレが生じる場合があります。有効にすると無音プレビューとは長さが変わります。
+          新郎・新婦パート専用BGMを使う場合も、テンポの解析自体は共通BGM（無ければ新郎・新婦の
+          いずれか）の1曲だけで行うため、パートごとにテンポが大きく異なる曲を選んでいると、
+          そのパートではカットのタイミングが少しずれることがあります。
         </p>
       </div>
 
@@ -628,6 +652,6 @@
     </p>
   </footer>
 
-  <script src="app.js?v=39"></script>
+  <script src="app.js?v=40"></script>
 </body>
 </html>
