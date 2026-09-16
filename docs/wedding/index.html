@@ -519,6 +519,17 @@
 
     <section class="panel panel-cta">
       <h2><span class="step-icon">🎬</span>ムービーを作成</h2>
+      <label>書き出し解像度
+        <select id="export-resolution">
+          <option value="720">標準 (1280×720 / 16:9)</option>
+          <option value="1080">フルHD (1920×1080 / 16:9) — 結婚式場のスクリーン・DVD向け</option>
+        </select>
+      </label>
+      <p class="hint">
+        どちらも画面の縦横比は16:9です。結婚式場の大きいスクリーンに映す場合や、DVD作成を
+        業者（カメラのキタムラなど）に依頼する場合は「フルHD」がおすすめです（ファイルサイズは
+        大きくなり、書き出しにも時間がかかります）。
+      </p>
       <p id="duration-estimate" class="hint"></p>
       <button id="create-btn" class="primary-btn" type="button">ムービーを作成（音声なし）</button>
       <div id="progress-box" class="progress-box hidden">
@@ -617,6 +628,6 @@
     </p>
   </footer>
 
-  <script src="app.js?v=38"></script>
+  <script src="app.js?v=39"></script>
 </body>
 </html>
