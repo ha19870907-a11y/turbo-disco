@@ -24,6 +24,9 @@ const INTRO_DUR = 3.2;
 const OUTRO_DUR = 3.2;
 const FADE = 0.6;
 const ZOOM_AMOUNT = 0.16;
+// 動画の一番最後にかける「プチュン」演出（レトロテレビの電源オフ風に、
+// 画面が縦→横の順に収縮して一点に消える）の長さ。
+const ENDING_POP_DURATION = 0.45;
 // 写真をフレームいっぱいに拡大表示（cover）する際、縦方向がフレームより
 // はみ出す（＝上下がトリミングされる）構図では、中央基準で切り抜くと
 // 人物の顔が上端で切れてしまうことが多い。顔は写真の上寄りに写ることが
@@ -2226,6 +2229,10 @@ function easeOutCubic(x) {
   return 1 - Math.pow(1 - x, 3);
 }
 
+function easeInQuad(x) {
+  return x * x;
+}
+
 function drawCountdownNumber(ctx, seg, localT, settings) {
   impactCtx.clearRect(0, 0, CANVAS_W, CANVAS_H);
   impactCtx.fillStyle = "#000000";
@@ -2258,6 +2265,14 @@ transitionBufferB.width = CANVAS_W;
 transitionBufferB.height = CANVAS_H;
 const transitionCtxA = transitionBufferA.getContext("2d");
 const transitionCtxB = transitionBufferB.getContext("2d");
+
+// 動画の最後、画面が「プチュン」と収縮して消えるエンディング演出用の
+// オフスクリーンバッファ（通常の描画結果を一旦ここに描いてから、収縮させながら
+// 本番のcanvasへ合成する）。
+const endingBuffer = document.createElement("canvas");
+endingBuffer.width = CANVAS_W;
+endingBuffer.height = CANVAS_H;
+const endingCtx = endingBuffer.getContext("2d");
 
 // "ランダム"指定時、写真の切り替えごとに使う効果を決める。
 // インデックスから決定的に導出するので、BGM追加時の再生成でも同じ映像になる。
@@ -2392,9 +2407,66 @@ function compositeTransition(ctx, canvasA, canvasB, progress, type) {
   }
 }
 
+// 動画の一番最後(ENDING_POP_DURATION秒間)に、それまで通り描いた内容を
+// レトロテレビの電源オフのように収縮させて消す。縦方向に潰れて横一直線に
+// なっていく動きに続けて（後半は重なりながら）その線が中央の点まで収縮して
+// 消え、その途中で中心が一瞬明るく光る（「プチュン」という擬音のイメージ）。
+function drawEndingPop(ctx, sourceCanvas, progress) {
+  ctx.fillStyle = "#000000";
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  if (progress >= 1) return;
+
+  const collapseP = Math.min(progress / 0.55, 1); // 縦方向の収縮: 0-55%
+  const shrinkP = Math.max(0, Math.min((progress - 0.45) / 0.4, 1)); // 横方向の収縮: 45-85%
+  const scaleY = Math.max(1 - easeInQuad(collapseP) * 0.985, 0.015);
+  const scaleX = Math.max(1 - easeInQuad(shrinkP), 0);
+
+  if (scaleX > 0.001) {
+    ctx.save();
+    ctx.translate(CANVAS_W / 2, CANVAS_H / 2);
+    ctx.scale(scaleX, scaleY);
+    ctx.translate(-CANVAS_W / 2, -CANVAS_H / 2);
+    ctx.drawImage(sourceCanvas, 0, 0, CANVAS_W, CANVAS_H);
+    ctx.restore();
+  }
+
+  // 収縮していく映像そのものを覆う白いハイライト（progress=0.5あたりでピーク）。
+  // 収縮中の映像と同じ大きさ・形で重ねることで、本物のブラウン管テレビが
+  // 電源オフ時に一瞬白く発光しながら収縮するような質感を出す。点まで
+  // 収縮しきる頃には自然に減衰している。
+  const flashAlpha = Math.sin(progress * Math.PI) * 0.8;
+  if (flashAlpha > 0.01) {
+    ctx.save();
+    ctx.globalAlpha = flashAlpha;
+    ctx.fillStyle = "#ffffff";
+    const glowW = Math.max(CANVAS_W * scaleX, 4);
+    const glowH = Math.max(CANVAS_H * scaleY, 3);
+    ctx.beginPath();
+    ctx.ellipse(CANVAS_W / 2, CANVAS_H / 2, glowW / 2, glowH / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
 function drawFrame(ctx, timeline, t, settings) {
   const { segments, startTimes, total } = timeline;
   t = Math.min(t, total);
+
+  // 「オープニング演出」は新郎新婦の生登場に向けて盛り上げて終わる演出のため、
+  // 画面のビネットも、末尾の「プチュン」演出（テレビの電源オフ風に消える）も
+  // 対象外にする（生登場の直前で画面が消えてしまうと逆効果になるため）。
+  const isOpening = settings.template === "opening";
+
+  // 動画の最後のENDING_POP_DURATION秒間は「プチュン」演出をかけるため、
+  // 通常の描画は一旦オフスクリーンバッファ(endingCtx)に描いてから、
+  // 収縮させながら本番のctxへ合成する。それ以外の区間は今まで通りctxに
+  // 直接描画する。
+  const endingEffectStart = Math.max(total - ENDING_POP_DURATION, 0);
+  const inEndingEffect = !isOpening && t >= endingEffectStart;
+  const targetCtx = inEndingEffect ? endingCtx : ctx;
+  if (inEndingEffect) {
+    endingCtx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+  }
 
   // 「開始時刻 <= t」を満たす最後のセグメントが現在のセグメント。
   // finalizeTimelineは切り替え時間の分だけ次のセグメントの開始時刻を早めているため、
@@ -2411,7 +2483,7 @@ function drawFrame(ctx, timeline, t, settings) {
 
   if (!inTransition) {
     const localT = t - startTimes[activeIndex];
-    drawSegment(ctx, segments[activeIndex], localT, settings);
+    drawSegment(targetCtx, segments[activeIndex], localT, settings);
   } else {
     const prevSeg = segments[prevIndex];
     const curSeg = segments[activeIndex];
@@ -2423,11 +2495,16 @@ function drawFrame(ctx, timeline, t, settings) {
     transitionCtxB.clearRect(0, 0, CANVAS_W, CANVAS_H);
     drawSegment(transitionCtxB, curSeg, curLocalT, settings);
     const type = pickTransitionType(settings, prevIndex);
-    compositeTransition(ctx, transitionBufferA, transitionBufferB, progress, type);
+    compositeTransition(targetCtx, transitionBufferA, transitionBufferB, progress, type);
   }
 
-  if (settings.template !== "opening") {
-    drawVignette(ctx, settings.theme.accent);
+  if (!isOpening) {
+    drawVignette(targetCtx, settings.theme.accent);
+  }
+
+  if (inEndingEffect) {
+    const effectProgress = Math.min((t - endingEffectStart) / ENDING_POP_DURATION, 1);
+    drawEndingPop(ctx, endingBuffer, effectProgress);
   }
 }
 
@@ -3085,7 +3162,7 @@ async function renderVideo({ bgm, beatSyncCutDuration, onProgress } = {}) {
   // canvasと同じ拡大率で作り直す（同じくctx.scale()を掛けておく）。これを
   // しないと、これらのバッファは常に等倍(1280x720)のまま拡大表示されることに
   // なり、カット切り替えやインパクトテキストの瞬間だけ動画がぼやけてしまう。
-  [transitionCtxA, transitionCtxB, impactCtx].forEach((c) => {
+  [transitionCtxA, transitionCtxB, impactCtx, endingCtx].forEach((c) => {
     c.canvas.width = CANVAS_W * exportScale;
     c.canvas.height = CANVAS_H * exportScale;
     if (exportScale !== 1) c.scale(exportScale, exportScale);
@@ -3137,6 +3214,12 @@ async function renderVideo({ bgm, beatSyncCutDuration, onProgress } = {}) {
     requestAnimationFrame(frame);
   });
 
+  // captureStream()は独立したタイミングでフレームを間引いてサンプリングするため、
+  // ループ終了直後にすぐstop()すると、直前に描いた最後のフレーム（「プチュン」
+  // 演出が完全に収縮しきった黒画面など）がまだ一度もサンプリングされずに
+  // 録画から欠落することがある。少し待ってから止めることで、確実に最後の
+  // フレームが収録されるようにする。
+  await new Promise((resolve) => setTimeout(resolve, 150));
   recorder.stop();
   const blob = await stopped;
   if (audioCleanup) audioCleanup();
