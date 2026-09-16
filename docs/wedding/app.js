@@ -1456,30 +1456,32 @@ function computeOpeningTimeline(settings) {
   });
 
   // 2. 新郎パート
-  const groomStartIdx = segments.length;
   pushImpact(
     [`GROOM: ${settings.groomName}`, settings.groomSub1, settings.groomSub2].filter(Boolean),
     2,
     { bigFontSize: 44, lineHeight: 54 }
   );
+  // BGMの開始・切り替えタイミングは、名前カードではなく実際に写真が
+  // 流れ始める時点を基準にする。
+  const groomStartIdx = segments.length;
   settings.groomPhotos.forEach((photo, i) => {
     segments.push({ type: "photo", duration: mediaDuration(photo, settings), photo, variant: i % 4 });
   });
 
   // 3. 新婦パート
-  const brideStartIdx = segments.length;
   pushImpact(
     [`BRIDE: ${settings.brideName}`, settings.brideSub1, settings.brideSub2].filter(Boolean),
     2,
     { bigFontSize: 44, lineHeight: 54 }
   );
+  const brideStartIdx = segments.length;
   settings.bridePhotos.forEach((photo, i) => {
     segments.push({ type: "photo", duration: mediaDuration(photo, settings), photo, variant: i % 4 });
   });
 
   // 4. 2人の出会い〜思い出パート
-  const togetherStartIdx = segments.length;
   pushImpact(["TWO PATHS CROSS", "SPECIAL MEMORIES"], 2, { bigFontSize: 48 });
+  const togetherStartIdx = segments.length;
   settings.togetherPhotos.forEach((photo, i) => {
     segments.push({ type: "photo", duration: mediaDuration(photo, settings), photo, variant: i % 4 });
   });
@@ -1496,13 +1498,19 @@ function computeOpeningTimeline(settings) {
   });
 
   const timeline = finalizeTimeline(segments, settings.transitionDuration, duckIndices);
-  // 新郎・新婦パート専用BGMを、それぞれのパートの時間帯にだけ差し替えられる
-  // ようにするための境界時刻（buildBgmSchedule()で使用）。
-  timeline.openingBgmZones = {
-    groomStart: timeline.startTimes[groomStartIdx],
-    brideStart: timeline.startTimes[brideStartIdx],
-    togetherStart: timeline.startTimes[togetherStartIdx],
-  };
+  // BGMの開始・切り替え境界時刻（buildBgmSchedule()で使用）。各*StartIdxは
+  // 名前カードではなく、そのパートの最初の写真の開始時刻を指す
+  // （カウントダウン中は無音にし、実際に写真が流れ始めたらBGMを流すため）。
+  let brideStart = timeline.startTimes[brideStartIdx];
+  const togetherStart = timeline.startTimes[togetherStartIdx];
+  let groomStart = timeline.startTimes[groomStartIdx];
+  // 新郎・新婦パートに写真が1枚も無い場合、そのパートの区間には次のパートの
+  // 名前カードしか存在しない。専用BGM・無音区間をそのカードにまで適用すると、
+  // 例えば新婦の名前カードに新郎専用BGMが被ってしまうため、写真が無いパートは
+  // 実質無いものとして次のパートに繰り込む。
+  if (settings.bridePhotos.length === 0) brideStart = togetherStart;
+  if (settings.groomPhotos.length === 0) groomStart = brideStart;
+  timeline.openingBgmZones = { groomStart, brideStart, togetherStart };
   return timeline;
 }
 
@@ -2878,16 +2886,16 @@ function buildAudioSchedule(infos, totalDuration) {
 
 // BGM設定（共通／新郎パート専用／新婦パート専用）とタイムラインから、実際に
 // 再生するスケジュール（クロスフェード込みの時系列リスト）を組み立てる。
-// 新郎・新婦パート専用のBGMが指定されている場合（新郎新婦パートのある
-// オープニング演出のみ該当）は、そのパートの時間帯だけ専用の曲に差し替え、
-// 指定が無い部分（イントロ・2人の思い出パート・クライマックスなど）は
-// 共通BGMをそのまま使う。専用BGMが1つも指定されていない場合は、これまで
-// 通り共通BGM1本を動画全体に敷く。
+// オープニング演出では、カウントダウン中はBGMを流さず、新郎パート（＝写真が
+// 流れ始めるタイミング）から再生を始める。新郎・新婦パート専用のBGMが指定
+// されている場合は、そのパートの時間帯だけ専用の曲に差し替え、指定が無い
+// 部分（2人の思い出パート・クライマックスなど）は共通BGMをそのまま使う。
+// オープニング演出以外のテンプレートには、この「カウントダウン中は無音」の
+// 概念自体が無いため、共通BGM1本を動画全体に敷く（従来通り）。
 async function buildBgmSchedule(bgm, timeline) {
   const zones = timeline.openingBgmZones;
-  const hasPartBgm = zones && (bgm.groom.length > 0 || bgm.bride.length > 0);
 
-  if (!hasPartBgm) {
+  if (!zones) {
     const commonInfos = await Promise.all(bgm.common.map(loadAudioDuration));
     return buildAudioSchedule(commonInfos, timeline.total);
   }
@@ -2900,15 +2908,29 @@ async function buildBgmSchedule(bgm, timeline) {
     Promise.all(bgm.bride.map(loadAudioDuration)),
   ]);
 
-  const zoneList = [
-    { start: 0, end: zones.groomStart, infos: commonInfos },
+  const rawZones = [
+    { start: 0, end: zones.groomStart, infos: [] }, // カウントダウン中は無音
     { start: zones.groomStart, end: zones.brideStart, infos: groomInfos.length ? groomInfos : commonInfos },
     { start: zones.brideStart, end: zones.togetherStart, infos: brideInfos.length ? brideInfos : commonInfos },
     { start: zones.togetherStart, end: timeline.total, infos: commonInfos },
   ];
 
+  // 隣り合うゾーンが専用BGM未指定で同じ共通BGMにフォールバックしている場合、
+  // ゾーンごとに別々のスケジュールとして組み立てると、パートの境目で共通BGMが
+  // 曲の先頭から不自然にリスタートしてしまう。同じ曲リストが連続するゾーンは
+  // 1つの区間にまとめてから組み立てることで、継続して自然に流れるようにする。
+  const mergedZones = [];
+  rawZones.forEach((zone) => {
+    const prev = mergedZones[mergedZones.length - 1];
+    if (prev && prev.infos === zone.infos) {
+      prev.end = zone.end;
+    } else {
+      mergedZones.push({ ...zone });
+    }
+  });
+
   const schedule = [];
-  zoneList.forEach(({ start, end, infos }) => {
+  mergedZones.forEach(({ start, end, infos }) => {
     const zoneDuration = end - start;
     if (zoneDuration <= 0 || infos.length === 0) return;
     buildAudioSchedule(infos, zoneDuration).forEach((item) => {
@@ -2976,7 +2998,11 @@ async function setupAudioPlaylist(schedule, totalDuration, audioDucks = []) {
     activeIsA = !activeIsA;
   }
 
-  if (schedule.length > 0) {
+  // スケジュールの先頭がt=0から始まる場合（従来通りの、動画全体にBGMを敷く
+  // ケース）は録画開始前に再生を始めておく。オープニング演出のカウントダウン中
+  // など、先頭のBGMがt=0より後から始まる場合は、ここでは何も再生を始めず、
+  // 実際の動画時刻がその時刻に達した時点でonFrame()に再生を開始させる。
+  if (schedule.length > 0 && schedule[0].start <= 0) {
     await playScheduleItem(0);
   }
 
