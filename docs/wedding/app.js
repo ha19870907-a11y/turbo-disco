@@ -24,6 +24,14 @@ const INTRO_DUR = 3.2;
 const OUTRO_DUR = 3.2;
 const FADE = 0.6;
 const ZOOM_AMOUNT = 0.16;
+// 写真をフレームいっぱいに拡大表示（cover）する際、縦方向がフレームより
+// はみ出す（＝上下がトリミングされる）構図では、中央基準で切り抜くと
+// 人物の顔が上端で切れてしまうことが多い。顔は写真の上寄りに写ることが
+// 多いという前提で、切り抜きの基準位置を中央(0.5)より上寄りにする。
+const FACE_SAFE_VERTICAL_ANCHOR = 0.15;
+// Ken Burns効果（ズーム＋パン）で縦方向に動かす量も、通常よりかなり
+// 抑える。フルに振ると顔基準の位置から外れてまた切れてしまうため。
+const FACE_SAFE_VERTICAL_PAN_RATIO = 0.15;
 const TRANSITION_TYPES = ["crossfade", "slide", "zoom", "wipe", "flash", "circle", "rotatezoom", "blur"];
 const AUDIO_CROSSFADE_SEC = 1.2;
 
@@ -1821,6 +1829,23 @@ function drawCaption(ctx, text, localT, duration, theme, style, fadeMode, fontSi
   ctx.restore();
 }
 
+// 写真をフレームいっぱいに拡大表示(cover)しつつKen Burns風にズーム/パンする際の
+// オフセット量を計算する。縦方向がフレームよりはみ出す構図（＝上下がトリミング
+// される）場合は、切り抜きの基準を上寄りにし、縦方向のパン量も抑えることで、
+// 上寄りに写りがちな人物の顔ができるだけ画面内に収まるようにする。
+function computeKenBurnsOffset(imgRatio, frameRatio, drawW, drawH, frameW, frameH, dx, dy, panProgress) {
+  const maxOffsetX = (drawW - frameW) / 2;
+  const fullMaxOffsetY = (drawH - frameH) / 2;
+  const isVerticalCrop = imgRatio <= frameRatio;
+  const verticalAnchor = isVerticalCrop ? FACE_SAFE_VERTICAL_ANCHOR : 0.5;
+  const baseOffsetY = fullMaxOffsetY * (1 - 2 * verticalAnchor);
+  const maxOffsetY = isVerticalCrop ? fullMaxOffsetY * FACE_SAFE_VERTICAL_PAN_RATIO : fullMaxOffsetY;
+  return {
+    offsetX: dx * maxOffsetX * panProgress,
+    offsetY: baseOffsetY + dy * maxOffsetY * panProgress,
+  };
+}
+
 function drawPhoto(ctx, seg, localT, settings) {
   const isVideo = seg.photo.kind === "video";
   const img = isVideo ? seg.photo.videoEl : seg.photo.img;
@@ -1865,9 +1890,6 @@ function drawPhoto(ctx, seg, localT, settings) {
   const drawW = baseW * scale;
   const drawH = baseH * scale;
 
-  const maxOffsetX = (drawW - frameW) / 2;
-  const maxOffsetY = (drawH - frameH) / 2;
-
   const directions = [
     [-1, -1],
     [1, 1],
@@ -1876,8 +1898,17 @@ function drawPhoto(ctx, seg, localT, settings) {
   ];
   const [dx, dy] = directions[seg.variant % directions.length];
   const panProgress = zoomIn ? progress : 1 - progress;
-  const offsetX = dx * maxOffsetX * panProgress;
-  const offsetY = dy * maxOffsetY * panProgress;
+  const { offsetX, offsetY } = computeKenBurnsOffset(
+    imgRatio,
+    canvasRatio,
+    drawW,
+    drawH,
+    frameW,
+    frameH,
+    dx,
+    dy,
+    panProgress
+  );
 
   const bgGrad = ctx.createLinearGradient(0, 0, CANVAS_W, CANVAS_H);
   bgGrad.addColorStop(0, settings.theme.bg1);
@@ -2257,8 +2288,6 @@ function drawCoverZoomPhoto(ctx, img, progress, variant, frameX, frameY, frameW,
   }
   const drawW = baseW * scale;
   const drawH = baseH * scale;
-  const maxOffsetX = (drawW - frameW) / 2;
-  const maxOffsetY = (drawH - frameH) / 2;
   const directions = [
     [-1, -1],
     [1, 1],
@@ -2267,8 +2296,17 @@ function drawCoverZoomPhoto(ctx, img, progress, variant, frameX, frameY, frameW,
   ];
   const [dx, dy] = directions[variant % directions.length];
   const panProgress = zoomIn ? progress : 1 - progress;
-  const offsetX = dx * maxOffsetX * panProgress;
-  const offsetY = dy * maxOffsetY * panProgress;
+  const { offsetX, offsetY } = computeKenBurnsOffset(
+    imgRatio,
+    frameRatio,
+    drawW,
+    drawH,
+    frameW,
+    frameH,
+    dx,
+    dy,
+    panProgress
+  );
 
   ctx.save();
   ctx.beginPath();
