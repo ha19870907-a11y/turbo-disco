@@ -21,7 +21,10 @@ const ODDS_SOURCES = [
   { base: "https://raw.githubusercontent.com/lamrongol/BoatraceOdds/gh-pages/docs/v3", label: "オッズ補完ミラー" },
 ];
 
-const CACHE_TTL_MS = 60 * 1000; // 元データの更新間隔(約3分)より短い周期でポーリングして反映を早める
+// 元データの更新間隔(約3分)より短い周期でポーリングして反映を早める。
+// 画面側の自動更新間隔(30秒)より確実に短くし、毎回のポーリングで必ずキャッシュが
+// 失効している状態にすることで、「更新されたのに画面には1周期遅れで反映される」事故を防ぐ。
+const CACHE_TTL_MS = 25 * 1000;
 const FETCH_TIMEOUT_MS = 10 * 1000;
 
 const memoryCache = new Map(); // date -> { data, fetchedAt }

@@ -13,7 +13,7 @@ const state = {
   // 30秒ごとの自動更新ではloadSeqも進むため、過去実績取得の中断判定にはこちらを使う。
 };
 
-const STADIUM_RETRY_MS = 60000; // その日のデータがまだ無い場合、これくらいの間隔で自動的に再試行する
+const STADIUM_RETRY_MS = 30000; // その日のデータがまだ無い場合、これくらいの間隔で自動的に再試行する
 
 const el = {
   dateInput: document.getElementById("date-input"),
@@ -135,7 +135,7 @@ async function loadStadiums() {
       el.stadiumGrid.innerHTML = `
         <div class="empty-state">
           この日の開催データがまだありません。実際にレースが開催中でも、データ提供元
-          （非公式）側の生成が追いついていない場合があります。60秒ごとに自動で再確認しますが、
+          （非公式）側の生成が追いついていない場合があります。30秒ごとに自動で再確認しますが、
           今すぐ確認したい場合は下のボタンを押してください。
         </div>
         <div style="text-align:center"><button id="stadium-retry-btn" class="ghost-btn" type="button">今すぐ再確認する</button></div>
@@ -164,7 +164,7 @@ async function loadStadiums() {
     setStatusBadge(null, err.message);
     const isToday = state.date === todayJst() && !state.sample;
     el.stadiumGrid.innerHTML = `
-      <div class="empty-state">${err.message}${isToday ? "（60秒ごとに自動で再確認します）" : ""}</div>
+      <div class="empty-state">${err.message}${isToday ? "（30秒ごとに自動で再確認します）" : ""}</div>
       ${isToday ? `<div style="text-align:center"><button id="stadium-retry-btn" class="ghost-btn" type="button">今すぐ再確認する</button></div>` : ""}
     `;
     document.getElementById("stadium-retry-btn")?.addEventListener("click", loadStadiums);

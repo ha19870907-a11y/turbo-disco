@@ -359,7 +359,7 @@ docs/                   静的PWA版（GitHub Pages公開用、サーバー不�
   fixtures/                    サンプルデータ表示モード用の実データ（2026-04-01）
 
 server.js              Express サーバー・APIエンドポイント（Node版）
-src/turnmarkClient.js  外部APIの取得・キャッシュ（TTL 60秒）・ミラーフォールバック
+src/turnmarkClient.js  外部APIの取得・キャッシュ（TTL 25秒）・ミラーフォールバック
 src/predictor.js        予想スコアリングロジック
 src/stadiums.js         競艇場番号 → 場名マッピング
 src/dateUtil.js         日本時間の日付ユーティリティ
