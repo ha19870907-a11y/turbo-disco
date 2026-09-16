@@ -336,5 +336,18 @@
     "angle": "注意点",
     "threadId": "18020091944875859",
     "postedAt": "2026-09-16T11:36:30.827Z"
+  },
+  {
+    "date": "2026-09-17",
+    "dayKey": "thu",
+    "slotIndex": 0,
+    "time": "07:00",
+    "label": "給付金",
+    "templateId": "TPL-031",
+    "genre": "給付金",
+    "category": "属性別",
+    "angle": "対象者",
+    "threadId": "17908131429307040",
+    "postedAt": "2026-09-16T22:03:49.059Z"
   }
 ]
