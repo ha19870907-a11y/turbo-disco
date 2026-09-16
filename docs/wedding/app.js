@@ -166,6 +166,7 @@ const els = {
   togetherFileInput: document.getElementById("together-file-input"),
   togetherGrid: document.getElementById("together-grid"),
 
+  exportResolution: document.getElementById("export-resolution"),
   durationEstimate: document.getElementById("duration-estimate"),
   createBtn: document.getElementById("create-btn"),
   progressBox: document.getElementById("progress-box"),
@@ -2096,16 +2097,20 @@ function finishImpactFrame(ctx, seg, localT) {
   // ポップだけで「ドカン」と出したいので、自前のフェードは重ねずフル表示にする。
   // それ以外（問いかけ文・パートタイトル）は従来通りゆるやかにフェードイン/アウトする。
   const alpha = seg.flashOnEnter ? 1 : fadeAlpha(localT, seg.duration, Math.min(0.25, seg.duration / 2 || 0.25));
+  // impactBufferは書き出し解像度に応じて実ピクセルサイズが変わるため、常に
+  // 明示的にCANVAS_W×CANVAS_H(論理サイズ)を指定して描画し、外側のctx.scale()
+  // による拡大率と二重にかけ合わさらないようにする（ぼやけ防止）。
+  const bufferScale = impactBuffer.width / CANVAS_W;
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.drawImage(impactBuffer, 0, 0);
+  ctx.drawImage(impactBuffer, 0, 0, CANVAS_W, CANVAS_H);
   if (seg.glitch) {
     const sliceCount = 3;
     for (let i = 0; i < sliceCount; i++) {
       const y = Math.random() * CANVAS_H;
       const h = 8 + Math.random() * 18;
       const dx = (Math.random() - 0.5) * 30;
-      ctx.drawImage(impactBuffer, 0, y, CANVAS_W, h, dx, y, CANVAS_W, h);
+      ctx.drawImage(impactBuffer, 0, y * bufferScale, CANVAS_W * bufferScale, h * bufferScale, dx, y, CANVAS_W, h);
     }
   }
   ctx.restore();
@@ -2191,16 +2196,22 @@ function pickTransitionType(settings, index) {
   return TRANSITION_TYPES[pos];
 }
 
+// canvasA/canvasBは、書き出し解像度に応じて実ピクセルサイズが変わる
+// オフスクリーンバッファ（transitionBufferA/B）。ここでのdrawImageは常に
+// 明示的にCANVAS_W×CANVAS_H(論理サイズ)を指定して描画する。これにより、
+// バッファの実サイズがいくつであっても、外側のctx.scale()による拡大率と
+// 二重にかけ合わさることなく、常に正しい大きさ・かつバッファ本来の解像度の
+// まま(ぼやけずに)描画される。
 function compositeTransition(ctx, canvasA, canvasB, progress, type) {
   switch (type) {
     case "slide": {
       const dx = CANVAS_W * progress;
-      ctx.drawImage(canvasA, -dx, 0);
-      ctx.drawImage(canvasB, CANVAS_W - dx, 0);
+      ctx.drawImage(canvasA, -dx, 0, CANVAS_W, CANVAS_H);
+      ctx.drawImage(canvasB, CANVAS_W - dx, 0, CANVAS_W, CANVAS_H);
       break;
     }
     case "zoom": {
-      ctx.drawImage(canvasA, 0, 0);
+      ctx.drawImage(canvasA, 0, 0, CANVAS_W, CANVAS_H);
       const scale = 1.15 - 0.15 * progress;
       const w = CANVAS_W * scale;
       const h = CANVAS_H * scale;
@@ -2211,26 +2222,26 @@ function compositeTransition(ctx, canvasA, canvasB, progress, type) {
       break;
     }
     case "wipe": {
-      ctx.drawImage(canvasA, 0, 0);
+      ctx.drawImage(canvasA, 0, 0, CANVAS_W, CANVAS_H);
       const wipeX = CANVAS_W * progress;
       ctx.save();
       ctx.beginPath();
       ctx.rect(0, 0, wipeX, CANVAS_H);
       ctx.clip();
-      ctx.drawImage(canvasB, 0, 0);
+      ctx.drawImage(canvasB, 0, 0, CANVAS_W, CANVAS_H);
       ctx.restore();
       break;
     }
     case "flash": {
       if (progress < 0.5) {
-        ctx.drawImage(canvasA, 0, 0);
+        ctx.drawImage(canvasA, 0, 0, CANVAS_W, CANVAS_H);
         ctx.save();
         ctx.globalAlpha = progress * 2;
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
         ctx.restore();
       } else {
-        ctx.drawImage(canvasB, 0, 0);
+        ctx.drawImage(canvasB, 0, 0, CANVAS_W, CANVAS_H);
         ctx.save();
         ctx.globalAlpha = (1 - progress) * 2;
         ctx.fillStyle = "#ffffff";
@@ -2241,27 +2252,27 @@ function compositeTransition(ctx, canvasA, canvasB, progress, type) {
     }
     case "circle": {
       // 中央から円形に広がりながら次の写真に切り替わる（CapCutの円形ワイプ風）
-      ctx.drawImage(canvasA, 0, 0);
+      ctx.drawImage(canvasA, 0, 0, CANVAS_W, CANVAS_H);
       const maxRadius = Math.hypot(CANVAS_W / 2, CANVAS_H / 2);
       const radius = maxRadius * easeOutCubic(progress);
       ctx.save();
       ctx.beginPath();
       ctx.arc(CANVAS_W / 2, CANVAS_H / 2, radius, 0, Math.PI * 2);
       ctx.clip();
-      ctx.drawImage(canvasB, 0, 0);
+      ctx.drawImage(canvasB, 0, 0, CANVAS_W, CANVAS_H);
       ctx.restore();
       break;
     }
     case "rotatezoom": {
       // 次の写真がわずかに回転しながらズームイン（CapCutのポップな回転演出風）
-      ctx.drawImage(canvasA, 0, 0);
+      ctx.drawImage(canvasA, 0, 0, CANVAS_W, CANVAS_H);
       ctx.save();
       ctx.globalAlpha = progress;
       ctx.translate(CANVAS_W / 2, CANVAS_H / 2);
       ctx.rotate((1 - progress) * 0.35);
       const scale = 0.7 + 0.3 * easeOutCubic(progress);
       ctx.scale(scale, scale);
-      ctx.drawImage(canvasB, -CANVAS_W / 2, -CANVAS_H / 2);
+      ctx.drawImage(canvasB, -CANVAS_W / 2, -CANVAS_H / 2, CANVAS_W, CANVAS_H);
       ctx.restore();
       break;
     }
@@ -2271,9 +2282,9 @@ function compositeTransition(ctx, canvasA, canvasB, progress, type) {
       ctx.save();
       ctx.filter = blurAmount > 0.1 ? `blur(${blurAmount}px)` : "none";
       ctx.globalAlpha = 1 - progress;
-      ctx.drawImage(canvasA, 0, 0);
+      ctx.drawImage(canvasA, 0, 0, CANVAS_W, CANVAS_H);
       ctx.globalAlpha = progress;
-      ctx.drawImage(canvasB, 0, 0);
+      ctx.drawImage(canvasB, 0, 0, CANVAS_W, CANVAS_H);
       ctx.filter = "none";
       ctx.restore();
       break;
@@ -2282,11 +2293,11 @@ function compositeTransition(ctx, canvasA, canvasB, progress, type) {
       // 本のページをめくるような演出（エンドロール専用）。
       // 次のページを先に敷いておき、現在のページを左端（本の綴じ目）を軸に
       // 横方向へ縮めていくことで、ページが奥へめくれていくように見せる。
-      ctx.drawImage(canvasB, 0, 0);
+      ctx.drawImage(canvasB, 0, 0, CANVAS_W, CANVAS_H);
       const scaleX = Math.max(1 - progress, 0.001);
       ctx.save();
       ctx.scale(scaleX, 1);
-      ctx.drawImage(canvasA, 0, 0);
+      ctx.drawImage(canvasA, 0, 0, CANVAS_W, CANVAS_H);
       ctx.restore();
 
       const shadowW = CANVAS_W * scaleX;
@@ -2299,10 +2310,10 @@ function compositeTransition(ctx, canvasA, canvasB, progress, type) {
     }
     case "crossfade":
     default: {
-      ctx.drawImage(canvasA, 0, 0);
+      ctx.drawImage(canvasA, 0, 0, CANVAS_W, CANVAS_H);
       ctx.save();
       ctx.globalAlpha = progress;
-      ctx.drawImage(canvasB, 0, 0);
+      ctx.drawImage(canvasB, 0, 0, CANVAS_W, CANVAS_H);
       ctx.restore();
       break;
     }
@@ -2930,9 +2941,26 @@ async function renderVideo({ audioFiles, beatSyncCutDuration, onProgress } = {})
   }
   const timeline = computeTimeline(settings);
   const canvas = els.canvas;
-  canvas.width = CANVAS_W;
-  canvas.height = CANVAS_H;
+  // 書き出し解像度（720p / フルHD）は、内部の描画座標(CANVAS_W×CANVAS_H基準)を
+  // すべて書き換えるのではなく、canvasの実サイズだけ拡大し、描画開始前に
+  // ctx.scale()で拡大率を掛けることで実現する。フォントサイズや余白など
+  // コード中に散らばる無数のpx単位の指定値はそのままに、Canvas自体の座標変換
+  // 機能で解像度だけを上げられるため、書き出し解像度ごとに描画ロジックを
+  // 個別対応する必要がない（縦横比はどちらも16:9のまま）。
+  const exportScale = els.exportResolution.value === "1080" ? 1.5 : 1;
+  canvas.width = CANVAS_W * exportScale;
+  canvas.height = CANVAS_H * exportScale;
   const ctx = canvas.getContext("2d");
+  if (exportScale !== 1) ctx.scale(exportScale, exportScale);
+  // トランジション合成・impact-text用のオフスクリーンバッファも、メインの
+  // canvasと同じ拡大率で作り直す（同じくctx.scale()を掛けておく）。これを
+  // しないと、これらのバッファは常に等倍(1280x720)のまま拡大表示されることに
+  // なり、カット切り替えやインパクトテキストの瞬間だけ動画がぼやけてしまう。
+  [transitionCtxA, transitionCtxB, impactCtx].forEach((c) => {
+    c.canvas.width = CANVAS_W * exportScale;
+    c.canvas.height = CANVAS_H * exportScale;
+    if (exportScale !== 1) c.scale(exportScale, exportScale);
+  });
 
   drawFrame(ctx, timeline, 0, settings);
 
