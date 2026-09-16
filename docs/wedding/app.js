@@ -1461,27 +1461,33 @@ function computeOpeningTimeline(settings) {
     2,
     { bigFontSize: 44, lineHeight: 54 }
   );
-  // BGMの開始・切り替えタイミングは、名前カードではなく実際に写真が
-  // 流れ始める時点を基準にする。
-  const groomStartIdx = segments.length;
+  // カウントダウンからの無音区間は、名前カードも含めて実際に写真が流れ始める
+  // 時点まで続ける（要望どおり「写真が流れ始めたらBGMをかける」ため）。
+  const groomPhotosStartIdx = segments.length;
   settings.groomPhotos.forEach((photo, i) => {
     segments.push({ type: "photo", duration: mediaDuration(photo, settings), photo, variant: i % 4 });
   });
 
   // 3. 新婦パート
+  // こちらは（カウントダウンからの立ち上がりと違い）曲から曲への切り替えなので、
+  // 新婦の名前カードが出た瞬間に専用BGMへ切り替わるよう、名前カードの開始時刻を
+  // 境界にする（写真が流れ始めるまで待たない）。
+  const brideStartIdx = segments.length;
   pushImpact(
     [`BRIDE: ${settings.brideName}`, settings.brideSub1, settings.brideSub2].filter(Boolean),
     2,
     { bigFontSize: 44, lineHeight: 54 }
   );
-  const brideStartIdx = segments.length;
   settings.bridePhotos.forEach((photo, i) => {
     segments.push({ type: "photo", duration: mediaDuration(photo, settings), photo, variant: i % 4 });
   });
 
   // 4. 2人の出会い〜思い出パート
-  pushImpact(["TWO PATHS CROSS", "SPECIAL MEMORIES"], 2, { bigFontSize: 48 });
+  // ここも新婦パートと同様、専用BGMから共通BGMへの曲の切り替えなので、
+  // 「TWO PATHS CROSS」の名前カードが出た瞬間に切り替える（写真が流れ始める
+  // まで待たない）。
   const togetherStartIdx = segments.length;
+  pushImpact(["TWO PATHS CROSS", "SPECIAL MEMORIES"], 2, { bigFontSize: 48 });
   settings.togetherPhotos.forEach((photo, i) => {
     segments.push({ type: "photo", duration: mediaDuration(photo, settings), photo, variant: i % 4 });
   });
@@ -1498,18 +1504,22 @@ function computeOpeningTimeline(settings) {
   });
 
   const timeline = finalizeTimeline(segments, settings.transitionDuration, duckIndices);
-  // BGMの開始・切り替え境界時刻（buildBgmSchedule()で使用）。各*StartIdxは
-  // 名前カードではなく、そのパートの最初の写真の開始時刻を指す
-  // （カウントダウン中は無音にし、実際に写真が流れ始めたらBGMを流すため）。
-  let brideStart = timeline.startTimes[brideStartIdx];
+  // BGMの開始・切り替え境界時刻（buildBgmSchedule()で使用）。
+  // - brideStart: 無音からの立ち上がりではなく曲の切り替えなので、名前カードが
+  //   出た瞬間に専用BGMへ切り替わるようにする（写真が流れ始めるまで待たない）。
+  //   ただし新婦に写真が1枚も無い場合、この方式では名前カードの数秒間だけ
+  //   専用BGMがフェードイン・アウトする不自然なブツ切れが起きてしまうため、
+  //   その場合はtogetherStartまで繰り込んでゾーン自体を無くす。
+  // - groomStart: カウントダウン〜新郎の名前カードまでは無音にし、実際に
+  //   新郎の写真が流れ始めた時点でBGMを流し始める（要望どおりの挙動）。
+  //   新郎に写真が1枚も無い場合はgroomPhotosStartIdxが（生の）新婦名前
+  //   カードの位置と一致してしまうため、上で繰り込み済みのbrideStartを
+  //   上限にする（新婦にも写真が無い場合はbrideStartが togetherStart まで
+  //   繰り込まれているため、無音区間はさらに2人の思い出パートの名前カード
+  //   まで正しく続く）。
   const togetherStart = timeline.startTimes[togetherStartIdx];
-  let groomStart = timeline.startTimes[groomStartIdx];
-  // 新郎・新婦パートに写真が1枚も無い場合、そのパートの区間には次のパートの
-  // 名前カードしか存在しない。専用BGM・無音区間をそのカードにまで適用すると、
-  // 例えば新婦の名前カードに新郎専用BGMが被ってしまうため、写真が無いパートは
-  // 実質無いものとして次のパートに繰り込む。
-  if (settings.bridePhotos.length === 0) brideStart = togetherStart;
-  if (settings.groomPhotos.length === 0) groomStart = brideStart;
+  const brideStart = settings.bridePhotos.length === 0 ? togetherStart : timeline.startTimes[brideStartIdx];
+  const groomStart = settings.groomPhotos.length === 0 ? brideStart : timeline.startTimes[groomPhotosStartIdx];
   timeline.openingBgmZones = { groomStart, brideStart, togetherStart };
   return timeline;
 }
