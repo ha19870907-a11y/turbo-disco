@@ -326,6 +326,43 @@ main {
   border-color: var(--accent);
 }
 
+.photo-vfocus-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.photo-vfocus-slider {
+  flex: 1;
+  accent-color: var(--accent-dark, var(--accent));
+}
+
+.photo-vfocus-reset {
+  font-size: 0.66rem;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.photo-vfocus-reset:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.photo-vfocus-preview {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: #000;
+  display: block;
+}
+
 .photo-item .order-badge {
   position: absolute;
   top: 4px;
