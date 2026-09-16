@@ -58,11 +58,6 @@ const MAX_GUEST_MESSAGE_LENGTH = 200;
 // 「遅い/標準/速い」に対応する、ページ表示時間・切り替え時間への倍率。
 const ENDROLL_SPEED_MAP = { slow: 1.35, normal: 1, fast: 0.75 };
 
-const state = {
-  bgmFiles: [], // { id, file }
-  nextBgmId: 1,
-};
-
 const els = {
   saveDraftBtn: document.getElementById("save-draft-btn"),
   deleteDraftBtn: document.getElementById("delete-draft-btn"),
@@ -180,9 +175,17 @@ const els = {
   shareSilentBtn: document.getElementById("share-silent-btn"),
   shareSilentHint: document.getElementById("share-silent-hint"),
   bgmSection: document.getElementById("bgm-section"),
+  bgmCommonHeading: document.getElementById("bgm-common-heading"),
   bgmDropzone: document.getElementById("bgm-dropzone"),
   bgmInput: document.getElementById("bgm-input"),
   bgmList: document.getElementById("bgm-list"),
+  openingBgmParts: document.getElementById("opening-bgm-parts"),
+  groomBgmDropzone: document.getElementById("groom-bgm-dropzone"),
+  groomBgmInput: document.getElementById("groom-bgm-input"),
+  groomBgmList: document.getElementById("groom-bgm-list"),
+  brideBgmDropzone: document.getElementById("bride-bgm-dropzone"),
+  brideBgmInput: document.getElementById("bride-bgm-input"),
+  brideBgmList: document.getElementById("bride-bgm-list"),
   beatSyncEnabled: document.getElementById("beat-sync-enabled"),
   beatSyncInterval: document.getElementById("beat-sync-interval"),
   addBgmBtn: document.getElementById("add-bgm-btn"),
@@ -1001,6 +1004,8 @@ function updateTemplateVisibility() {
   els.thanksSection.classList.toggle("hidden", !isThanks);
   els.thanksPhotosSection.classList.toggle("hidden", !isThanks);
   els.thanksEntriesSection.classList.toggle("hidden", !isThanks);
+  els.openingBgmParts.classList.toggle("hidden", !isOpening);
+  els.bgmCommonHeading.textContent = isOpening ? "共通BGM" : "BGM";
   // 下書きの有無はテンプレートごとに非同期(IndexedDB)で確認するため、確認が
   // 終わるまでの一瞬、前のテンプレートの下書き情報（保存日時など）が誤って
   // 表示され続けることがないよう、切り替えた瞬間にいったん隠しておく。
@@ -1041,64 +1046,154 @@ function updateTemplateVisibility() {
 [els.endrollSpeed, els.profileSpeed, els.thanksSpeed].forEach((el) => el.addEventListener("change", updateDurationEstimate));
 
 // --- BGM（複数曲）の追加・並べ替え ---
+// 共通BGMと、オープニング演出の新郎/新婦パート専用BGMで同じロジックを使い回す。
 
-function renderBgmList() {
-  els.bgmList.innerHTML = "";
-  state.bgmFiles.forEach((track, index) => {
-    const row = document.createElement("div");
-    row.className = "bgm-row";
-    row.draggable = true;
-    row.dataset.id = String(track.id);
+function createBgmGroup({ dropzoneEl, fileInputEl, listEl, onChange }) {
+  const group = { tracks: [], nextId: 1 };
 
-    const badge = document.createElement("span");
-    badge.className = "bgm-order";
-    badge.textContent = String(index + 1);
-    row.appendChild(badge);
+  function render() {
+    listEl.innerHTML = "";
+    group.tracks.forEach((track, index) => {
+      const row = document.createElement("div");
+      row.className = "bgm-row";
+      row.draggable = true;
+      row.dataset.id = String(track.id);
 
-    const name = document.createElement("span");
-    name.className = "bgm-name";
-    name.textContent = track.file.name;
-    row.appendChild(name);
+      const badge = document.createElement("span");
+      badge.className = "bgm-order";
+      badge.textContent = String(index + 1);
+      row.appendChild(badge);
 
-    const removeBtn = document.createElement("button");
-    removeBtn.className = "bgm-remove";
-    removeBtn.type = "button";
-    removeBtn.textContent = "×";
-    removeBtn.addEventListener("click", () => {
-      state.bgmFiles = state.bgmFiles.filter((t) => t.id !== track.id);
-      renderBgmList();
-      updateAddBgmButtonState();
+      const name = document.createElement("span");
+      name.className = "bgm-name";
+      name.textContent = track.file.name;
+      row.appendChild(name);
+
+      const removeBtn = document.createElement("button");
+      removeBtn.className = "bgm-remove";
+      removeBtn.type = "button";
+      removeBtn.textContent = "×";
+      removeBtn.addEventListener("click", () => {
+        group.tracks = group.tracks.filter((t) => t.id !== track.id);
+        render();
+        onChange();
+      });
+      row.appendChild(removeBtn);
+
+      row.addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("text/plain", String(track.id));
+        e.dataTransfer.effectAllowed = "move";
+      });
+      row.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        row.classList.add("drag-over");
+      });
+      row.addEventListener("dragleave", () => row.classList.remove("drag-over"));
+      row.addEventListener("drop", (e) => {
+        e.preventDefault();
+        row.classList.remove("drag-over");
+        const draggedId = Number(e.dataTransfer.getData("text/plain"));
+        if (draggedId === track.id) return;
+        const fromIndex = group.tracks.findIndex((t) => t.id === draggedId);
+        const toIndex = group.tracks.findIndex((t) => t.id === track.id);
+        if (fromIndex < 0 || toIndex < 0) return;
+        const [moved] = group.tracks.splice(fromIndex, 1);
+        group.tracks.splice(toIndex, 0, moved);
+        render();
+      });
+
+      listEl.appendChild(row);
     });
-    row.appendChild(removeBtn);
+  }
 
-    row.addEventListener("dragstart", (e) => {
-      e.dataTransfer.setData("text/plain", String(track.id));
-      e.dataTransfer.effectAllowed = "move";
-    });
-    row.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      row.classList.add("drag-over");
-    });
-    row.addEventListener("dragleave", () => row.classList.remove("drag-over"));
-    row.addEventListener("drop", (e) => {
-      e.preventDefault();
-      row.classList.remove("drag-over");
-      const draggedId = Number(e.dataTransfer.getData("text/plain"));
-      if (draggedId === track.id) return;
-      const fromIndex = state.bgmFiles.findIndex((t) => t.id === draggedId);
-      const toIndex = state.bgmFiles.findIndex((t) => t.id === track.id);
-      if (fromIndex < 0 || toIndex < 0) return;
-      const [moved] = state.bgmFiles.splice(fromIndex, 1);
-      state.bgmFiles.splice(toIndex, 0, moved);
-      renderBgmList();
-    });
+  function addFiles(fileList) {
+    const incoming = Array.from(fileList).filter((f) => looksLikeType(f, "audio/", AUDIO_EXTENSIONS));
+    if (incoming.length === 0) {
+      if (fileList.length > 0) alert("音声ファイルを選択してください（対応形式: mp3, m4a, wav, aac, ogg など）");
+      return;
+    }
 
-    els.bgmList.appendChild(row);
+    const remainingSlots = MAX_BGM_TRACKS - group.tracks.length;
+    if (remainingSlots <= 0) {
+      alert(`BGMは最大${MAX_BGM_TRACKS}曲まで追加できます`);
+      return;
+    }
+    const toAdd = incoming.slice(0, remainingSlots);
+    if (incoming.length > toAdd.length) {
+      alert(`BGMは最大${MAX_BGM_TRACKS}曲までのため、一部の曲は追加されませんでした`);
+    }
+
+    let skippedLarge = 0;
+    toAdd.forEach((file) => {
+      if (file.size > MAX_AUDIO_BYTES) {
+        skippedLarge++;
+        return;
+      }
+      group.tracks.push({ id: group.nextId++, file });
+    });
+    if (skippedLarge > 0) {
+      alert(`容量が大きすぎる音声${skippedLarge}件は追加しませんでした（上限: ${Math.round(MAX_AUDIO_BYTES / 1024 / 1024)}MB/曲）`);
+    }
+
+    render();
+    onChange();
+  }
+
+  dropzoneEl.addEventListener("click", () => fileInputEl.click());
+  fileInputEl.addEventListener("change", (e) => {
+    addFiles(e.target.files);
+    fileInputEl.value = "";
   });
+  ["dragenter", "dragover"].forEach((evt) =>
+    dropzoneEl.addEventListener(evt, (e) => {
+      e.preventDefault();
+      dropzoneEl.classList.add("dragover");
+    })
+  );
+  ["dragleave", "drop"].forEach((evt) =>
+    dropzoneEl.addEventListener(evt, (e) => {
+      e.preventDefault();
+      dropzoneEl.classList.remove("dragover");
+    })
+  );
+  dropzoneEl.addEventListener("drop", (e) => addFiles(e.dataTransfer.files));
+
+  // 下書き復元用: 保存されていたファイル(Blob)の配列から、現在の内容をすべて置き換える。
+  function restoreTracks(savedTracks) {
+    group.tracks = (savedTracks || []).map((b) => ({
+      id: group.nextId++,
+      file: new File([b.blob], b.fileName, { type: b.fileType }),
+    }));
+    render();
+  }
+
+  group.render = render;
+  group.restoreTracks = restoreTracks;
+  return group;
 }
 
+const commonBgmGroup = createBgmGroup({
+  dropzoneEl: els.bgmDropzone,
+  fileInputEl: els.bgmInput,
+  listEl: els.bgmList,
+  onChange: () => updateAddBgmButtonState(),
+});
+const groomBgmGroup = createBgmGroup({
+  dropzoneEl: els.groomBgmDropzone,
+  fileInputEl: els.groomBgmInput,
+  listEl: els.groomBgmList,
+  onChange: () => updateAddBgmButtonState(),
+});
+const brideBgmGroup = createBgmGroup({
+  dropzoneEl: els.brideBgmDropzone,
+  fileInputEl: els.brideBgmInput,
+  listEl: els.brideBgmList,
+  onChange: () => updateAddBgmButtonState(),
+});
+
 function updateAddBgmButtonState() {
-  els.addBgmBtn.disabled = state.bgmFiles.length === 0;
+  els.addBgmBtn.disabled =
+    commonBgmGroup.tracks.length === 0 && groomBgmGroup.tracks.length === 0 && brideBgmGroup.tracks.length === 0;
 }
 
 // --- 「本のページをめくる」演出3テンプレート共通: 項目一覧
@@ -1287,58 +1382,6 @@ const thanksEntryManager = createEntryListManager({
   onChange: () => updateDurationEstimate(),
 });
 
-function addBgmFiles(fileList) {
-  const incoming = Array.from(fileList).filter((f) => looksLikeType(f, "audio/", AUDIO_EXTENSIONS));
-  if (incoming.length === 0) {
-    if (fileList.length > 0) alert("音声ファイルを選択してください（対応形式: mp3, m4a, wav, aac, ogg など）");
-    return;
-  }
-
-  const remainingSlots = MAX_BGM_TRACKS - state.bgmFiles.length;
-  if (remainingSlots <= 0) {
-    alert(`BGMは最大${MAX_BGM_TRACKS}曲まで追加できます`);
-    return;
-  }
-  const toAdd = incoming.slice(0, remainingSlots);
-  if (incoming.length > toAdd.length) {
-    alert(`BGMは最大${MAX_BGM_TRACKS}曲までのため、一部の曲は追加されませんでした`);
-  }
-
-  let skippedLarge = 0;
-  toAdd.forEach((file) => {
-    if (file.size > MAX_AUDIO_BYTES) {
-      skippedLarge++;
-      return;
-    }
-    state.bgmFiles.push({ id: state.nextBgmId++, file });
-  });
-  if (skippedLarge > 0) {
-    alert(`容量が大きすぎる音声${skippedLarge}件は追加しませんでした（上限: ${Math.round(MAX_AUDIO_BYTES / 1024 / 1024)}MB/曲）`);
-  }
-
-  renderBgmList();
-  updateAddBgmButtonState();
-}
-
-els.bgmDropzone.addEventListener("click", () => els.bgmInput.click());
-els.bgmInput.addEventListener("change", (e) => {
-  addBgmFiles(e.target.files);
-  els.bgmInput.value = "";
-});
-["dragenter", "dragover"].forEach((evt) =>
-  els.bgmDropzone.addEventListener(evt, (e) => {
-    e.preventDefault();
-    els.bgmDropzone.classList.add("dragover");
-  })
-);
-["dragleave", "drop"].forEach((evt) =>
-  els.bgmDropzone.addEventListener(evt, (e) => {
-    e.preventDefault();
-    els.bgmDropzone.classList.remove("dragover");
-  })
-);
-els.bgmDropzone.addEventListener("drop", (e) => addBgmFiles(e.dataTransfer.files));
-
 // --- タイムライン構築 ---
 
 // セグメント列から開始時刻・合計時間・音声ダック区間（クライマックスの一瞬の無音）を計算する。
@@ -1413,6 +1456,7 @@ function computeOpeningTimeline(settings) {
   });
 
   // 2. 新郎パート
+  const groomStartIdx = segments.length;
   pushImpact(
     [`GROOM: ${settings.groomName}`, settings.groomSub1, settings.groomSub2].filter(Boolean),
     2,
@@ -1423,6 +1467,7 @@ function computeOpeningTimeline(settings) {
   });
 
   // 3. 新婦パート
+  const brideStartIdx = segments.length;
   pushImpact(
     [`BRIDE: ${settings.brideName}`, settings.brideSub1, settings.brideSub2].filter(Boolean),
     2,
@@ -1433,6 +1478,7 @@ function computeOpeningTimeline(settings) {
   });
 
   // 4. 2人の出会い〜思い出パート
+  const togetherStartIdx = segments.length;
   pushImpact(["TWO PATHS CROSS", "SPECIAL MEMORIES"], 2, { bigFontSize: 48 });
   settings.togetherPhotos.forEach((photo, i) => {
     segments.push({ type: "photo", duration: mediaDuration(photo, settings), photo, variant: i % 4 });
@@ -1449,7 +1495,15 @@ function computeOpeningTimeline(settings) {
     flashOnEnter: true,
   });
 
-  return finalizeTimeline(segments, settings.transitionDuration, duckIndices);
+  const timeline = finalizeTimeline(segments, settings.transitionDuration, duckIndices);
+  // 新郎・新婦パート専用BGMを、それぞれのパートの時間帯にだけ差し替えられる
+  // ようにするための境界時刻（buildBgmSchedule()で使用）。
+  timeline.openingBgmZones = {
+    groomStart: timeline.startTimes[groomStartIdx],
+    brideStart: timeline.startTimes[brideStartIdx],
+    togetherStart: timeline.startTimes[togetherStartIdx],
+  };
+  return timeline;
 }
 
 const ENDROLL_MAX_TEXT_WIDTH = CANVAS_W - 200;
@@ -2807,6 +2861,7 @@ async function detectBeats(file) {
 // 動画自体が長い場合にBGMが最後まで敷き詰められなくなることがないよう、
 // 現実的にありえる動画の長さに対して十分大きい値にしてある。
 function buildAudioSchedule(infos, totalDuration) {
+  if (infos.length === 0) return [];
   const schedule = [];
   let t = 0;
   let i = 0;
@@ -2821,17 +2876,53 @@ function buildAudioSchedule(infos, totalDuration) {
   return schedule;
 }
 
+// BGM設定（共通／新郎パート専用／新婦パート専用）とタイムラインから、実際に
+// 再生するスケジュール（クロスフェード込みの時系列リスト）を組み立てる。
+// 新郎・新婦パート専用のBGMが指定されている場合（新郎新婦パートのある
+// オープニング演出のみ該当）は、そのパートの時間帯だけ専用の曲に差し替え、
+// 指定が無い部分（イントロ・2人の思い出パート・クライマックスなど）は
+// 共通BGMをそのまま使う。専用BGMが1つも指定されていない場合は、これまで
+// 通り共通BGM1本を動画全体に敷く。
+async function buildBgmSchedule(bgm, timeline) {
+  const zones = timeline.openingBgmZones;
+  const hasPartBgm = zones && (bgm.groom.length > 0 || bgm.bride.length > 0);
+
+  if (!hasPartBgm) {
+    const commonInfos = await Promise.all(bgm.common.map(loadAudioDuration));
+    return buildAudioSchedule(commonInfos, timeline.total);
+  }
+
+  // 各グループ内・グループ間とも、ファイルの読み込み(再生時間の取得)自体は
+  // 互いに独立しているため、直列に待たず並行して読み込む。
+  const [commonInfos, groomInfos, brideInfos] = await Promise.all([
+    Promise.all(bgm.common.map(loadAudioDuration)),
+    Promise.all(bgm.groom.map(loadAudioDuration)),
+    Promise.all(bgm.bride.map(loadAudioDuration)),
+  ]);
+
+  const zoneList = [
+    { start: 0, end: zones.groomStart, infos: commonInfos },
+    { start: zones.groomStart, end: zones.brideStart, infos: groomInfos.length ? groomInfos : commonInfos },
+    { start: zones.brideStart, end: zones.togetherStart, infos: brideInfos.length ? brideInfos : commonInfos },
+    { start: zones.togetherStart, end: timeline.total, infos: commonInfos },
+  ];
+
+  const schedule = [];
+  zoneList.forEach(({ start, end, infos }) => {
+    const zoneDuration = end - start;
+    if (zoneDuration <= 0 || infos.length === 0) return;
+    buildAudioSchedule(infos, zoneDuration).forEach((item) => {
+      schedule.push({ ...item, start: item.start + start });
+    });
+  });
+  return schedule;
+}
+
 // 複数曲のBGMを、曲間クロスフェード付きで動画の長さいっぱいに流すための再生管理。
 // 2つの<audio>要素を交互に使い、切り替わりのタイミングで音量をクロスフェードする。
 // audioDucksが指定されている場合は、その区間でBGMの音量を一瞬下げて戻す
 // （オープニング演出のクライマックス前の「静寂の一瞬」を演出する）。
-async function setupAudioPlaylist(audioFiles, totalDuration, audioDucks = []) {
-  const infos = [];
-  for (const file of audioFiles) {
-    infos.push(await loadAudioDuration(file));
-  }
-  const schedule = buildAudioSchedule(infos, totalDuration);
-
+async function setupAudioPlaylist(schedule, totalDuration, audioDucks = []) {
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
   const audioCtx = new AudioCtx();
   const audioElA = document.createElement("audio");
@@ -2919,14 +3010,16 @@ async function setupAudioPlaylist(audioFiles, totalDuration, audioDucks = []) {
   function cleanup() {
     audioElA.pause();
     audioElB.pause();
-    infos.forEach((info) => URL.revokeObjectURL(info.url));
+    // 同じ曲がループ・複数パートで繰り返し使われ、schedule内に同じurlが
+    // 複数回登場することがあるため、重複を除いてから解放する。
+    new Set(schedule.map((item) => item.url)).forEach((url) => URL.revokeObjectURL(url));
     audioCtx.close();
   }
 
   return { audioTracks: dest.stream.getAudioTracks(), onFrame, cleanup };
 }
 
-async function renderVideo({ audioFiles, beatSyncCutDuration, onProgress } = {}) {
+async function renderVideo({ bgm, beatSyncCutDuration, onProgress } = {}) {
   let settings = getSettings();
   if (countPhotos(settings) === 0) {
     throw new Error("写真・動画・メッセージを1つ以上追加してください");
@@ -2969,8 +3062,10 @@ async function renderVideo({ audioFiles, beatSyncCutDuration, onProgress } = {})
   let audioCleanup = null;
   let onAudioFrame = null;
 
-  if (audioFiles && audioFiles.length > 0) {
-    const playlist = await setupAudioPlaylist(audioFiles, timeline.total, timeline.audioDucks || []);
+  const hasAnyBgm = bgm && (bgm.common.length > 0 || bgm.groom.length > 0 || bgm.bride.length > 0);
+  if (hasAnyBgm) {
+    const schedule = await buildBgmSchedule(bgm, timeline);
+    const playlist = await setupAudioPlaylist(schedule, timeline.total, timeline.audioDucks || []);
     tracks = tracks.concat(playlist.audioTracks);
     onAudioFrame = playlist.onFrame;
     audioCleanup = playlist.cleanup;
@@ -3136,6 +3231,14 @@ function collectGroupDraftItems(group) {
     }));
 }
 
+function collectBgmDraftTracks(bgmGroup) {
+  return bgmGroup.tracks.map((t) => ({
+    blob: t.file,
+    fileName: t.file.name,
+    fileType: t.file.type,
+  }));
+}
+
 function collectDraftData() {
   return {
     savedAt: Date.now(),
@@ -3200,11 +3303,9 @@ function collectDraftData() {
       profile: collectGroupDraftItems(profileGroup),
       thanks: collectGroupDraftItems(thanksGroup),
     },
-    bgmFiles: state.bgmFiles.map((t) => ({
-      blob: t.file,
-      fileName: t.file.name,
-      fileType: t.file.type,
-    })),
+    bgmFiles: collectBgmDraftTracks(commonBgmGroup),
+    groomBgmFiles: collectBgmDraftTracks(groomBgmGroup),
+    brideBgmFiles: collectBgmDraftTracks(brideBgmGroup),
     guestMessages: guestMessageManager.entries.map((g) => ({ name: g.name, group: g.group, message: g.message })),
     profileEntries: profileEntryManager.entries.map((g) => ({ name: g.name, group: g.group, message: g.message })),
     thanksEntries: thanksEntryManager.entries.map((g) => ({ name: g.name, group: g.group, message: g.message })),
@@ -3276,11 +3377,9 @@ async function restoreDraftData(data) {
   await profileGroup.restoreItems((data.groups && data.groups.profile) || []);
   await thanksGroup.restoreItems((data.groups && data.groups.thanks) || []);
 
-  state.bgmFiles = (data.bgmFiles || []).map((b) => ({
-    id: state.nextBgmId++,
-    file: new File([b.blob], b.fileName, { type: b.fileType }),
-  }));
-  renderBgmList();
+  commonBgmGroup.restoreTracks(data.bgmFiles || []);
+  groomBgmGroup.restoreTracks(data.groomBgmFiles || []);
+  brideBgmGroup.restoreTracks(data.brideBgmFiles || []);
   updateAddBgmButtonState();
 
   guestMessageManager.restoreItems(data.guestMessages || []);
@@ -3365,7 +3464,10 @@ els.createBtn.addEventListener("click", async () => {
 });
 
 els.addBgmBtn.addEventListener("click", async () => {
-  if (state.bgmFiles.length === 0) {
+  const commonFiles = commonBgmGroup.tracks.map((t) => t.file);
+  const groomFiles = groomBgmGroup.tracks.map((t) => t.file);
+  const brideFiles = brideBgmGroup.tracks.map((t) => t.file);
+  if (commonFiles.length === 0 && groomFiles.length === 0 && brideFiles.length === 0) {
     alert("BGMファイルを1曲以上追加してください");
     return;
   }
@@ -3377,7 +3479,8 @@ els.addBgmBtn.addEventListener("click", async () => {
   if (els.beatSyncEnabled.checked) {
     setProgress(els.bgmProgressFill, els.bgmProgressLabel, 0, "BGMのテンポを解析中…");
     try {
-      const beatInfo = await detectBeats(state.bgmFiles[0].file);
+      const beatSourceFile = commonFiles[0] || groomFiles[0] || brideFiles[0];
+      const beatInfo = await detectBeats(beatSourceFile);
       const beatsPerCut = Number(els.beatSyncInterval.value) || 2;
       beatSyncCutDuration = beatInfo.beatInterval * beatsPerCut;
       if (!beatInfo.confident) {
@@ -3392,7 +3495,7 @@ els.addBgmBtn.addEventListener("click", async () => {
 
   try {
     const blob = await renderVideo({
-      audioFiles: state.bgmFiles.map((track) => track.file),
+      bgm: { common: commonFiles, groom: groomFiles, bride: brideFiles },
       beatSyncCutDuration,
       onProgress: (ratio) =>
         setProgress(els.bgmProgressFill, els.bgmProgressLabel, ratio, `BGMを合成中… ${Math.round(ratio * 100)}%`),
