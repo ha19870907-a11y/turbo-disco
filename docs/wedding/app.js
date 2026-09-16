@@ -402,6 +402,33 @@ function capImageSize(img) {
   return off;
 }
 
+// 写真ごとの「縦位置」調整UIで使うプレビュー描画。実際の動画はKen Burns効果で
+// 最大 (1+ZOOM_AMOUNT)倍までズームしながらパンするため、パンなし・等倍のまま
+// 描画すると、実際にいちばん切り抜きが厳しくなる瞬間より見た目が甘くなって
+// しまう（プレビューでは顔が入っているのに、動画では切れてしまう）。そのため、
+// 常に「最大ズーム・上方向へのパンが最大まで進んだ状態」で描画し、実際の動画で
+// 起こりうる最も厳しい切り抜きを基準にプレビューする。
+function drawCropPreview(canvas, img, anchorFrac) {
+  const ctx = canvas.getContext("2d");
+  const frameW = canvas.width;
+  const frameH = canvas.height;
+  ctx.clearRect(0, 0, frameW, frameH);
+  const { width: imgW, height: imgH } = intrinsicSize(img);
+  if (!imgW || !imgH) return;
+  const imgRatio = imgW / imgH;
+  const frameRatio = frameW / frameH;
+  const { baseW, baseH } = computeCoverBaseSize(imgRatio, frameRatio, frameW, frameH);
+  const drawW = baseW * (1 + ZOOM_AMOUNT);
+  const drawH = baseH * (1 + ZOOM_AMOUNT);
+  const { offsetX, offsetY } = computeKenBurnsOffset(imgRatio, frameRatio, drawW, drawH, frameW, frameH, 0, -1, 1, anchorFrac);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, frameW, frameH);
+  ctx.clip();
+  ctx.drawImage(img, frameW / 2 - drawW / 2 + offsetX, frameH / 2 - drawH / 2 + offsetY, drawW, drawH);
+  ctx.restore();
+}
+
 // 写真の追加・並べ替え・キャプション入力・削除をまとめたUIコンポーネント。
 // スタンダードの単一グループと、オープニング演出の新郎/新婦/2人パートの
 // 3グループで同じロジックを使い回す。
@@ -630,6 +657,68 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange, endrollGr
       sizeLabel.appendChild(sizeInput);
       advancedFields.appendChild(sizeLabel);
 
+      if (!endrollGroupField) {
+        // 写真をフレームいっぱいに拡大表示する際、見切れやすい人物の顔の位置に
+        // 合わせて切り抜き基準を手動調整するためのスライダーと、その場で
+        // 見え方を確認できるプレビュー（実際の動画と同じ描画ロジックを使用）。
+        // エンドロール系テンプレートの写真は全体表示(見切れない)なので対象外。
+        const vFocusLabel = document.createElement("label");
+        vFocusLabel.className = "photo-field-label";
+        vFocusLabel.textContent = "縦位置（見切れる場合に調整）";
+
+        const vFocusPreview = document.createElement("canvas");
+        vFocusPreview.className = "photo-vfocus-preview";
+        vFocusPreview.width = 240;
+        vFocusPreview.height = 135;
+
+        const vFocusRow = document.createElement("div");
+        vFocusRow.className = "photo-vfocus-row";
+        const vFocusInput = document.createElement("input");
+        vFocusInput.type = "range";
+        vFocusInput.className = "photo-vfocus-slider";
+        vFocusInput.min = "0";
+        vFocusInput.max = "100";
+        vFocusInput.step = "1";
+        vFocusInput.value = String(photo.verticalFocus != null ? photo.verticalFocus : FACE_SAFE_VERTICAL_ANCHOR * 100);
+        vFocusInput.draggable = false;
+        vFocusInput.title = "上(0)〜下(100)。写真を拡大表示する際の切り抜き基準位置です。プレビューを見ながら、顔が見切れないように調整してください。";
+        const vFocusResetBtn = document.createElement("button");
+        vFocusResetBtn.type = "button";
+        vFocusResetBtn.className = "photo-vfocus-reset";
+        vFocusResetBtn.textContent = "自動に戻す";
+        vFocusResetBtn.draggable = false;
+        vFocusResetBtn.title = "顔の位置を自動推定した既定値に戻します";
+
+        const updatePreview = () => {
+          const img = photo.kind === "video" ? photo.videoEl : photo.img;
+          const anchorFrac = (photo.verticalFocus != null ? photo.verticalFocus : FACE_SAFE_VERTICAL_ANCHOR * 100) / 100;
+          drawCropPreview(vFocusPreview, img, anchorFrac);
+        };
+        vFocusInput.addEventListener("input", () => {
+          photo.verticalFocus = Number(vFocusInput.value);
+          updatePreview();
+          onChange();
+        });
+        vFocusResetBtn.addEventListener("click", () => {
+          photo.verticalFocus = null;
+          vFocusInput.value = String(FACE_SAFE_VERTICAL_ANCHOR * 100);
+          updatePreview();
+          onChange();
+        });
+
+        vFocusRow.appendChild(vFocusInput);
+        vFocusRow.appendChild(vFocusResetBtn);
+        vFocusLabel.appendChild(vFocusRow);
+        advancedFields.appendChild(vFocusLabel);
+        advancedFields.appendChild(vFocusPreview);
+        updatePreview();
+        // 動画は"loadedmetadata"時点ではまだ描画できるフレームが無いことがあるため、
+        // その場合は最初のフレームが用意できた時点でもう一度プレビューを描き直す。
+        if (photo.kind === "video" && photo.videoEl.readyState < 2) {
+          photo.videoEl.addEventListener("loadeddata", updatePreview, { once: true });
+        }
+      }
+
       advanced.appendChild(advancedFields);
       item.appendChild(advanced);
 
@@ -700,6 +789,7 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange, endrollGr
             captionFontSize: null,
             captionFade: null,
             displayScale: null,
+            verticalFocus: null,
             endrollGroup: "",
             ...videoItem,
           });
@@ -729,6 +819,7 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange, endrollGr
           captionFontSize: null,
           captionFade: null,
           displayScale: null,
+          verticalFocus: null,
           endrollGroup: "",
         });
       } catch (err) {
@@ -792,6 +883,7 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange, endrollGr
             captionFontSize: saved.captionFontSize != null ? saved.captionFontSize : null,
             captionFade: saved.captionFade || null,
             displayScale: saved.displayScale != null ? saved.displayScale : null,
+            verticalFocus: saved.verticalFocus != null ? saved.verticalFocus : null,
             endrollGroup: saved.endrollGroup || "",
             ...videoItem,
             clipSeconds: Math.min(saved.clipSeconds || videoItem.clipSeconds, maxAllowed),
@@ -815,6 +907,7 @@ function createPhotoGroup({ gridEl, dropzoneEl, fileInputEl, onChange, endrollGr
             captionFontSize: saved.captionFontSize != null ? saved.captionFontSize : null,
             captionFade: saved.captionFade || null,
             displayScale: saved.displayScale != null ? saved.displayScale : null,
+            verticalFocus: saved.verticalFocus != null ? saved.verticalFocus : null,
             endrollGroup: saved.endrollGroup || "",
           });
         } catch (err) {
@@ -1829,15 +1922,30 @@ function drawCaption(ctx, text, localT, duration, theme, style, fadeMode, fontSi
   ctx.restore();
 }
 
+// 写真・動画をフレームいっぱいに拡大表示(cover)する際の基本サイズを計算する。
+// フレームより横長の素材は高さをフレームに合わせ、縦長の素材は幅をフレームに
+// 合わせることで、はみ出た分だけ後段でトリミングされるようにする。
+function computeCoverBaseSize(imgRatio, frameRatio, frameW, frameH) {
+  if (imgRatio > frameRatio) {
+    const baseH = frameH;
+    return { baseW: baseH * imgRatio, baseH };
+  }
+  const baseW = frameW;
+  return { baseW, baseH: baseW / imgRatio };
+}
+
 // 写真をフレームいっぱいに拡大表示(cover)しつつKen Burns風にズーム/パンする際の
 // オフセット量を計算する。縦方向がフレームよりはみ出す構図（＝上下がトリミング
 // される）場合は、切り抜きの基準を上寄りにし、縦方向のパン量も抑えることで、
 // 上寄りに写りがちな人物の顔ができるだけ画面内に収まるようにする。
-function computeKenBurnsOffset(imgRatio, frameRatio, drawW, drawH, frameW, frameH, dx, dy, panProgress) {
+// manualAnchorFrac（0〜1、写真ごとの「縦位置」設定）が指定されている場合は、
+// 自動判定(FACE_SAFE_VERTICAL_ANCHOR)の代わりにその位置を基準にする。
+function computeKenBurnsOffset(imgRatio, frameRatio, drawW, drawH, frameW, frameH, dx, dy, panProgress, manualAnchorFrac = null) {
   const maxOffsetX = (drawW - frameW) / 2;
   const fullMaxOffsetY = (drawH - frameH) / 2;
   const isVerticalCrop = imgRatio <= frameRatio;
-  const verticalAnchor = isVerticalCrop ? FACE_SAFE_VERTICAL_ANCHOR : 0.5;
+  const autoAnchor = manualAnchorFrac != null ? manualAnchorFrac : FACE_SAFE_VERTICAL_ANCHOR;
+  const verticalAnchor = isVerticalCrop ? autoAnchor : 0.5;
   const baseOffsetY = fullMaxOffsetY * (1 - 2 * verticalAnchor);
   const maxOffsetY = isVerticalCrop ? fullMaxOffsetY * FACE_SAFE_VERTICAL_PAN_RATIO : fullMaxOffsetY;
   return {
@@ -1879,14 +1987,7 @@ function drawPhoto(ctx, seg, localT, settings) {
   const frameX = (CANVAS_W - frameW) / 2;
   const frameY = (CANVAS_H - frameH) / 2;
 
-  let baseW, baseH;
-  if (imgRatio > canvasRatio) {
-    baseH = frameH;
-    baseW = baseH * imgRatio;
-  } else {
-    baseW = frameW;
-    baseH = baseW / imgRatio;
-  }
+  const { baseW, baseH } = computeCoverBaseSize(imgRatio, canvasRatio, frameW, frameH);
   const drawW = baseW * scale;
   const drawH = baseH * scale;
 
@@ -1898,6 +1999,7 @@ function drawPhoto(ctx, seg, localT, settings) {
   ];
   const [dx, dy] = directions[seg.variant % directions.length];
   const panProgress = zoomIn ? progress : 1 - progress;
+  const manualAnchorFrac = seg.photo.verticalFocus != null ? seg.photo.verticalFocus / 100 : null;
   const { offsetX, offsetY } = computeKenBurnsOffset(
     imgRatio,
     canvasRatio,
@@ -1907,7 +2009,8 @@ function drawPhoto(ctx, seg, localT, settings) {
     frameH,
     dx,
     dy,
-    panProgress
+    panProgress,
+    manualAnchorFrac
   );
 
   const bgGrad = ctx.createLinearGradient(0, 0, CANVAS_W, CANVAS_H);
@@ -2278,14 +2381,7 @@ function drawCoverZoomPhoto(ctx, img, progress, variant, frameX, frameY, frameW,
   const { width: imgW, height: imgH } = intrinsicSize(img);
   const imgRatio = imgW / imgH;
   const frameRatio = frameW / frameH;
-  let baseW, baseH;
-  if (imgRatio > frameRatio) {
-    baseH = frameH;
-    baseW = baseH * imgRatio;
-  } else {
-    baseW = frameW;
-    baseH = baseW / imgRatio;
-  }
+  const { baseW, baseH } = computeCoverBaseSize(imgRatio, frameRatio, frameW, frameH);
   const drawW = baseW * scale;
   const drawH = baseH * scale;
   const directions = [
@@ -3007,6 +3103,7 @@ function collectGroupDraftItems(group) {
       captionFontSize: p.captionFontSize,
       captionFade: p.captionFade,
       displayScale: p.displayScale,
+      verticalFocus: p.verticalFocus,
       endrollGroup: p.endrollGroup || "",
     }));
 }
