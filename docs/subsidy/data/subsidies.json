@@ -1,9 +1,20 @@
 {
-  "fetchedAt": "2026-09-15T21:15:59.285Z",
+  "fetchedAt": "2026-09-16T21:16:34.450Z",
   "source": "jGrants (https://www.jgrants-portal.go.jp/)",
   "note": "複数の検索語でjGrants公開APIを検索し、重複を除いてまとめたスナップショットです。全制度を網羅するものではありません。",
-  "count": 323,
+  "count": 329,
   "items": [
+    {
+      "id": "a0WJ200000CDYbIMAX",
+      "title": "令和８年度リスキリング・キャリアデザイン応援事業-R8",
+      "institutionName": "令和8年度リスキリング・キャリアデザイン応援事業-R8",
+      "subsidyMaxLimit": 400000,
+      "subsidyRate": "1項目20万円、2項目40万円",
+      "targetAreaSearch": "東京都",
+      "targetNumberOfEmployees": "300名以下",
+      "acceptanceStartDatetime": "2026-05-20T01:00Z",
+      "acceptanceEndDatetime": "2026-06-03T08:00Z"
+    },
     {
       "id": "a0WJ200000CDY2TMAX",
       "title": "既存住宅流通活性化緊急促進事業",
@@ -14,28 +25,6 @@
       "targetNumberOfEmployees": "従業員数の制約なし",
       "acceptanceStartDatetime": "2026-03-23T01:00Z",
       "acceptanceEndDatetime": "2026-06-21T08:00Z"
-    },
-    {
-      "id": "a0WJ200000CDdauMAD",
-      "title": "令和８年度 第２回 事業承継支援助成金",
-      "institutionName": "事業承継・再生支援事業　事業承継支援助成金",
-      "subsidyMaxLimit": 2000000,
-      "subsidyRate": "助成対象と認められる経費の2/3以内／小規模企業者がAタイプ、Bタイプ、Dタイプのうち「企業価値や事業価値の算定」に取り組む経費は10/10以内",
-      "targetAreaSearch": "東京都",
-      "targetNumberOfEmployees": "300名以下",
-      "acceptanceStartDatetime": "2026-08-03T00:00Z",
-      "acceptanceEndDatetime": "2026-09-16T08:00Z"
-    },
-    {
-      "id": "a0WJ200000CDYmSMAX",
-      "title": "2026年度「中小企業競争力強化促進事業業」（マーケティング支援事業）［2次募集］",
-      "institutionName": "【北海道】中小企業競争力強化促進事業（マーケティング支援事業）［2次募集］",
-      "subsidyMaxLimit": 2000000,
-      "subsidyRate": "1/2以内",
-      "targetAreaSearch": "北海道",
-      "targetNumberOfEmployees": "300名以下",
-      "acceptanceStartDatetime": "2026-08-19T00:00Z",
-      "acceptanceEndDatetime": "2026-09-16T08:00Z"
     },
     {
       "id": "a0WJ200000CDdmVMAT",
@@ -742,14 +731,36 @@
       "acceptanceEndDatetime": "2026-10-16T03:00Z"
     },
     {
+      "id": "a0WJ200000CDeYyMAL",
+      "title": "⼩規模事業者持続化補助⾦＜⼀般型 災害支援枠（令和8年熊本地震）＞1次公募【商⼯会地区】",
+      "institutionName": "小規模事業者持続化補助金＜一般型 災害支援枠＞",
+      "subsidyMaxLimit": 2000000,
+      "subsidyRate": "2/3、定額（一定の要件を満たす事業者のみ対象）",
+      "targetAreaSearch": "熊本県",
+      "targetNumberOfEmployees": "20名以下",
+      "acceptanceStartDatetime": "2026-09-16T08:00Z",
+      "acceptanceEndDatetime": "2026-10-16T08:00Z"
+    },
+    {
       "id": "a0WJ200000CDWp3MAH",
       "title": "⼩規模事業者持続化補助⾦＜⼀般型 災害⽀援枠（令和６年能登半島地震等）＞10次公募【商⼯会地区】",
-      "institutionName": "小規模事業者持続化補助金＜一般型＞",
+      "institutionName": "小規模事業者持続化補助金＜一般型 災害支援枠＞",
       "subsidyMaxLimit": 2000000,
       "subsidyRate": "2/3、定額（一定の要件を満たす事業者のみ対象）",
       "targetAreaSearch": "石川県",
       "targetNumberOfEmployees": "20名以下",
       "acceptanceStartDatetime": "2026-07-27T08:00Z",
+      "acceptanceEndDatetime": "2026-10-16T08:00Z"
+    },
+    {
+      "id": "a0WJ200000CDeToMAL",
+      "title": "小規模事業者持続化補助金＜一般型 災害支援枠（令和８年熊本地震）＞１次公募【商工会議所地区】",
+      "institutionName": "小規模事業者持続化補助金＜一般型 災害支援枠＞",
+      "subsidyMaxLimit": 2000000,
+      "subsidyRate": "２／３、定額（一定の要件を満たす事業者のみ対象）",
+      "targetAreaSearch": "熊本県",
+      "targetNumberOfEmployees": "20名以下",
+      "acceptanceStartDatetime": "2026-09-16T08:00Z",
       "acceptanceEndDatetime": "2026-10-16T08:00Z"
     },
     {
@@ -927,6 +938,17 @@
       "targetNumberOfEmployees": "従業員数の制約なし",
       "acceptanceStartDatetime": "2026-03-24T04:00Z",
       "acceptanceEndDatetime": "2026-10-30T15:00Z"
+    },
+    {
+      "id": "a0WJ200000CDXjwMAH",
+      "title": "【福井県】令和８年度企業の太陽光・蓄電池設備導入促進事業補助金",
+      "institutionName": "【福井県】企業の太陽光・蓄電池設備導入促進事業補助金",
+      "subsidyMaxLimit": 11300000,
+      "subsidyRate": null,
+      "targetAreaSearch": "福井県",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2026-04-16T15:00Z",
+      "acceptanceEndDatetime": "2026-10-31T14:59Z"
     },
     {
       "id": "a0WJ200000CDYbNMAX",
@@ -1314,6 +1336,28 @@
       "acceptanceEndDatetime": "2026-12-25T08:15Z"
     },
     {
+      "id": "a0WJ200000CDXjyMAH",
+      "title": "【福井県】電気自動車用充電インフラ整備促進事業補助金",
+      "institutionName": "【福井県】電気自動車用充電インフラ整備促進事業補助金",
+      "subsidyMaxLimit": 1500000,
+      "subsidyRate": "1/2（国の補助金確定額または相当額に対して） ※ただし、国補助金と合わせて総事業費の最大3/4を超えない範囲とする",
+      "targetAreaSearch": "福井県",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2026-04-16T15:00Z",
+      "acceptanceEndDatetime": "2026-12-25T14:59Z"
+    },
+    {
+      "id": "a0WJ200000CDXjxMAH",
+      "title": "【福井県】令和８年度 Ｖ２Ｈ充放電設備設置支援事業補助金",
+      "institutionName": "【福井県】Ｖ２Ｈ充放電設備設置支援事業補助金",
+      "subsidyMaxLimit": 100000,
+      "subsidyRate": "定額（対象設備の購入費用に対し一律10万円）",
+      "targetAreaSearch": "福井県",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2026-04-16T15:00Z",
+      "acceptanceEndDatetime": "2026-12-25T14:59Z"
+    },
+    {
       "id": "a0W2x000007CStEEAW",
       "title": "農林水産物認証取得支援事業（農家認証取得支援事業）補助金",
       "institutionName": "農林水産物認証取得支援事業（農家認証取得支援事業）補助金",
@@ -1459,13 +1503,13 @@
     {
       "id": "a0WJ200000CDK7NMAX",
       "title": "中小企業の外国人従業員に対する研修等支援助成金（一般コース）",
-      "institutionName": "中小企業の外国人従業員に対する研修等支援助成金",
+      "institutionName": null,
       "subsidyMaxLimit": 250000,
-      "subsidyRate": "1/2",
+      "subsidyRate": null,
       "targetAreaSearch": "東京都",
       "targetNumberOfEmployees": "300名以下",
-      "acceptanceStartDatetime": "2026-04-09T05:00Z",
-      "acceptanceEndDatetime": "2027-01-14T14:59Z"
+      "acceptanceStartDatetime": "2026-04-09T05:00:00.000Z",
+      "acceptanceEndDatetime": "2027-01-14T14:59:00.000Z"
     },
     {
       "id": "a0WJ200000CDK7OMAX",
@@ -2128,6 +2172,17 @@
       "acceptanceEndDatetime": "2027-03-31T08:00Z"
     },
     {
+      "id": "a0WfQ000003CWvFUAW",
+      "title": "燃料電池フォークリフト実装支援事業助成金",
+      "institutionName": "燃料電池フォークリフト実装支援事業助成金",
+      "subsidyMaxLimit": 0,
+      "subsidyRate": null,
+      "targetAreaSearch": "東京都",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2026-09-15T08:00Z",
+      "acceptanceEndDatetime": "2027-03-31T08:00Z"
+    },
+    {
       "id": "a0WJ200000CDeTAMA1",
       "title": "小郡市企業立地優遇制度",
       "institutionName": "【福岡県小郡市】企業立地優遇制度",
@@ -2455,6 +2510,17 @@
       "targetAreaSearch": "全国",
       "targetNumberOfEmployees": "従業員数の制約なし",
       "acceptanceStartDatetime": "2026-04-30T15:00Z",
+      "acceptanceEndDatetime": "2027-03-31T14:59Z"
+    },
+    {
+      "id": "a0WJ200000CDXjzMAH",
+      "title": "【福井県】次世代自動車普及促進事業補助金",
+      "institutionName": "【福井県】次世代自動車普及促進事業補助金",
+      "subsidyMaxLimit": 500000,
+      "subsidyRate": "定額補助",
+      "targetAreaSearch": "福井県",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2026-04-16T15:00Z",
       "acceptanceEndDatetime": "2027-03-31T14:59Z"
     },
     {
