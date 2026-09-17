@@ -1,8 +1,8 @@
 {
-  "fetchedAt": "2026-09-16T21:16:34.450Z",
+  "fetchedAt": "2026-09-17T21:16:38.299Z",
   "source": "jGrants (https://www.jgrants-portal.go.jp/)",
   "note": "複数の検索語でjGrants公開APIを検索し、重複を除いてまとめたスナップショットです。全制度を網羅するものではありません。",
-  "count": 329,
+  "count": 332,
   "items": [
     {
       "id": "a0WJ200000CDYbIMAX",
@@ -720,6 +720,17 @@
       "acceptanceEndDatetime": "2026-10-15T03:00Z"
     },
     {
+      "id": "a0WJ200000CDeZuMAL",
+      "title": "令和８年度データセンターのゼロエミッション化・レジリエンス強化促進事業（二次公募）",
+      "institutionName": "二酸化炭素排出抑制対策事業費等補助金",
+      "subsidyMaxLimit": 0,
+      "subsidyRate": "公募要領を参照",
+      "targetAreaSearch": "全国",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2026-09-17T05:00Z",
+      "acceptanceEndDatetime": "2026-10-16T03:00Z"
+    },
+    {
       "id": "a0WJ200000CDKZFMA5",
       "title": "令和８年度_グリーンスローモビリティ等導入促進事業（二次公募）",
       "institutionName": "二酸化炭素排出抑制対策事業費等補助金",
@@ -728,6 +739,17 @@
       "targetAreaSearch": "全国",
       "targetNumberOfEmployees": "従業員数の制約なし",
       "acceptanceStartDatetime": "2026-09-07T01:00Z",
+      "acceptanceEndDatetime": "2026-10-16T03:00Z"
+    },
+    {
+      "id": "a0WJ200000CDeTZMA1",
+      "title": "「ポスト5G情報通信システム基盤強化研究開発事業／ロボティクス分野におけるソフトウェア開発基盤構築」の公募",
+      "institutionName": "ポスト５Ｇ情報通信システム基盤強化研究開発事業",
+      "subsidyMaxLimit": 0,
+      "subsidyRate": null,
+      "targetAreaSearch": "全国",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2026-09-17T01:00Z",
       "acceptanceEndDatetime": "2026-10-16T03:00Z"
     },
     {
@@ -773,6 +795,17 @@
       "targetNumberOfEmployees": "20名以下",
       "acceptanceStartDatetime": "2026-07-27T06:00Z",
       "acceptanceEndDatetime": "2026-10-16T08:00Z"
+    },
+    {
+      "id": "a0W5h00000ZueXcEAJ",
+      "title": "ドローンを活用したツアー造成支援補助金",
+      "institutionName": "ドローンを活用したツアー造成支援事業",
+      "subsidyMaxLimit": 5000000,
+      "subsidyRate": "補助対象経費の2/3以内",
+      "targetAreaSearch": "東京都",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2026-09-17T05:00Z",
+      "acceptanceEndDatetime": "2026-10-16T14:59Z"
     },
     {
       "id": "a0WJ200000CDUheMAH",
@@ -1369,17 +1402,6 @@
       "acceptanceEndDatetime": "2026-12-28T08:00Z"
     },
     {
-      "id": "a0W2x000007CStOEAW",
-      "title": "農林水産物認証取得支援事業（水産認証取得支援事業）補助金",
-      "institutionName": "農林水産物認証取得支援事業（水産認証取得支援事業）補助金",
-      "subsidyMaxLimit": 0,
-      "subsidyRate": "2/3以内",
-      "targetAreaSearch": "東京都",
-      "targetNumberOfEmployees": "従業員数の制約なし",
-      "acceptanceStartDatetime": "2022-04-01T01:00Z",
-      "acceptanceEndDatetime": "2026-12-28T08:00Z"
-    },
-    {
       "id": "a0WJ200000CDVkeMAH",
       "title": "【経済産業省】ものづくり・商業・サービス生産性向上促進補助金（20次締切）",
       "institutionName": "ものづくり補助金",
@@ -1388,6 +1410,17 @@
       "targetAreaSearch": "全国",
       "targetNumberOfEmployees": "従業員数の制約なし",
       "acceptanceStartDatetime": "2025-10-27T08:00Z",
+      "acceptanceEndDatetime": "2026-12-28T08:00Z"
+    },
+    {
+      "id": "a0W2x000007CStOEAW",
+      "title": "農林水産物認証取得支援事業（水産認証取得支援事業）補助金",
+      "institutionName": "農林水産物認証取得支援事業（水産認証取得支援事業）補助金",
+      "subsidyMaxLimit": 0,
+      "subsidyRate": "2/3以内",
+      "targetAreaSearch": "東京都",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2022-04-01T01:00Z",
       "acceptanceEndDatetime": "2026-12-28T08:00Z"
     },
     {
@@ -1503,13 +1536,13 @@
     {
       "id": "a0WJ200000CDK7NMAX",
       "title": "中小企業の外国人従業員に対する研修等支援助成金（一般コース）",
-      "institutionName": null,
+      "institutionName": "中小企業の外国人従業員に対する研修等支援助成金",
       "subsidyMaxLimit": 250000,
-      "subsidyRate": null,
+      "subsidyRate": "1/2",
       "targetAreaSearch": "東京都",
       "targetNumberOfEmployees": "300名以下",
-      "acceptanceStartDatetime": "2026-04-09T05:00:00.000Z",
-      "acceptanceEndDatetime": "2027-01-14T14:59:00.000Z"
+      "acceptanceStartDatetime": "2026-04-09T05:00Z",
+      "acceptanceEndDatetime": "2027-01-14T14:59Z"
     },
     {
       "id": "a0WJ200000CDK7OMAX",
