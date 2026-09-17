@@ -131,7 +131,9 @@ KPIとアカウントのフォロワー数推移を取得・記録します（`s
   アクセス解析やASP管理画面などの実績を人が入力する前提です）。
 - **UTM計測**: `scripts/monetization.js`の`buildTrackingUrl()`が、
   `utm_source=threads&utm_medium=social&utm_campaign=<campaignId>&utm_content=<postId>`
-  付きの計測用URLを生成します。
+  付きの計測用URLを生成します。ただしA8.net等ASP発行の独自リダイレクトリンクは、
+  クエリパラメータの追加が成果計測を壊すリスクがあるため、リンク登録時に
+  `"disableUtm": true`を設定するとURLを一切加工せずそのまま使います。
 
 **実績値の反映方法**
 ```bash

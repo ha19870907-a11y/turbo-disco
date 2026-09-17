@@ -83,9 +83,15 @@ function findLink(linkId) {
 // UTM付きの計測用URLを生成する。linkのbaseUrlに、投稿を特定できるutm_contentを付与する。
 // 実際に存在しない解析ツール・APIは前提にせず、URLの構築のみを行う
 // (実際のクリック計測は遷移先のサイト側のアクセス解析で行う想定)。
+// ASP(アフィリエイトサービスプロバイダ)発行の独自リダイレクトリンクなど、
+// クエリパラメータの追加が成果計測を壊すリスクがある場合は、
+// link.disableUtm=true を設定するとbaseUrlをそのまま返す(加工しない)。
 function buildTrackingUrl(link, { postId } = {}) {
   if (!link || !link.baseUrl) {
     throw new Error('リンクにbaseUrlが設定されていません。');
+  }
+  if (link.disableUtm) {
+    return link.baseUrl;
   }
   const url = new URL(link.baseUrl);
   url.searchParams.set('utm_source', 'threads');
