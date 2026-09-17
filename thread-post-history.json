@@ -362,5 +362,18 @@
     "angle": "申請方法",
     "threadId": "17958615147215975",
     "postedAt": "2026-09-17T03:26:16.489Z"
+  },
+  {
+    "date": "2026-09-17",
+    "dayKey": "thu",
+    "slotIndex": 2,
+    "time": "20:30",
+    "label": "クイズ",
+    "templateId": "TPL-050",
+    "genre": "医療費",
+    "category": "クイズ",
+    "angle": "対象者",
+    "threadId": "17879899326624548",
+    "postedAt": "2026-09-17T11:36:26.267Z"
   }
 ]
