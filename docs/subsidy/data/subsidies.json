@@ -1,8 +1,8 @@
 {
-  "fetchedAt": "2026-09-17T21:16:38.299Z",
+  "fetchedAt": "2026-09-18T21:15:58.771Z",
   "source": "jGrants (https://www.jgrants-portal.go.jp/)",
   "note": "複数の検索語でjGrants公開APIを検索し、重複を除いてまとめたスナップショットです。全制度を網羅するものではありません。",
-  "count": 332,
+  "count": 331,
   "items": [
     {
       "id": "a0WJ200000CDYbIMAX",
@@ -25,61 +25,6 @@
       "targetNumberOfEmployees": "従業員数の制約なし",
       "acceptanceStartDatetime": "2026-03-23T01:00Z",
       "acceptanceEndDatetime": "2026-06-21T08:00Z"
-    },
-    {
-      "id": "a0WJ200000CDdmVMAT",
-      "title": "令和８年度　電力利活用事業（単年度事業分）　第３次公募　【　廃棄物処理施設を核とした地域循環共生圏構築促進事業　】",
-      "institutionName": "二酸化炭素排出抑制対策事業費等補助金（廃棄物処理施設を核とした地域循環共生圏構築促進事業）",
-      "subsidyMaxLimit": 0,
-      "subsidyRate": "①EV収集車・船舶：価格との差額の３／４（ただし上限あり）、②EV収集以外の設備導入事業：補助対象経費の１／２（ただし上限あり）　　公募要領参照",
-      "targetAreaSearch": "全国",
-      "targetNumberOfEmployees": "従業員数の制約なし",
-      "acceptanceStartDatetime": "2026-08-24T00:00Z",
-      "acceptanceEndDatetime": "2026-09-18T08:00Z"
-    },
-    {
-      "id": "a0WJ200000CDdmfMAD",
-      "title": "令和８年度　熱利活用事業（単年度事業分）　第３次公募　【　廃棄物処理施設を核とした地域循環共生圏構築促進事業　】",
-      "institutionName": "二酸化炭素排出抑制対策事業費等補助金（廃棄物処理施設を核とした地域循環共生圏構築促進事業）",
-      "subsidyMaxLimit": 0,
-      "subsidyRate": "補助対象経費の１／２(但し上限あり）公募要領参照",
-      "targetAreaSearch": "全国",
-      "targetNumberOfEmployees": "従業員数の制約なし",
-      "acceptanceStartDatetime": "2026-08-24T00:00Z",
-      "acceptanceEndDatetime": "2026-09-18T08:00Z"
-    },
-    {
-      "id": "a0WJ200000CDdmpMAD",
-      "title": "令和８年度　ＦＳ調査事業　第３次公募　【　廃棄物処理施設を核とした地域循環共生圏構築促進事業　】",
-      "institutionName": "二酸化炭素排出抑制対策事業費等補助金（廃棄物処理施設を核とした地域循環共生圏構築促進事業）",
-      "subsidyMaxLimit": 0,
-      "subsidyRate": "原則、定額、ただし、算出された額が1,500万円を超える場合は、1,500万円",
-      "targetAreaSearch": "全国",
-      "targetNumberOfEmployees": "従業員数の制約なし",
-      "acceptanceStartDatetime": "2026-08-24T00:00Z",
-      "acceptanceEndDatetime": "2026-09-18T08:00Z"
-    },
-    {
-      "id": "a0WfQ000003I7MHUA0",
-      "title": "【山形県】令和8年度中小企業等海外展開支援事業費補助金（海外出願支援事業）２次公募",
-      "institutionName": "中小企業等海外展開支援事業費補助金（海外出願支援事業）",
-      "subsidyMaxLimit": 3000000,
-      "subsidyRate": "1/2",
-      "targetAreaSearch": "山形県",
-      "targetNumberOfEmployees": "300名以下",
-      "acceptanceStartDatetime": "2026-08-24T01:00Z",
-      "acceptanceEndDatetime": "2026-09-18T08:00Z"
-    },
-    {
-      "id": "a0WJ200000CDb6JMAT",
-      "title": "【令和７年度】二酸化炭素排出抑制対策事業費等補助金（水インフラにおける脱炭素化推進事業）［四次公募］",
-      "institutionName": "建築物等のZEB化・省CO2化普及加速事業",
-      "subsidyMaxLimit": 0,
-      "subsidyRate": "①1/3、1/2②1/2",
-      "targetAreaSearch": "全国",
-      "targetNumberOfEmployees": "従業員数の制約なし",
-      "acceptanceStartDatetime": "2026-06-18T07:00Z",
-      "acceptanceEndDatetime": "2026-09-18T08:00Z"
     },
     {
       "id": "a0WJ200000CDeXgMAL",
@@ -310,6 +255,17 @@
       "targetAreaSearch": "全国",
       "targetNumberOfEmployees": "従業員数の制約なし",
       "acceptanceStartDatetime": "2026-09-14T01:00Z",
+      "acceptanceEndDatetime": "2026-09-30T03:00Z"
+    },
+    {
+      "id": "a0WJ200000CDeY5MAL",
+      "title": "「脱炭素化・エネルギー転換に資する我が国技術の国際実証事業／普及促進事業／グローバルな液化水素サプライチェーン構築に向けた我が国技術の適用可能性等調査」の公募",
+      "institutionName": "P93050_脱炭素化・エネルギー転換に資する我が国技術の国際実証事業",
+      "subsidyMaxLimit": 0,
+      "subsidyRate": null,
+      "targetAreaSearch": "全国",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2026-09-18T01:00Z",
       "acceptanceEndDatetime": "2026-09-30T03:00Z"
     },
     {
@@ -654,6 +610,17 @@
       "acceptanceEndDatetime": "2026-10-09T03:00Z"
     },
     {
+      "id": "a0WJ200000CDeXvMAL",
+      "title": "【福岡県3次】令和8年度_中小企業等海外展開支援事業費補助金（海外出願支援事業）",
+      "institutionName": "中小企業等海外展開支援事業費補助金（海外出願支援事業）",
+      "subsidyMaxLimit": 3000000,
+      "subsidyRate": "1/2",
+      "targetAreaSearch": "福岡県",
+      "targetNumberOfEmployees": "300名以下",
+      "acceptanceStartDatetime": "2026-09-18T00:00Z",
+      "acceptanceEndDatetime": "2026-10-09T08:00Z"
+    },
+    {
       "id": "a0WJ200000CDeQmMAL",
       "title": "伝統的工芸品産業支援補助金（令和8年度第2回災害復興事業）",
       "institutionName": "伝統的工芸品産業支援補助金",
@@ -852,6 +819,17 @@
       "acceptanceEndDatetime": "2026-10-19T03:00Z"
     },
     {
+      "id": "a0WJ200000CDeY0MAL",
+      "title": "「水素社会モデル構築高度化技術開発・実証事業」の第2回公募",
+      "institutionName": "P26004_水素社会モデル構築高度化技術開発・実証事業",
+      "subsidyMaxLimit": 0,
+      "subsidyRate": null,
+      "targetAreaSearch": "全国",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2026-09-18T01:00Z",
+      "acceptanceEndDatetime": "2026-10-19T03:00Z"
+    },
+    {
       "id": "a0WJ200000CDeVeMAL",
       "title": "「『ディープテック・スタートアップ支援基金／国際共同研究開発』新規採択支援業務及び潜在的案件発掘促進を目的とした情報発信手法に関する調査」の公募",
       "institutionName": "調査等",
@@ -861,6 +839,17 @@
       "targetNumberOfEmployees": "従業員数の制約なし",
       "acceptanceStartDatetime": "2026-09-14T01:00Z",
       "acceptanceEndDatetime": "2026-10-20T03:00Z"
+    },
+    {
+      "id": "a0WJ200000CDeOLMA1",
+      "title": "「地盤・海象・気象等の調査・観測技術の高度化・高効率化に関する研究開発」　の公募",
+      "institutionName": "P07015_風力発電等導入支援事業",
+      "subsidyMaxLimit": 0,
+      "subsidyRate": null,
+      "targetAreaSearch": "全国",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2026-09-18T01:00Z",
+      "acceptanceEndDatetime": "2026-10-22T03:00Z"
     },
     {
       "id": "a0WfQ000003I7R7UAK",
