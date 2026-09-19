@@ -414,5 +414,18 @@
     "angle": "金額",
     "threadId": "18114854026964566",
     "postedAt": "2026-09-18T11:35:37.543Z"
+  },
+  {
+    "date": "2026-09-19",
+    "dayKey": "sat",
+    "slotIndex": 0,
+    "time": "09:00",
+    "label": "家族向け制度",
+    "templateId": "TPL-045",
+    "genre": "家族向け",
+    "category": "共感",
+    "angle": "冒頭",
+    "threadId": "18127405546763632",
+    "postedAt": "2026-09-19T00:12:47.855Z"
   }
 ]
