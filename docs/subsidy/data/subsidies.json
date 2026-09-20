@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-09-19T22:46:44.590Z",
+  "fetchedAt": "2026-09-20T23:06:57.517Z",
   "source": "jGrants (https://www.jgrants-portal.go.jp/)",
   "note": "複数の検索語でjGrants公開APIを検索し、重複を除いてまとめたスナップショットです。全制度を網羅するものではありません。",
   "count": 331,
@@ -438,11 +438,11 @@
       "title": "令和８年度社会福祉施設等への非常用電源等の整備促進事業補助金",
       "institutionName": "社会福祉施設等への非常用電源等の整備促進事業補助金",
       "subsidyMaxLimit": 3750000,
-      "subsidyRate": "４分の３",
+      "subsidyRate": null,
       "targetAreaSearch": "東京都",
       "targetNumberOfEmployees": "従業員数の制約なし",
-      "acceptanceStartDatetime": "2026-07-20T15:00Z",
-      "acceptanceEndDatetime": "2026-09-30T15:00Z"
+      "acceptanceStartDatetime": "2026-07-20T15:00:00.000Z",
+      "acceptanceEndDatetime": "2026-09-30T15:00:00.000Z"
     },
     {
       "id": "a0WJ200000CDYQnMAP",
@@ -3569,6 +3569,17 @@
       "acceptanceEndDatetime": "2030-03-31T14:45Z"
     },
     {
+      "id": "a0WJ200000CDYkAMAX",
+      "title": "令和8年度【1年目申請用】ES（社員満足度）向上による若手人材確保・定着事業助成金",
+      "institutionName": null,
+      "subsidyMaxLimit": 3000000,
+      "subsidyRate": null,
+      "targetAreaSearch": "東京都",
+      "targetNumberOfEmployees": "300名以下",
+      "acceptanceStartDatetime": "2026-05-12T05:00:00.000Z",
+      "acceptanceEndDatetime": "2030-11-14T15:00:00.000Z"
+    },
+    {
       "id": "a0WJ200000CDNiaMAH",
       "title": "令和7年度　ES（社員満足度）向上による若手人材確保・定着事業助成金　１年目申請用",
       "institutionName": "ES（社員満足度）向上による若手人材確保・定着事業助成金",
@@ -3577,17 +3588,6 @@
       "targetAreaSearch": "東京都",
       "targetNumberOfEmployees": "300名以下",
       "acceptanceStartDatetime": "2025-05-11T15:00Z",
-      "acceptanceEndDatetime": "2030-11-14T15:00Z"
-    },
-    {
-      "id": "a0WJ200000CDYkAMAX",
-      "title": "令和8年度【1年目申請用】ES（社員満足度）向上による若手人材確保・定着事業助成金",
-      "institutionName": "ES（社員満足度）向上による若手人材確保・定着事業助成金",
-      "subsidyMaxLimit": 3000000,
-      "subsidyRate": "1/2",
-      "targetAreaSearch": "東京都",
-      "targetNumberOfEmployees": "300名以下",
-      "acceptanceStartDatetime": "2026-05-12T05:00Z",
       "acceptanceEndDatetime": "2030-11-14T15:00Z"
     },
     {
