@@ -453,5 +453,18 @@
     "angle": "注意点",
     "threadId": "18150108070531086",
     "postedAt": "2026-09-19T11:35:38.152Z"
+  },
+  {
+    "date": "2026-09-20",
+    "dayKey": "sun",
+    "slotIndex": 0,
+    "time": "09:00",
+    "label": "週間まとめ",
+    "templateId": "TPL-056",
+    "genre": "医療費",
+    "category": "保存版",
+    "angle": "冒頭",
+    "threadId": "17911198776497062",
+    "postedAt": "2026-09-20T00:03:57.131Z"
   }
 ]
