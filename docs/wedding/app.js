@@ -3027,6 +3027,63 @@ async function buildBgmSchedule(bgm, timeline) {
   return schedule;
 }
 
+// カウントダウン「5,4,3,2,1,0」の各数字が切り替わる瞬間（flashOnEnterと同じ
+// タイミング）に鳴らす短いビープ音の周波数。数字が減るにつれて音程を上げて
+// いき、「0」の瞬間だけ一段高く・長く・上ずる音にして締めのアクセントにする
+// （BGM自体はこの後の新郎パートまで無音のまま。カウントダウン画面の間だけ
+// 画面の演出に合わせた効果音を鳴らす）。
+const COUNTDOWN_BEEP_FREQ = { 5: 523.25, 4: 587.33, 3: 659.25, 2: 698.46, 1: 783.99, 0: 1046.5 };
+
+// オープニング演出のカウントダウン数字セグメントに合わせて、効果音を
+// 事前スケジュールする。BGMの有無にかかわらず独立して動作する
+// （setupAudioPlaylist()と同様、AudioContext+MediaStreamDestinationで
+// 生成した音声トラックを動画の音声トラックに合成する）。
+// カウントダウン数字が1つも無いテンプレート（オープニング演出以外）では
+// nullを返す。
+function setupCountdownSfx(timeline) {
+  const beats = timeline.segments
+    .map((seg, i) => ({ seg, start: timeline.startTimes[i] }))
+    .filter(({ seg }) => seg.type === "countdown-number");
+  if (beats.length === 0) return null;
+
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  const audioCtx = new AudioCtx();
+  const dest = audioCtx.createMediaStreamDestination();
+  const masterGain = audioCtx.createGain();
+  masterGain.gain.value = 0.35;
+  masterGain.connect(dest);
+
+  beats.forEach(({ seg, start }) => {
+    const isFinal = seg.number === "0";
+    const freq = COUNTDOWN_BEEP_FREQ[seg.number] ?? 660;
+    const when = audioCtx.currentTime + start;
+    const dur = isFinal ? 0.45 : 0.16;
+
+    const osc = audioCtx.createOscillator();
+    osc.type = isFinal ? "triangle" : "sine";
+    osc.frequency.setValueAtTime(freq, when);
+    if (isFinal) {
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.5, when + dur);
+    }
+
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0, when);
+    gain.gain.linearRampToValueAtTime(isFinal ? 0.9 : 0.7, when + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, when + dur);
+
+    osc.connect(gain);
+    gain.connect(masterGain);
+    osc.start(when);
+    osc.stop(when + dur + 0.02);
+  });
+
+  function cleanup() {
+    audioCtx.close();
+  }
+
+  return { audioTracks: dest.stream.getAudioTracks(), cleanup };
+}
+
 // 複数曲のBGMを、曲間クロスフェード付きで動画の長さいっぱいに流すための再生管理。
 // 2つの<audio>要素を交互に使い、切り替わりのタイミングで音量をクロスフェードする。
 // audioDucksが指定されている場合は、その区間でBGMの音量を一瞬下げて戻す
@@ -3184,6 +3241,17 @@ async function renderVideo({ bgm, beatSyncCutDuration, onProgress } = {}) {
     audioCleanup = playlist.cleanup;
   }
 
+  // カウントダウン効果音はBGMの設定有無に関わらず独立して合成する。
+  // ここまでのBGM読み込み(await)が終わった直後、録画開始の直前に生成することで、
+  // AudioContext内で予約する再生時刻(audioCtx.currentTime起点)と実際の描画時刻
+  // (t=0起点)のずれを最小限にしている。
+  let sfxCleanup = null;
+  const countdownSfx = setupCountdownSfx(timeline);
+  if (countdownSfx) {
+    tracks = tracks.concat(countdownSfx.audioTracks);
+    sfxCleanup = countdownSfx.cleanup;
+  }
+
   const combinedStream = new MediaStream(tracks);
   const mimeType = pickMimeType();
   const recorder = new MediaRecorder(combinedStream, mimeType ? { mimeType } : undefined);
@@ -3223,6 +3291,7 @@ async function renderVideo({ bgm, beatSyncCutDuration, onProgress } = {}) {
   recorder.stop();
   const blob = await stopped;
   if (audioCleanup) audioCleanup();
+  if (sfxCleanup) sfxCleanup();
   timeline.segments.forEach((seg) => {
     if (seg.type === "photo" && seg.photo.kind === "video") {
       seg.photo.videoEl.pause();
