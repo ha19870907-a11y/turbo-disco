@@ -505,5 +505,18 @@
     "angle": "金額",
     "threadId": "18143061256585581",
     "postedAt": "2026-09-20T22:02:42.738Z"
+  },
+  {
+    "date": "2026-09-21",
+    "dayKey": "mon",
+    "slotIndex": 1,
+    "time": "12:15",
+    "label": "制度の詳しい解説",
+    "templateId": "TPL-006",
+    "genre": "保育",
+    "category": "属性別",
+    "angle": "対象者",
+    "threadId": "18141388900505608",
+    "postedAt": "2026-09-21T03:30:24.394Z"
   }
 ]
