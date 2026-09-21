@@ -37,6 +37,11 @@ const FACE_SAFE_VERTICAL_ANCHOR = 0.15;
 const FACE_SAFE_VERTICAL_PAN_RATIO = 0.15;
 const TRANSITION_TYPES = ["crossfade", "slide", "zoom", "wipe", "flash", "circle", "rotatezoom", "blur"];
 const AUDIO_CROSSFADE_SEC = 1.2;
+// 無音からBGMが最初に鳴り始める瞬間だけに使う、短いフェードイン時間。
+// 曲間のクロスフェード(AUDIO_CROSSFADE_SEC)をそのまま最初の立ち上がりにも
+// 使うと、写真の切り替えトランジションよりBGMの音量が上がりきるのが遅く、
+// 「写真とBGMのタイミングがズレている」ように感じられてしまうため分けている。
+const AUDIO_FIRST_ATTACK_SEC = 0.35;
 
 // 入力ファイルに対する上限（悪意あるファイルやサイズの大きすぎるファイルで
 // タブがフリーズ・クラッシュするのを防ぐための安全策）
@@ -3027,11 +3032,17 @@ async function buildBgmSchedule(bgm, timeline) {
   return schedule;
 }
 
+// カウントダウンの各数字（"0"以外）・"0"それぞれのティック音の長さ。
+// createTickBuffer()（バッファの長さ）とsetupCountdownSfx()（音量エンベロープの
+// 長さ）の両方から参照し、2箇所の値がずれてクリップ／余分な無音が
+// 生じないようにする。
+const COUNTDOWN_TICK_DURATION = { normal: 0.08, final: 0.12 };
+
 // 時計の秒針が「コチッ」と時を刻む音を模した、ノイズ由来の短い打撃音を
 // 1回分生成する。isFinalの回（カウントダウンの「0」）だけわずかに長く・
 // 大きくして、写真が流れ始める直前のアクセントにする。
 function createTickBuffer(audioCtx, isFinal) {
-  const duration = isFinal ? 0.09 : 0.06;
+  const duration = isFinal ? COUNTDOWN_TICK_DURATION.final : COUNTDOWN_TICK_DURATION.normal;
   const length = Math.max(1, Math.floor(audioCtx.sampleRate * duration));
   const buffer = audioCtx.createBuffer(1, length, audioCtx.sampleRate);
   const data = buffer.getChannelData(0);
@@ -3063,16 +3074,16 @@ function setupCountdownSfx(audioCtx, dest, timeline) {
   beats.forEach(({ seg, start }) => {
     const isFinal = seg.number === "0";
     const when = audioCtx.currentTime + start;
-    const dur = isFinal ? 0.09 : 0.06;
+    const dur = isFinal ? COUNTDOWN_TICK_DURATION.final : COUNTDOWN_TICK_DURATION.normal;
 
     const noise = audioCtx.createBufferSource();
     noise.buffer = createTickBuffer(audioCtx, isFinal);
 
-    // 実際の時計の秒針音に近い、高域に寄った打撃音になるよう帯域通過させる。
+    // 実際の時計の秒針音に近い、低めの帯域に寄せた打撃音になるよう帯域通過させる。
     const bandpass = audioCtx.createBiquadFilter();
     bandpass.type = "bandpass";
-    bandpass.frequency.value = isFinal ? 2600 : 2200;
-    bandpass.Q.value = 4;
+    bandpass.frequency.value = isFinal ? 650 : 480;
+    bandpass.Q.value = 3;
 
     const gain = audioCtx.createGain();
     gain.gain.setValueAtTime(isFinal ? 0.95 : 0.65, when);
@@ -3121,12 +3132,21 @@ async function setupAudioPlaylist(audioCtx, dest, schedule, totalDuration, audio
 
   async function playScheduleItem(idx) {
     if (idx === scheduleIndex) return;
+    // 無音から最初に立ち上がる瞬間（BGMが始まる瞬間）だけは、曲と曲を
+    // つなぐ通常のクロスフェード(AUDIO_CROSSFADE_SEC=1.2秒)ではなく、
+    // もっと短いアタックで素早く立ち上げる。1.2秒かけてゆっくり立ち上がると、
+    // 写真の切り替えトランジション（通常1秒未満）よりBGMの立ち上がりが
+    // 遅く感じられ、「写真の登場タイミングとBGMがズレている」ように
+    // 見えてしまうため。曲間の切り替え（無音からではない）は、これまで通り
+    // ゆっくりクロスフェードしてつなぐ。
+    const isFirstPlay = scheduleIndex === -1;
     scheduleIndex = idx;
     const item = schedule[idx];
     const incomingEl = activeIsA ? audioElB : audioElA;
     const incomingGain = activeIsA ? gainB : gainA;
     const outgoingGain = activeIsA ? gainA : gainB;
     const now = audioCtx.currentTime;
+    const fadeIn = isFirstPlay ? Math.min(item.crossfade, AUDIO_FIRST_ATTACK_SEC) : item.crossfade;
 
     incomingEl.src = item.url;
     incomingEl.currentTime = 0;
@@ -3137,7 +3157,7 @@ async function setupAudioPlaylist(audioCtx, dest, schedule, totalDuration, audio
     } catch (err) {
       // 自動再生がブロックされても録画自体は続行する
     }
-    incomingGain.gain.linearRampToValueAtTime(1, now + item.crossfade);
+    incomingGain.gain.linearRampToValueAtTime(1, now + fadeIn);
 
     outgoingGain.gain.cancelScheduledValues(now);
     outgoingGain.gain.setValueAtTime(outgoingGain.gain.value, now);
