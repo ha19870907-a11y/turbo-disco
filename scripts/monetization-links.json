@@ -1,1 +1,13 @@
-[]
+[
+  {
+    "linkId": "link_001",
+    "campaignId": "agency_dotcom_a8",
+    "destination": "代理店ドットコム（副業・独立・新規事業の資料請求サイト、株式会社プライスレス）",
+    "revenueType": "affiliate",
+    "baseUrl": "https://r.8to.jp/3bScixWD73Zc",
+    "description": "A8.netプログラムID s00000027523001。成果条件は無料の資料請求。ASP独自のリダイレクトリンクのため、クエリパラメータ追加による成果計測破損を避けるためUTMは付与しない(disableUtm)。クリック数・資料請求件数はA8.net管理画面の実績を確認してupdate-monetization.jsで手動反映する。",
+    "disableUtm": true,
+    "active": true,
+    "createdAt": "2026-09-17T00:00:00.000Z"
+  }
+]
