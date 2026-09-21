@@ -3027,70 +3027,75 @@ async function buildBgmSchedule(bgm, timeline) {
   return schedule;
 }
 
-// カウントダウン「5,4,3,2,1,0」の各数字が切り替わる瞬間（flashOnEnterと同じ
-// タイミング）に鳴らす短いビープ音の周波数。数字が減るにつれて音程を上げて
-// いき、「0」の瞬間だけ一段高く・長く・上ずる音にして締めのアクセントにする
-// （BGM自体はこの後の新郎パートまで無音のまま。カウントダウン画面の間だけ
-// 画面の演出に合わせた効果音を鳴らす）。
-const COUNTDOWN_BEEP_FREQ = { 5: 523.25, 4: 587.33, 3: 659.25, 2: 698.46, 1: 783.99, 0: 1046.5 };
+// 時計の秒針が「コチッ」と時を刻む音を模した、ノイズ由来の短い打撃音を
+// 1回分生成する。isFinalの回（カウントダウンの「0」）だけわずかに長く・
+// 大きくして、写真が流れ始める直前のアクセントにする。
+function createTickBuffer(audioCtx, isFinal) {
+  const duration = isFinal ? 0.09 : 0.06;
+  const length = Math.max(1, Math.floor(audioCtx.sampleRate * duration));
+  const buffer = audioCtx.createBuffer(1, length, audioCtx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < length; i++) {
+    const decay = Math.exp(-i / (length * 0.22));
+    data[i] = (Math.random() * 2 - 1) * decay;
+  }
+  return buffer;
+}
 
-// オープニング演出のカウントダウン数字セグメントに合わせて、効果音を
-// 事前スケジュールする。BGMの有無にかかわらず独立して動作する
-// （setupAudioPlaylist()と同様、AudioContext+MediaStreamDestinationで
-// 生成した音声トラックを動画の音声トラックに合成する）。
+// オープニング演出のカウントダウン数字セグメントに合わせて、時計の秒針が
+// 時を刻むような効果音を事前スケジュールする。BGMの有無にかかわらず独立して
+// 動作するが、録画するMediaRecorderはAudioContextをまたいだ複数の音声トラックを
+// 正しく合成できない（片方が無音・音声トラック自体が短く欠落するなど）ため、
+// setupAudioPlaylist()と同じ1つのAudioContext・MediaStreamDestinationを
+// 共有して合成する（audioCtx/destはrenderVideo()から渡される）。
 // カウントダウン数字が1つも無いテンプレート（オープニング演出以外）では
-// nullを返す。
-function setupCountdownSfx(timeline) {
+// 何もせずnullを返す。
+function setupCountdownSfx(audioCtx, dest, timeline) {
   const beats = timeline.segments
     .map((seg, i) => ({ seg, start: timeline.startTimes[i] }))
     .filter(({ seg }) => seg.type === "countdown-number");
   if (beats.length === 0) return null;
 
-  const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  const audioCtx = new AudioCtx();
-  const dest = audioCtx.createMediaStreamDestination();
   const masterGain = audioCtx.createGain();
-  masterGain.gain.value = 0.35;
+  masterGain.gain.value = 0.6;
   masterGain.connect(dest);
 
   beats.forEach(({ seg, start }) => {
     const isFinal = seg.number === "0";
-    const freq = COUNTDOWN_BEEP_FREQ[seg.number] ?? 660;
     const when = audioCtx.currentTime + start;
-    const dur = isFinal ? 0.45 : 0.16;
+    const dur = isFinal ? 0.09 : 0.06;
 
-    const osc = audioCtx.createOscillator();
-    osc.type = isFinal ? "triangle" : "sine";
-    osc.frequency.setValueAtTime(freq, when);
-    if (isFinal) {
-      osc.frequency.exponentialRampToValueAtTime(freq * 1.5, when + dur);
-    }
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = createTickBuffer(audioCtx, isFinal);
+
+    // 実際の時計の秒針音に近い、高域に寄った打撃音になるよう帯域通過させる。
+    const bandpass = audioCtx.createBiquadFilter();
+    bandpass.type = "bandpass";
+    bandpass.frequency.value = isFinal ? 2600 : 2200;
+    bandpass.Q.value = 4;
 
     const gain = audioCtx.createGain();
-    gain.gain.setValueAtTime(0, when);
-    gain.gain.linearRampToValueAtTime(isFinal ? 0.9 : 0.7, when + 0.02);
+    gain.gain.setValueAtTime(isFinal ? 0.95 : 0.65, when);
     gain.gain.exponentialRampToValueAtTime(0.001, when + dur);
 
-    osc.connect(gain);
+    noise.connect(bandpass);
+    bandpass.connect(gain);
     gain.connect(masterGain);
-    osc.start(when);
-    osc.stop(when + dur + 0.02);
+    noise.start(when);
+    noise.stop(when + dur + 0.01);
   });
 
-  function cleanup() {
-    audioCtx.close();
-  }
-
-  return { audioTracks: dest.stream.getAudioTracks(), cleanup };
+  return { cleanup() {} };
 }
 
 // 複数曲のBGMを、曲間クロスフェード付きで動画の長さいっぱいに流すための再生管理。
 // 2つの<audio>要素を交互に使い、切り替わりのタイミングで音量をクロスフェードする。
 // audioDucksが指定されている場合は、その区間でBGMの音量を一瞬下げて戻す
 // （オープニング演出のクライマックス前の「静寂の一瞬」を演出する）。
-async function setupAudioPlaylist(schedule, totalDuration, audioDucks = []) {
-  const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  const audioCtx = new AudioCtx();
+// audioCtx/destはrenderVideo()が用意した共有のAudioContext・
+// MediaStreamDestinationを受け取る（カウントダウン効果音と同じ理由で
+// 単一のAudioContextに統一する必要があるため、ここでは生成しない）。
+async function setupAudioPlaylist(audioCtx, dest, schedule, totalDuration, audioDucks = []) {
   const audioElA = document.createElement("audio");
   const audioElB = document.createElement("audio");
   const sourceA = audioCtx.createMediaElementSource(audioElA);
@@ -3098,7 +3103,6 @@ async function setupAudioPlaylist(schedule, totalDuration, audioDucks = []) {
   const gainA = audioCtx.createGain();
   const gainB = audioCtx.createGain();
   const masterGain = audioCtx.createGain();
-  const dest = audioCtx.createMediaStreamDestination();
   gainA.gain.value = 0;
   gainB.gain.value = 0;
   sourceA.connect(gainA);
@@ -3182,11 +3186,12 @@ async function setupAudioPlaylist(schedule, totalDuration, audioDucks = []) {
     audioElB.pause();
     // 同じ曲がループ・複数パートで繰り返し使われ、schedule内に同じurlが
     // 複数回登場することがあるため、重複を除いてから解放する。
+    // audioCtx自体はカウントダウン効果音と共有しているため、ここでは閉じない
+    // （呼び出し元のrenderVideo()がまとめて閉じる）。
     new Set(schedule.map((item) => item.url)).forEach((url) => URL.revokeObjectURL(url));
-    audioCtx.close();
   }
 
-  return { audioTracks: dest.stream.getAudioTracks(), onFrame, cleanup };
+  return { onFrame, cleanup };
 }
 
 async function renderVideo({ bgm, beatSyncCutDuration, onProgress } = {}) {
@@ -3231,25 +3236,39 @@ async function renderVideo({ bgm, beatSyncCutDuration, onProgress } = {}) {
   let tracks = videoStream.getVideoTracks();
   let audioCleanup = null;
   let onAudioFrame = null;
-
-  const hasAnyBgm = bgm && (bgm.common.length > 0 || bgm.groom.length > 0 || bgm.bride.length > 0);
-  if (hasAnyBgm) {
-    const schedule = await buildBgmSchedule(bgm, timeline);
-    const playlist = await setupAudioPlaylist(schedule, timeline.total, timeline.audioDucks || []);
-    tracks = tracks.concat(playlist.audioTracks);
-    onAudioFrame = playlist.onFrame;
-    audioCleanup = playlist.cleanup;
-  }
-
-  // カウントダウン効果音はBGMの設定有無に関わらず独立して合成する。
-  // ここまでのBGM読み込み(await)が終わった直後、録画開始の直前に生成することで、
-  // AudioContext内で予約する再生時刻(audioCtx.currentTime起点)と実際の描画時刻
-  // (t=0起点)のずれを最小限にしている。
   let sfxCleanup = null;
-  const countdownSfx = setupCountdownSfx(timeline);
-  if (countdownSfx) {
-    tracks = tracks.concat(countdownSfx.audioTracks);
-    sfxCleanup = countdownSfx.cleanup;
+  let sharedAudioCtx = null;
+
+  // BGMとカウントダウン効果音は、それぞれ別々のAudioContextから
+  // MediaStreamTrackを作って動画のトラックに足すと、MediaRecorderが
+  // 2つのAudioContextをまたいだ音声トラックを正しく合成できず、
+  // 片方の音（あるいは両方）が途中で欠落してしまう。そのため、
+  // 音声を使う場合は1つのAudioContext・MediaStreamDestinationを
+  // 共有し、両方の音をそこに合成してから単一の音声トラックとして
+  // 動画に足す。
+  const hasAnyBgm = bgm && (bgm.common.length > 0 || bgm.groom.length > 0 || bgm.bride.length > 0);
+  const hasCountdownSfx = timeline.segments.some((seg) => seg.type === "countdown-number");
+  if (hasAnyBgm || hasCountdownSfx) {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    sharedAudioCtx = new AudioCtx();
+    const dest = sharedAudioCtx.createMediaStreamDestination();
+
+    if (hasAnyBgm) {
+      const schedule = await buildBgmSchedule(bgm, timeline);
+      const playlist = await setupAudioPlaylist(sharedAudioCtx, dest, schedule, timeline.total, timeline.audioDucks || []);
+      onAudioFrame = playlist.onFrame;
+      audioCleanup = playlist.cleanup;
+    }
+
+    // カウントダウン効果音はBGMの設定有無に関わらず独立して鳴らす。
+    // ここまでのBGM読み込み(await)が終わった直後、録画開始の直前に
+    // スケジュールすることで、AudioContext内で予約する再生時刻
+    // (audioCtx.currentTime起点)と実際の描画時刻(t=0起点)のずれを
+    // 最小限にしている。
+    const countdownSfx = setupCountdownSfx(sharedAudioCtx, dest, timeline);
+    if (countdownSfx) sfxCleanup = countdownSfx.cleanup;
+
+    tracks = tracks.concat(dest.stream.getAudioTracks());
   }
 
   const combinedStream = new MediaStream(tracks);
@@ -3292,6 +3311,7 @@ async function renderVideo({ bgm, beatSyncCutDuration, onProgress } = {}) {
   const blob = await stopped;
   if (audioCleanup) audioCleanup();
   if (sfxCleanup) sfxCleanup();
+  if (sharedAudioCtx) sharedAudioCtx.close();
   timeline.segments.forEach((seg) => {
     if (seg.type === "photo" && seg.photo.kind === "video") {
       seg.photo.videoEl.pause();
