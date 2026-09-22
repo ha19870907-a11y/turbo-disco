@@ -570,5 +570,18 @@
     "angle": "対象者",
     "threadId": "18466960369139806",
     "postedAt": "2026-09-22T11:39:58.661Z"
+  },
+  {
+    "date": "2026-09-23",
+    "dayKey": "wed",
+    "slotIndex": 0,
+    "time": "07:00",
+    "label": "子育て支援",
+    "templateId": "TPL-011",
+    "genre": "児童手当",
+    "category": "知らないと損",
+    "angle": "申請方法",
+    "threadId": "18112440164133599",
+    "postedAt": "2026-09-22T22:09:16.329Z"
   }
 ]
