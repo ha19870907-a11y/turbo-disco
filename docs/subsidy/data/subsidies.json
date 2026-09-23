@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-09-22T23:35:40.246Z",
+  "fetchedAt": "2026-09-23T23:31:04.263Z",
   "source": "jGrants (https://www.jgrants-portal.go.jp/)",
   "note": "複数の検索語でjGrants公開APIを検索し、重複を除いてまとめたスナップショットです。全制度を網羅するものではありません。",
   "count": 331,
@@ -1391,17 +1391,6 @@
       "acceptanceEndDatetime": "2026-12-28T08:00Z"
     },
     {
-      "id": "a0WJ200000CDVkeMAH",
-      "title": "【経済産業省】ものづくり・商業・サービス生産性向上促進補助金（20次締切）",
-      "institutionName": "ものづくり補助金",
-      "subsidyMaxLimit": 35000000,
-      "subsidyRate": "1/2 もしくは 2/3",
-      "targetAreaSearch": "全国",
-      "targetNumberOfEmployees": "従業員数の制約なし",
-      "acceptanceStartDatetime": "2025-10-27T08:00Z",
-      "acceptanceEndDatetime": "2026-12-28T08:00Z"
-    },
-    {
       "id": "a0W2x000007CStOEAW",
       "title": "農林水産物認証取得支援事業（水産認証取得支援事業）補助金",
       "institutionName": "農林水産物認証取得支援事業（水産認証取得支援事業）補助金",
@@ -1410,6 +1399,17 @@
       "targetAreaSearch": "東京都",
       "targetNumberOfEmployees": "従業員数の制約なし",
       "acceptanceStartDatetime": "2022-04-01T01:00Z",
+      "acceptanceEndDatetime": "2026-12-28T08:00Z"
+    },
+    {
+      "id": "a0WJ200000CDVkeMAH",
+      "title": "【経済産業省】ものづくり・商業・サービス生産性向上促進補助金（20次締切）",
+      "institutionName": "ものづくり補助金",
+      "subsidyMaxLimit": 35000000,
+      "subsidyRate": "1/2 もしくは 2/3",
+      "targetAreaSearch": "全国",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2025-10-27T08:00Z",
       "acceptanceEndDatetime": "2026-12-28T08:00Z"
     },
     {
@@ -1666,6 +1666,17 @@
       "acceptanceEndDatetime": "2027-01-29T15:00Z"
     },
     {
+      "id": "a0WJ200000CDYW7MAP",
+      "title": "岡崎ものづくり支援補助金（新製品共創事業）",
+      "institutionName": "岡崎ものづくり支援補助金",
+      "subsidyMaxLimit": 300000,
+      "subsidyRate": null,
+      "targetAreaSearch": "愛知県",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2026-03-31T15:00:00.000Z",
+      "acceptanceEndDatetime": "2027-01-31T14:59:00.000Z"
+    },
+    {
       "id": "a0WJ200000CDYW5MAP",
       "title": "岡崎ものづくり支援補助金（知的財産権取得事業）",
       "institutionName": "岡崎ものづくり支援補助金",
@@ -1692,17 +1703,6 @@
       "title": "岡崎ものづくり支援補助金（プラットフォーム活用事業）",
       "institutionName": "岡崎ものづくり支援補助金",
       "subsidyMaxLimit": 500000,
-      "subsidyRate": "補助対象経費の1/2以内（予算の範囲内であれば、補助限度額に達するまで何回でも申請可能）",
-      "targetAreaSearch": "愛知県",
-      "targetNumberOfEmployees": "従業員数の制約なし",
-      "acceptanceStartDatetime": "2026-03-31T15:00Z",
-      "acceptanceEndDatetime": "2027-01-31T14:59Z"
-    },
-    {
-      "id": "a0WJ200000CDYW7MAP",
-      "title": "岡崎ものづくり支援補助金（新製品共創事業）",
-      "institutionName": "岡崎ものづくり支援補助金",
-      "subsidyMaxLimit": 300000,
       "subsidyRate": "補助対象経費の1/2以内（予算の範囲内であれば、補助限度額に達するまで何回でも申請可能）",
       "targetAreaSearch": "愛知県",
       "targetNumberOfEmployees": "従業員数の制約なし",
@@ -2095,6 +2095,17 @@
       "acceptanceEndDatetime": "2027-03-31T07:00Z"
     },
     {
+      "id": "a0WJ200000CDeTAMA1",
+      "title": "小郡市企業立地優遇制度",
+      "institutionName": null,
+      "subsidyMaxLimit": 0,
+      "subsidyRate": null,
+      "targetAreaSearch": "福岡県",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2026-08-27T00:00:00.000Z",
+      "acceptanceEndDatetime": "2027-03-31T08:00:00.000Z"
+    },
+    {
       "id": "a0WJ200000CDYfwMAH",
       "title": "古賀市温室効果ガス排出量可視化システム導入費補助金",
       "institutionName": "古賀市温室効果ガス排出量可視化システム導入費補助金",
@@ -2205,17 +2216,6 @@
       "acceptanceEndDatetime": "2027-03-31T08:00Z"
     },
     {
-      "id": "a0WJ200000CDeTAMA1",
-      "title": "小郡市企業立地優遇制度",
-      "institutionName": "【福岡県小郡市】企業立地優遇制度",
-      "subsidyMaxLimit": 0,
-      "subsidyRate": null,
-      "targetAreaSearch": "福岡県",
-      "targetNumberOfEmployees": "従業員数の制約なし",
-      "acceptanceStartDatetime": "2026-08-27T00:00Z",
-      "acceptanceEndDatetime": "2027-03-31T08:00Z"
-    },
-    {
       "id": "a0WJ200000CDY9gMAH",
       "title": "令和8年度省エネ型VOC排出削減設備導入促進事業",
       "institutionName": "省エネ型VOC排出削減設備導入促進事業",
@@ -2258,6 +2258,17 @@
       "targetNumberOfEmployees": "300名以下",
       "acceptanceStartDatetime": "2026-03-31T23:30Z",
       "acceptanceEndDatetime": "2027-03-31T08:15Z"
+    },
+    {
+      "id": "a0WJ200000CDYuhMAH",
+      "title": "休廃止鉱山鉱害防止等工事費補助金（令和８年度当初）【中国監督部】",
+      "institutionName": "休廃止鉱山鉱害防止等工事費補助金",
+      "subsidyMaxLimit": 2212849000,
+      "subsidyRate": null,
+      "targetAreaSearch": "全国",
+      "targetNumberOfEmployees": "従業員数の制約なし",
+      "acceptanceStartDatetime": "2026-05-19T03:00:00.000Z",
+      "acceptanceEndDatetime": "2027-03-31T09:00:00.000Z"
     },
     {
       "id": "a0WJ200000CDY7yMAH",
@@ -2372,17 +2383,6 @@
     {
       "id": "a0WJ200000CDYuSMAX",
       "title": "休廃止鉱山鉱害防止等工事費補助金（令和８年度当初）【関東監督部】",
-      "institutionName": "休廃止鉱山鉱害防止等工事費補助金",
-      "subsidyMaxLimit": 2212849000,
-      "subsidyRate": "補助対象経費の３／４",
-      "targetAreaSearch": "全国",
-      "targetNumberOfEmployees": "従業員数の制約なし",
-      "acceptanceStartDatetime": "2026-05-19T03:00Z",
-      "acceptanceEndDatetime": "2027-03-31T09:00Z"
-    },
-    {
-      "id": "a0WJ200000CDYuhMAH",
-      "title": "休廃止鉱山鉱害防止等工事費補助金（令和８年度当初）【中国監督部】",
       "institutionName": "休廃止鉱山鉱害防止等工事費補助金",
       "subsidyMaxLimit": 2212849000,
       "subsidyRate": "補助対象経費の３／４",
