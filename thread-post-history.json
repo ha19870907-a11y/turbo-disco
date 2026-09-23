@@ -596,5 +596,18 @@
     "angle": "地域",
     "threadId": "18091825376260111",
     "postedAt": "2026-09-23T03:26:59.767Z"
+  },
+  {
+    "date": "2026-09-23",
+    "dayKey": "wed",
+    "slotIndex": 2,
+    "time": "20:30",
+    "label": "制度比較",
+    "templateId": "TPL-044",
+    "genre": "所得・税",
+    "category": "比較",
+    "angle": "注意点",
+    "threadId": "17932201794143476",
+    "postedAt": "2026-09-23T11:35:36.578Z"
   }
 ]
