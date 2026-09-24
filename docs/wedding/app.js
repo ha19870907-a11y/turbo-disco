@@ -1400,7 +1400,25 @@ function finalizeTimeline(segments, transitionDuration, duckIndices = []) {
   segments.forEach((seg, i) => {
     startTimes.push(t);
     t += seg.duration;
-    if (i < segments.length - 1) t -= transitionDuration;
+    if (i < segments.length - 1) {
+      // トランジション時間が現在のセグメント自身の長さを超えると、次のセグメントの
+      // 開始時刻が現在のセグメントの開始時刻より前になり（時間が逆戻りし）、
+      // drawFrame()の「その時刻でアクティブなセグメントを探す」処理が壊れてしまう
+      // （写真の表示順がおかしくなる、指定した表示時間が反映されないように見える
+      // など）。オープニング演出では「1枚あたりの表示時間」を0.4秒まで短くでき、
+      // 「切り替えの長さ」は1秒まで長くできるため、短い写真とその設定次第で
+      // 実際に発生しうる。そのため、このセグメントから次への実際のトランジション
+      // 時間は、両側の短い方（現在のセグメント・次のセグメントそれぞれの長さ）を
+      // 超えないよう頭打ちにする。次のセグメント側の長さも見ないと、次のセグメントが
+      // 現在のセグメントより極端に短い場合に、そのセグメント自身がアクティブになる
+      // 区間がゼロになり、本来あるはずの滑らかなクロスフェードが飛んで見える
+      // （drawFrame()のactiveIndex探索が同時刻の後勝ちで次のセグメントに追いついて
+      // しまうため）。drawFrame()側は、この頭打ち後の実際の値を
+      // segments[i+1].transitionInDurationから読み、進捗計算のズレを防ぐ。
+      const effectiveTransition = Math.min(transitionDuration, seg.duration, segments[i + 1].duration);
+      segments[i + 1].transitionInDuration = effectiveTransition;
+      t -= effectiveTransition;
+    }
   });
   const total = Math.max(t, 1);
   const audioDucks = duckIndices.map((idx) => ({
@@ -2519,7 +2537,13 @@ function drawFrame(ctx, timeline, t, settings) {
     const curSeg = segments[activeIndex];
     const prevLocalT = t - startTimes[prevIndex];
     const curLocalT = t - startTimes[activeIndex];
-    const progress = Math.min(Math.max(curLocalT / settings.transitionDuration, 0), 1);
+    // finalizeTimeline()がこの境界のトランジション時間を頭打ちにしている場合
+    // （短いセグメントの直後など）、実際に重なっている時間はsettings.transitionDuration
+    // より短い。頭打ち後の実際の値(curSeg.transitionInDuration)を使わないと、
+    // 進捗がトランジション区間の終わりまでに1に達せず、合成が中途半端なまま
+    // 次のセグメントに切り替わってしまう。
+    const effectiveTransitionDuration = curSeg.transitionInDuration ?? settings.transitionDuration;
+    const progress = Math.min(Math.max(curLocalT / effectiveTransitionDuration, 0), 1);
     transitionCtxA.clearRect(0, 0, CANVAS_W, CANVAS_H);
     drawSegment(transitionCtxA, prevSeg, prevLocalT, settings);
     transitionCtxB.clearRect(0, 0, CANVAS_W, CANVAS_H);
