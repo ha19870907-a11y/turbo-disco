@@ -1565,10 +1565,23 @@ function computeEndRollTypingSchedule(entries, speed) {
   });
 }
 
+// 配列をsize個ずつの塊に分割する（来賓メッセージ・感謝ムービーのページ分割で使う）。
+function chunkArray(arr, size) {
+  const chunks = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
+}
+
 // 来賓メッセージを「グループ」でまとめ、1ページにENDROLL_MAX_ENTRIES_PER_PAGE人まで
 // 入るように区切って、ページ（本のページに相当する単位）の配列にする。グループ名が
 // 同じ行は並び順に関係なく1つのグループとしてまとめる（初出のグループ順でページ化）。
 // 人数が多いグループは同じグループ内で複数ページに分割する（つづきページ）。
+// ただし2人のプロフィールは、タイピング演出ではなく文字サイズの自動縮小で
+// 1ページに収める固定映像のため、固定の人数上限では区切らず、実際の文字量から
+// 最小の縮小率でも収まるだけの項目数を1ページに詰め込む（それでも収まりきら
+// ない分だけ「つづき」ページに回す。splitProfileEntriesIntoPages()参照）。
 function buildEndRollPages(settings) {
   const order = [];
   const buckets = new Map();
@@ -1586,16 +1599,20 @@ function buildEndRollPages(settings) {
   order.forEach((groupName) => {
     const entries = buckets.get(groupName);
     const groupPages = [];
-    for (let i = 0; i < entries.length; i += ENDROLL_MAX_ENTRIES_PER_PAGE) {
+    const entryChunks =
+      settings.template === "profile"
+        ? splitProfileEntriesIntoPages(entries, Boolean(groupName))
+        : chunkArray(entries, ENDROLL_MAX_ENTRIES_PER_PAGE);
+    entryChunks.forEach((chunkEntries, i) => {
       const page = {
         group: groupName,
         isContinuation: i > 0,
-        entries: entries.slice(i, i + ENDROLL_MAX_ENTRIES_PER_PAGE),
+        entries: chunkEntries,
         photos: [],
       };
       pages.push(page);
       groupPages.push(page);
-    }
+    });
     pagesByGroup.set(groupName, groupPages);
   });
 
@@ -1665,7 +1682,13 @@ function computeEndRollPageDuration(page, settings) {
   const last = schedule[schedule.length - 1];
   const typingEnd = last ? last.start + last.nameDur + last.gapDur + last.messageDur : ENDROLL_TYPE_INITIAL_DELAY * speed;
   const groupReadTime = page.group ? 0.6 * speed : 0;
-  const typingBasedDuration = Math.min(Math.max(typingEnd + groupReadTime + ENDROLL_TYPE_FINAL_HOLD * speed, 3), 20);
+  const rawDuration = typingEnd + groupReadTime + ENDROLL_TYPE_FINAL_HOLD * speed;
+  // 来賓メッセージ・感謝ムービーは1ページ最大ENDROLL_MAX_ENTRIES_PER_PAGE人までの
+  // 前提で20秒を上限にしているが、2人のプロフィールは1ページに項目をより多く
+  // まとめる（splitProfileEntriesIntoPages()参照）ため、この20秒の上限は適用せず、
+  // 内容量に応じて読む時間を確保する（全体の上限はENDROLL_PAGE_MAX_DURATION_SECに委ねる）。
+  const typingBasedDuration =
+    settings.template === "profile" ? Math.max(rawDuration, 3) : Math.min(Math.max(rawDuration, 3), 20);
   const slidesDuration = endRollPhotoSlideDurations(page.photos, speed).reduce((sum, d) => sum + d, 0);
   return Math.min(Math.max(typingBasedDuration, slidesDuration), ENDROLL_PAGE_MAX_DURATION_SEC);
 }
@@ -2698,23 +2721,63 @@ const PROFILE_MIN_TEXT_SCALE = 0.45;
 // ページ下端の飾り枠に文字が被らないための余白。
 const PROFILE_CONTENT_BOTTOM = CANVAS_H - 60;
 
+// scale倍した文字サイズで項目1件を描画した場合に必要な高さを計算する
+// （ctx.fontは呼び出し側で設定済みであること）。
+function computeProfileEntryHeight(ctx, entry, scale) {
+  // drawProfileStaticEntries()は、entry.nameが空でも見出し分の行送りを
+  // 必ず消費する（エンドロールの元の描画と同じ挙動）ため、ここでも
+  // 条件を付けずに常に加算し、両者の高さの見積もりを一致させる。
+  let height = ENDROLL_NAME_GAP * scale;
+  if (entry.message) {
+    const lines = wrapTextWithOffsets(ctx, entry.message, ENDROLL_MAX_TEXT_WIDTH);
+    height += Math.max(lines.length, 1) * ENDROLL_MESSAGE_LINE_HEIGHT * scale;
+  }
+  height += ENDROLL_ENTRY_GAP * scale;
+  return height;
+}
+
 // scale倍した文字サイズで項目一覧を描画した場合に必要な高さを計算する
 // （実際の描画・自動縮小の判定の両方で使うため、必ずこの関数を通す）。
 function computeProfileEntriesHeight(ctx, entries, scale) {
   ctx.font = `300 ${Math.max(Math.round(20 * scale), 1)}px serif`;
-  let total = 0;
+  return entries.reduce((total, entry) => total + computeProfileEntryHeight(ctx, entry, scale), 0);
+}
+
+// drawEndRollPage()が項目一覧を描画し始めるY座標（グループ見出しが
+// あるかどうかで変わる）。ページ分割の判定・実際の描画の両方で使うため、
+// 必ずこの関数を通して同じ値を共有する。
+function profileEntriesStartY(hasGroupHeading) {
+  return hasGroupHeading ? 90 + 22 + ENDROLL_PAGE_GROUP_HEADING_GAP : 90 + 20;
+}
+
+// 2人のプロフィールの1グループ分の項目一覧を、ページに収まる範囲でできるだけ
+// 多くまとめてページに分割する。固定の人数上限ではなく、最小の文字縮小率
+// (PROFILE_MIN_TEXT_SCALE)でも収まるだけの項目数を1ページに詰め込み、それでも
+// 収まりきらない分だけ次の「つづき」ページに回す（通常の項目数なら常に1ページに
+// まとまる）。各項目の高さは1回だけ計算し、詰め込み判定は累積値との比較のみで
+// 行う（項目ごとに手前までの候補を毎回まるごと再計測するとO(件数^2)になり、
+// 項目編集のたびに呼ばれるこの関数が件数の多いプロフィールで重くなるため）。
+function splitProfileEntriesIntoPages(entries, hasGroupHeading) {
+  const ctx = els.canvas.getContext("2d");
+  const availableHeight = Math.max(PROFILE_CONTENT_BOTTOM - profileEntriesStartY(hasGroupHeading), 0);
+  ctx.font = `300 ${Math.max(Math.round(20 * PROFILE_MIN_TEXT_SCALE), 1)}px serif`;
+
+  const pages = [];
+  let current = [];
+  let currentHeight = 0;
   entries.forEach((entry) => {
-    // drawProfileStaticEntries()は、entry.nameが空でも見出し分の行送りを
-    // 必ず消費する（エンドロールの元の描画と同じ挙動）ため、ここでも
-    // 条件を付けずに常に加算し、両者の高さの見積もりを一致させる。
-    total += ENDROLL_NAME_GAP * scale;
-    if (entry.message) {
-      const lines = wrapTextWithOffsets(ctx, entry.message, ENDROLL_MAX_TEXT_WIDTH);
-      total += Math.max(lines.length, 1) * ENDROLL_MESSAGE_LINE_HEIGHT * scale;
+    const entryHeight = computeProfileEntryHeight(ctx, entry, PROFILE_MIN_TEXT_SCALE);
+    if (current.length > 0 && currentHeight + entryHeight > availableHeight) {
+      pages.push(current);
+      current = [entry];
+      currentHeight = entryHeight;
+    } else {
+      current.push(entry);
+      currentHeight += entryHeight;
     }
-    total += ENDROLL_ENTRY_GAP * scale;
   });
-  return total;
+  if (current.length > 0) pages.push(current);
+  return pages;
 }
 
 // 2人のプロフィールの「質問・回答」項目一覧を、1ページに収まるよう文字の
@@ -2817,6 +2880,9 @@ function drawEndRollPage(ctx, seg, localT, settings) {
   }
 
   const textColor = hasPhotoBg ? paper.onPhotoText : paper.ink;
+  // 以下で計算されるyの最終値は、必ずprofileEntriesStartY(!!seg.group)と
+  // 一致させること（splitProfileEntriesIntoPages()のページ分割判定が
+  // この開始位置を前提にしているため）。
   let y = 90;
 
   if (seg.group) {
