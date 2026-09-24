@@ -1605,8 +1605,9 @@ function buildEndRollPages(settings) {
   // 場合はそのページの中でスライドショーのように順番に切り替わる（1ページしか
   // ないグループでも、複数枚設定すればそのページ内で全部使われる）。ページ数の
   // 方が写真の枚数より多い場合は、足りない分だけ先頭の写真に戻って繰り返す。
-  // グループ未指定の写真は、これまで通り順番に、専用の写真が無いグループの
-  // 最初のページにだけ割り当てる。
+  // グループ未指定の写真も同じ考え方で、専用の写真が無いページ全体に均等に
+  // 振り分ける（1ページしか無ければ、そのページで全ての写真がスライドショー
+  // される）。
   const photos = settings.endrollPhotos || [];
   const targetedByGroup = new Map();
   const untargeted = [];
@@ -1621,23 +1622,24 @@ function buildEndRollPages(settings) {
   });
 
   targetedByGroup.forEach((targetedList, groupName) => {
-    const groupPages = pagesByGroup.get(groupName) || [];
-    groupPages.forEach((page, j) => {
-      const assigned = targetedList.filter((_, idx) => idx % groupPages.length === j);
-      page.photos = assigned.length > 0 ? assigned : [targetedList[j % targetedList.length]];
-    });
+    distributePhotosAcrossPages(targetedList, pagesByGroup.get(groupName) || []);
   });
 
-  let untargetedIndex = 0;
-  pages.forEach((page) => {
-    if (page.photos.length > 0) return; // 専用の写真が既に割り当て済み
-    if (!page.isContinuation && untargeted.length > 0) {
-      page.photos = [untargeted[untargetedIndex % untargeted.length]];
-      untargetedIndex++;
-    }
-  });
+  const untargetedPages = pages.filter((page) => page.photos.length === 0 && !page.isContinuation);
+  distributePhotosAcrossPages(untargeted, untargetedPages);
 
   return pages;
+}
+
+// 写真のリストをページのリストに均等に振り分ける（groupPhotosByGroup/
+// untargetedの両方で使う共通ロジック）。ページ数の方が写真の枚数より多い
+// 場合は、足りない分だけ先頭の写真に戻って繰り返す。
+function distributePhotosAcrossPages(photoList, pageList) {
+  if (photoList.length === 0 || pageList.length === 0) return;
+  pageList.forEach((page, j) => {
+    const assigned = photoList.filter((_, idx) => idx % pageList.length === j);
+    page.photos = assigned.length > 0 ? assigned : [photoList[j % photoList.length]];
+  });
 }
 
 const ENDROLL_PHOTO_DEFAULT_SLIDE_SEC = 3; // 背景写真の表示秒数が未設定の場合の既定の長さ（×speed）
@@ -2764,10 +2766,14 @@ function drawEndRollPage(ctx, seg, localT, settings) {
     y += 20;
   }
 
+  // 2人のプロフィール（質問・回答の項目一覧）は、来賓メッセージ・親への感謝の
+  // ような1文字ずつのタイピング演出はかけず、ページが出た瞬間から項目を
+  // すべてそのまま表示する「固定映像」にする（文字自体に動きは不要なため）。
+  const isStaticText = settings.template === "profile";
   const schedule = computeEndRollTypingSchedule(seg.entries, settings.endrollSpeed);
 
   schedule.forEach(({ entry, start, nameDur, gapDur, messageDur }) => {
-    const elapsed = localT - start;
+    const elapsed = isStaticText ? Infinity : localT - start;
 
     let revealedName = "";
     if (entry.name) {
@@ -2791,7 +2797,7 @@ function drawEndRollPage(ctx, seg, localT, settings) {
 
     let revealCount = 0;
     if (entry.message) {
-      const messageElapsed = elapsed - nameDur - gapDur;
+      const messageElapsed = isStaticText ? Infinity : elapsed - nameDur - gapDur;
       if (messageElapsed <= 0) {
         revealCount = 0;
       } else if (messageDur <= 0) {
