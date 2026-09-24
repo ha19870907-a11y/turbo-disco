@@ -2689,6 +2689,75 @@ function drawEndRollPhotoBackground(ctx, photos, localT, speed, seg) {
   }
 }
 
+// 2人のプロフィールの項目一覧（質問・回答）の左端位置。エンドロールの
+// センター寄せ版と同じ左右の余白になるよう、ENDROLL_MAX_TEXT_WIDTHと対称に揃える。
+const PROFILE_TEXT_LEFT_MARGIN = (CANVAS_W - ENDROLL_MAX_TEXT_WIDTH) / 2;
+// 項目数・文章量が多くても1ページに収まるよう文字サイズを縮小する際の下限
+// （これ以上小さくすると読みづらくなるため、はみ出す場合はここで頭打ちにする）。
+const PROFILE_MIN_TEXT_SCALE = 0.45;
+// ページ下端の飾り枠に文字が被らないための余白。
+const PROFILE_CONTENT_BOTTOM = CANVAS_H - 60;
+
+// scale倍した文字サイズで項目一覧を描画した場合に必要な高さを計算する
+// （実際の描画・自動縮小の判定の両方で使うため、必ずこの関数を通す）。
+function computeProfileEntriesHeight(ctx, entries, scale) {
+  ctx.font = `300 ${Math.max(Math.round(20 * scale), 1)}px serif`;
+  let total = 0;
+  entries.forEach((entry) => {
+    // drawProfileStaticEntries()は、entry.nameが空でも見出し分の行送りを
+    // 必ず消費する（エンドロールの元の描画と同じ挙動）ため、ここでも
+    // 条件を付けずに常に加算し、両者の高さの見積もりを一致させる。
+    total += ENDROLL_NAME_GAP * scale;
+    if (entry.message) {
+      const lines = wrapTextWithOffsets(ctx, entry.message, ENDROLL_MAX_TEXT_WIDTH);
+      total += Math.max(lines.length, 1) * ENDROLL_MESSAGE_LINE_HEIGHT * scale;
+    }
+    total += ENDROLL_ENTRY_GAP * scale;
+  });
+  return total;
+}
+
+// 2人のプロフィールの「質問・回答」項目一覧を、1ページに収まるよう文字の
+// 大きさを自動調整しながら左寄せで描画する（タイピング演出は行わない固定表示）。
+// このページが表示されている間、毎フレーム呼ばれるが、entries・開始位置が
+// 変わらなければ縮小率も変わらないため、一度求めたらseg自身にキャッシュして
+// 使い回す（測定のためのwrapTextWithOffsetsを毎フレーム何度も再実行しない）。
+function drawProfileStaticEntries(ctx, seg, startY, textColor, paper) {
+  const entries = seg.entries;
+  if (seg._profileTextScale == null || seg._profileTextScaleStartY !== startY) {
+    const availableHeight = Math.max(PROFILE_CONTENT_BOTTOM - startY, 0);
+    let scale = 1;
+    while (scale > PROFILE_MIN_TEXT_SCALE && computeProfileEntriesHeight(ctx, entries, scale) > availableHeight) {
+      scale = Math.max(scale - 0.05, PROFILE_MIN_TEXT_SCALE);
+    }
+    seg._profileTextScale = scale;
+    seg._profileTextScaleStartY = startY;
+  }
+  const scale = seg._profileTextScale;
+
+  ctx.textAlign = "left";
+  const x = PROFILE_TEXT_LEFT_MARGIN;
+  let y = startY;
+  entries.forEach((entry) => {
+    if (entry.name) {
+      ctx.font = `600 ${Math.max(Math.round(26 * scale), 1)}px serif`;
+      ctx.fillStyle = paper.accent;
+      ctx.fillText(entry.name, x, y);
+    }
+    y += ENDROLL_NAME_GAP * scale;
+
+    if (entry.message) {
+      ctx.font = `300 ${Math.max(Math.round(20 * scale), 1)}px serif`;
+      ctx.fillStyle = textColor;
+      wrapTextWithOffsets(ctx, entry.message, ENDROLL_MAX_TEXT_WIDTH).forEach(({ line }) => {
+        ctx.fillText(line, x, y);
+        y += ENDROLL_MESSAGE_LINE_HEIGHT * scale;
+      });
+    }
+    y += ENDROLL_ENTRY_GAP * scale;
+  });
+}
+
 // エンドロールの1ページ分を描画する。見出しページは中央にお礼のメッセージを表示。
 // 通常ページは、写真があればページ全体を写真の背景にし（なければ本のページの
 // ような紙の質感の背景）、グループ見出し・来賓の名前とメッセージを、お名前→
@@ -2768,12 +2837,18 @@ function drawEndRollPage(ctx, seg, localT, settings) {
 
   // 2人のプロフィール（質問・回答の項目一覧）は、来賓メッセージ・親への感謝の
   // ような1文字ずつのタイピング演出はかけず、ページが出た瞬間から項目を
-  // すべてそのまま表示する「固定映像」にする（文字自体に動きは不要なため）。
-  const isStaticText = settings.template === "profile";
+  // すべてそのまま、1ページに収まるよう文字サイズを自動調整しながら左寄せで
+  // 表示する「固定映像」にする（文字自体に動きは不要なため）。
+  if (settings.template === "profile") {
+    drawProfileStaticEntries(ctx, seg, y, textColor, paper);
+    ctx.restore();
+    return;
+  }
+
   const schedule = computeEndRollTypingSchedule(seg.entries, settings.endrollSpeed);
 
   schedule.forEach(({ entry, start, nameDur, gapDur, messageDur }) => {
-    const elapsed = isStaticText ? Infinity : localT - start;
+    const elapsed = localT - start;
 
     let revealedName = "";
     if (entry.name) {
@@ -2797,7 +2872,7 @@ function drawEndRollPage(ctx, seg, localT, settings) {
 
     let revealCount = 0;
     if (entry.message) {
-      const messageElapsed = isStaticText ? Infinity : elapsed - nameDur - gapDur;
+      const messageElapsed = elapsed - nameDur - gapDur;
       if (messageElapsed <= 0) {
         revealCount = 0;
       } else if (messageDur <= 0) {
