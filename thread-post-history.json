@@ -622,5 +622,18 @@
     "angle": "対象者",
     "threadId": "18112919525025111",
     "postedAt": "2026-09-23T22:04:08.432Z"
+  },
+  {
+    "date": "2026-09-24",
+    "dayKey": "thu",
+    "slotIndex": 1,
+    "time": "12:15",
+    "label": "補助金",
+    "templateId": "TPL-034",
+    "genre": "補助金",
+    "category": "コメント誘導",
+    "angle": "申請方法",
+    "threadId": "17891576934436460",
+    "postedAt": "2026-09-24T03:25:34.677Z"
   }
 ]
