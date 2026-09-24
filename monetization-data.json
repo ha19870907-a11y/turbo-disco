@@ -1,1 +1,25 @@
-[]
+[
+  {
+    "postId": "18074705798443004",
+    "linkId": "link_001",
+    "campaignId": "agency_dotcom_a8",
+    "revenueType": "affiliate",
+    "destination": "代理店ドットコム（副業・独立・新規事業の資料請求サイト、株式会社プライスレス）",
+    "source": "threads",
+    "medium": "social",
+    "campaign": "agency_dotcom_a8",
+    "content": "18074705798443004",
+    "trackingUrl": "https://r.8to.jp/3bScixWD73Zc",
+    "templateId": "TPL-059",
+    "genre": "会社員",
+    "category": "知らないと損",
+    "angle": "対象者",
+    "conversionType": null,
+    "clicks": 0,
+    "conversions": 0,
+    "revenue": 0,
+    "currency": "JPY",
+    "createdAt": "2026-09-24T05:14:47.110Z",
+    "updatedAt": "2026-09-24T05:14:47.110Z"
+  }
+]
