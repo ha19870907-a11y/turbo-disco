@@ -648,5 +648,18 @@
     "angle": "対象者",
     "threadId": "18118174489766024",
     "postedAt": "2026-09-24T11:37:21.052Z"
+  },
+  {
+    "date": "2026-09-25",
+    "dayKey": "fri",
+    "slotIndex": 0,
+    "time": "07:00",
+    "label": "今週の制度TOP3",
+    "templateId": "TPL-057",
+    "genre": "節税",
+    "category": "保存版",
+    "angle": "冒頭",
+    "threadId": "18408810595092877",
+    "postedAt": "2026-09-24T22:11:30.215Z"
   }
 ]
