@@ -687,5 +687,18 @@
     "angle": "冒頭",
     "threadId": "18021946067712807",
     "postedAt": "2026-09-25T11:37:41.009Z"
+  },
+  {
+    "date": "2026-09-26",
+    "dayKey": "sat",
+    "slotIndex": 1,
+    "time": "13:00",
+    "label": "地域別制度",
+    "templateId": "TPL-047",
+    "genre": "地域別",
+    "category": "比較",
+    "angle": "地域",
+    "threadId": "18115592620791078",
+    "postedAt": "2026-09-26T03:28:56.557Z"
   }
 ]
