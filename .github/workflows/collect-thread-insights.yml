@@ -27,11 +27,14 @@ jobs:
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
         run: node scripts/fetch-thread-insights.js
 
+      - name: Update winning-pattern weights (STEP4)
+        run: node scripts/winning-patterns.js
+
       - name: Commit updated insights log
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add thread-insights.json thread-follower-history.json
+          git add thread-insights.json thread-follower-history.json scripts/pattern-weights.json
           if git diff --cached --quiet; then
             echo "変更なし"
           else
