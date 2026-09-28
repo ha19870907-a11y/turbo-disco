@@ -15,12 +15,25 @@ const path = require('node:path');
 const { postToThreads, postReplyToThreads } = require('./post-thread.js');
 const { resolveSlot, pickTemplate } = require('./scheduler.js');
 const { readTemplateLinks, registerPostLink } = require('./monetization.js');
+const { getTemplateWeight } = require('./winning-patterns.js');
 
 const templates = require('./thread-templates.json');
 const schedule = require('./weekly-schedule.json');
 
 const HISTORY_FILE = path.join(__dirname, '..', 'thread-post-history.json');
+const PATTERN_WEIGHTS_FILE = path.join(__dirname, 'pattern-weights.json');
 const HISTORY_KEEP = 200;
+
+// STEP4: winning-patterns.jsが生成した実績スコア(pattern-weights.json)があれば、
+// テンプレート選択の重み付けに使う。まだ生成されていない/壊れている場合は
+// 従来通りの一様ランダム抽選にフォールバックする(投稿自体は止めない)。
+function readPatternWeights() {
+  try {
+    return JSON.parse(fs.readFileSync(PATTERN_WEIGHTS_FILE, 'utf8'));
+  } catch {
+    return null;
+  }
+}
 
 function readHistory() {
   try {
@@ -48,7 +61,9 @@ async function main() {
     return;
   }
 
-  const template = pickTemplate(templates, history, slot);
+  const patternWeights = readPatternWeights();
+  const getWeight = patternWeights ? (template) => getTemplateWeight(patternWeights, template) : undefined;
+  const template = pickTemplate(templates, history, slot, getWeight);
 
   try {
     const result = await postToThreads(template.text);

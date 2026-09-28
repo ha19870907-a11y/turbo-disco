@@ -5,6 +5,10 @@
 // - resolveSlot: 現在時刻(JST)から曜日・スロット番号を判定する
 // - pickTemplate: スロットの条件(ジャンル/カテゴリー)に合い、かつ直近の投稿と
 //   テンプレート・ジャンル×切り口が被らないテンプレートを選ぶ
+//   (STEP4: weightsを渡すと、候補プール内での抽選確率をwinning-patterns.jsが
+//    算出した実績スコアで重み付けする。スロットの条件判定・重複回避の範囲は
+//    一切変えず、絞り込んだ候補プールの中でどれを選びやすくするかだけに影響する。
+//    weights省略時は従来通りの完全ランダム抽選のまま。)
 
 const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
@@ -39,7 +43,22 @@ function resolveSlot(schedule, now = new Date()) {
   return { dayKey, slotIndex, date, slot: daySlots[slotIndex] };
 }
 
-function pickTemplate(templates, history, slotConfig) {
+function weightedPick(pool, weightFn) {
+  const weights = pool.map(weightFn);
+  const total = weights.reduce((a, b) => a + b, 0);
+  if (!(total > 0)) {
+    // 重みが全て0以下など異常な場合は従来通りの一様ランダムにフォールバックする。
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+  let r = Math.random() * total;
+  for (let i = 0; i < pool.length; i += 1) {
+    r -= weights[i];
+    if (r <= 0) return pool[i];
+  }
+  return pool[pool.length - 1];
+}
+
+function pickTemplate(templates, history, slotConfig, getWeight) {
   const lookback = history.slice(-HISTORY_LOOKBACK);
   const recentTemplateIds = new Set(lookback.map((h) => h.templateId));
   const lastAngleByGenre = new Map();
@@ -75,7 +94,7 @@ function pickTemplate(templates, history, slotConfig) {
   for (const opts of attempts) {
     const pool = templates.filter((template) => matches(template, opts));
     if (pool.length > 0) {
-      return pool[Math.floor(Math.random() * pool.length)];
+      return typeof getWeight === 'function' ? weightedPick(pool, getWeight) : pool[Math.floor(Math.random() * pool.length)];
     }
   }
 
