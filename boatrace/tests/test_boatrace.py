@@ -97,6 +97,33 @@ class PredictTest(unittest.TestCase):
         self.assertAlmostEqual(top["ev"], round(top["prob"] * top["odds"], 2))
 
 
+class BugfixTest(unittest.TestCase):
+    def test_scratched_boat_excluded(self):
+        boats = parse.parse_racelist(fx("racelist"))["boats"]
+        o3 = {k: v for k, v in parse.parse_odds3t(fx("odds3t")).items() if "4" not in k}
+        p = predict.predict({"boats": boats, "odds3t": o3})
+        self.assertNotIn(4, p["probs"])
+        self.assertTrue(all("4" not in x["combo"] for x in p["picks"]))
+        self.assertAlmostEqual(sum(p["probs"].values()), 1.0, places=3)
+
+    def test_password_change_rebuilds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "a.json")
+            with mock.patch.dict(os.environ, {"BOATRACE_PASSWORD": "old"}):
+                update.save_json(path, {"x": 1})
+            with mock.patch.dict(os.environ, {"BOATRACE_PASSWORD": "new"}):
+                self.assertEqual(update.load_json(path, "default"), "default")
+
+    def test_official_recent_not_double_counted(self):
+        store = update.RacerStore.__new__(update.RacerStore)
+        store.cache = {"4001": {"recent": [
+            {"venue": "桐生", "date": "2026/10/26", "finish": "1"},
+            {"venue": "大村", "date": "2026/10/10", "finish": "2"}]}}
+        store.history = {"4001": [{"date": "20261028", "jcd": "01", "rno": 1, "finish": 3}]}
+        recent = store.summary("4001")["recent"]
+        self.assertEqual([(r["venue"], str(r["finish"])) for r in recent], [("桐生", "3"), ("大村", "2")])
+
+
 class UpdateTest(unittest.TestCase):
     """fetch を差し替えて prep → live（展示・オッズ・結果）の一連を確認する。"""
 
@@ -157,6 +184,11 @@ class UpdateTest(unittest.TestCase):
         self.assertGreaterEqual(day["hits"]["live"][0], 1)
         store = update.RacerStore()
         self.assertEqual(store.history["4001"][0]["finish"], 1)
+        # 結果が出ないまま締切から90分を過ぎたレースは取りに行かない
+        calls = []
+        with mock.patch.object(update.fetch, "race_page", lambda k, j, r, h: calls.append((k, r)) or None):
+            update.live(hd, now=dt.datetime(2026, 10, 28, 23, 0, tzinfo=jst))
+        self.assertEqual(calls, [])
         self.assertEqual(store.summary("4003")["recent"][0]["course"], 2)
 
 

@@ -132,7 +132,7 @@ def score_boat(b, ctx):
         s += -2.5 * (ex - med)
         if b.get("ex_rank") == 1:
             reasons.append(f"展示タイム1位({ex:.2f})")
-        elif b.get("ex_rank") == 6:
+        elif b.get("ex_rank") and b.get("ex_rank") == ctx.get("ex_n"):
             reasons.append("展示タイム最下位")
     sst = b.get("ex_st")
     if sst is not None and abs(sst) < 1:
@@ -150,6 +150,15 @@ def score_boat(b, ctx):
     if c != b["waku"]:
         reasons.append(f"{b['waku']}号艇が{c}コース進入")
     return s, reasons
+
+
+def scratched(race):
+    """欠場艇の枠番。3連単オッズがあれば、どの組番にも出てこない艇を欠場とみなす。"""
+    odds3t = race.get("odds3t") or {}
+    if len(odds3t) < 20:
+        return set()
+    seen = {int(x) for combo in odds3t for x in combo.split("-")}
+    return {b["waku"] for b in race["boats"]} - seen
 
 
 def _softmax(xs, temp=1.0):
@@ -179,8 +188,8 @@ def predict(race):
     """race: {boats:[...], start:[...], weather:{}, odds_win:{}, odds3t:{}, pc:{}}
     戻り値: {probs:{枠:p}, marks:{枠:印}, picks:[{combo,prob,odds,ev}], reasons:{枠:[...]}, confidence}
     """
-    boats = race["boats"]
-    if len(boats) < 2:
+    boats = [b for b in race["boats"] if b["waku"] not in scratched(race)]
+    if len(boats) < 3:
         return None
     ctx = {"pc_marks": (race.get("pc") or {}).get("marks")}
 
@@ -189,6 +198,7 @@ def predict(race):
     exs = [b.get("ex_time") for b in boats if b.get("ex_time")]
     if exs:
         ctx["ex_median"] = sorted(exs)[len(exs) // 2]
+        ctx["ex_n"] = len(exs)
         order = sorted((b.get("ex_time"), b["waku"]) for b in boats if b.get("ex_time"))
         rank = {w: i + 1 for i, (_, w) in enumerate(order)}
     else:

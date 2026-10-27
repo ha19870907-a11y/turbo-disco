@@ -20,6 +20,7 @@ OUT_DIR = os.path.join(ROOT, "docs", "boatrace", "data")
 STATE_DIR = os.path.join(ROOT, "boatrace", "state")
 JST = dt.timezone(dt.timedelta(hours=9))
 
+RESULT_GIVE_UP_MIN = 90  # 締切からこれだけ過ぎても結果が取れなければ諦める
 RECENT_TTL_DAYS = 1   # 直近成績の取り直し間隔
 COURSE_TTL_DAYS = 7   # コース別成績の取り直し間隔
 HISTORY_KEEP = 40     # 選手ごとに残す自前の結果記録数
@@ -40,7 +41,11 @@ def load_json(path, default):
     except (OSError, ValueError):
         return default
     if secure.is_encrypted(data):
-        return secure.decrypt(data, secure.password())
+        try:
+            return secure.decrypt(data, secure.password())
+        except Exception:  # パスワード変更後の古いデータなど。読めないものは作り直す
+            log(f"{os.path.basename(path)} を復号できないため作り直します")
+            return default
     return data
 
 
@@ -119,19 +124,16 @@ class RacerStore:
         recent = [{"date": r["date"], "venue": parse.VENUES.get(r["jcd"], r["jcd"]),
                    "course": r.get("course"), "st": r.get("st"), "finish": r["finish"]}
                   for r in own[:10]]
-        if len(recent) < 10:
-            seen = {(r["date"], r["venue"]) for r in recent}
-            for r in c.get("recent", []):
-                if len(recent) >= 10:
-                    break
-                if r.get("date") and (r["date"].replace("/", ""), r["venue"]) in seen:
-                    continue
-                recent.append({"date": r.get("date"), "venue": r["venue"], "finish": r["finish"]})
+        official = [r for r in c.get("recent", []) if not _covered(r, own)]
+        for r in official:
+            if len(recent) >= 10:
+                break
+            recent.append({"date": r.get("date"), "venue": r["venue"], "finish": r["finish"]})
         course_stats = {int(k): v for k, v in (c.get("course_stats") or {}).items()}
 
         # 得意場: 自前記録・直近3節の場ごとの平均着順（3走以上）
         by_venue = {}
-        for r in own + [dict(x, jcd=parse.VENUE_BY_NAME.get(x["venue"])) for x in c.get("recent", [])]:
+        for r in own + [dict(x, jcd=parse.VENUE_BY_NAME.get(x["venue"])) for x in official]:
             f = r.get("finish")
             if not (isinstance(f, int) or str(f).isdigit()):
                 continue
@@ -152,6 +154,23 @@ class RacerStore:
             "venue_stats": [{"venue": v, "n": n, "avg": round(a, 2)} for v, n, a in venues[:3]],
             "course_avg": {c: round(sum(fs) / len(fs), 2) for c, fs in sorted(by_course.items())},
         }
+
+
+def _covered(official, own):
+    """公式の直近3節の1走が、自前の記録にある節（同じ場で開始日から7日以内）に含まれるか。"""
+    d = (official.get("date") or "").split("-")[0]
+    try:
+        start = dt.datetime.strptime(d, "%Y/%m/%d")
+    except ValueError:
+        return False
+    jcd = parse.VENUE_BY_NAME.get(official.get("venue"))
+    for r in own:
+        if r.get("jcd") != jcd:
+            continue
+        day = dt.datetime.strptime(r["date"], "%Y%m%d")
+        if 0 <= (day - start).days <= 7:
+            return True
+    return False
 
 
 def _older(stamp, today, days):
@@ -300,13 +319,14 @@ def live(hd, now=None, online=True):
                     info["boats"] = {str(k): x for k, x in info["boats"].items()}
                     r["before"] = info
                     got = True
-                if not r.get("pc"):
+                if not r.get("pc") and not r.get("pc_tried"):
+                    r["pc_tried"] = True
                     html = fetch.race_page("pcexpect", v["jcd"], r["rno"], hd)
                     pc = parse.parse_pcexpect(html) if html else None
                     if pc and (pc["marks"] or pc["focus"]):
                         r["pc"] = pc
             stale = _age_min(r.get("odds_at"), now)
-            if -2 <= mins <= 60 or (mins <= 180 and stale >= 30):
+            if -2 <= mins <= 60 or (60 < mins <= 180 and stale >= 30):
                 html = fetch.race_page("oddstf", v["jcd"], r["rno"], hd)
                 win = parse.parse_oddstf(html) if html else {}
                 if win:
@@ -320,7 +340,7 @@ def live(hd, now=None, online=True):
                         r["odds3t"] = o3
                         r["odds_at"] = now.strftime("%H:%M")
                         got = True
-            if mins <= -6:
+            if -RESULT_GIVE_UP_MIN <= mins <= -6:
                 html = fetch.race_page("raceresult", v["jcd"], r["rno"], hd)
                 res = parse.parse_result(html) if html else None
                 if res and res["order"]:

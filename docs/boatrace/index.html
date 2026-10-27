@@ -316,9 +316,9 @@ function raceBody(d, r) {
       ${boat(w)}
       <div><div class="name">${esc(b.name)}</div>
         <div class="small">${esc(b.cls || "")} ${esc(b.toban)} ${esc(b.branch || "")} ${b.age ? b.age + "歳" : ""}</div></div>
-      <div class="prob"><span class="mark">${p.marks[w] || ""}</span><b>${pct(prob)}</b>
+      <div class="prob"><span class="mark">${p.marks[w] || ""}</span><b>${prob == null ? "欠場" : pct(prob)}</b>
         ${delta ? `<span class="small">${delta > 0 ? "+" : ""}${delta}</span>` : ""}
-        <div class="pbar"><i style="width:${Math.round(prob * 100)}%"></i></div>
+        <div class="pbar"><i style="width:${Math.round((prob || 0) * 100)}%"></i></div>
         <div class="small">${odds ? `単勝 ${odds}倍` : ""}${pcm ? ` 公式${pcm}` : ""}</div></div>
       <div class="stats kv">
         <div><span>全国</span><b>${fmt(b.nat_win)}</b></div>
