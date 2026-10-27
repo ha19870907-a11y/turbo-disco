@@ -1,0 +1,941 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>設備伝票ツール</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  /* 業務帳票ツール: 上部タブ + 1カラムのカード。明細は広い画面で表、スマホでは1行=1ブロック */
+  :root {
+    --bg: #eef1f4;
+    --surface: #ffffff;
+    --ink: #17212b;
+    --muted: #5d6b78;
+    --line: #d3dae1;
+    --accent: #0e5a8a;
+    --accent-ink: #ffffff;
+    --accent-soft: #e2eef6;
+    --danger: #b3261e;
+    --ok: #1e7a46;
+    --font-ui: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+    --font-doc: "BIZ UDPGothic", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #11171d; --surface: #1a232c; --ink: #e5ebf0; --muted: #9aa8b5; --line: #2e3a46;
+      --accent: #5fb0e6; --accent-ink: #0b1620; --accent-soft: #1d3446; --danger: #f08a80; --ok: #6fcf97;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #11171d; --surface: #1a232c; --ink: #e5ebf0; --muted: #9aa8b5; --line: #2e3a46;
+    --accent: #5fb0e6; --accent-ink: #0b1620; --accent-soft: #1d3446; --danger: #f08a80; --ok: #6fcf97;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--font-ui); font-size: 15px; line-height: 1.5; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 12px 96px; }
+  header.top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding-block: 8px 12px; }
+  header.top h1 { font-family: var(--font-doc); font-size: 19px; margin: 0; letter-spacing: 0.04em; }
+  .sync { font-size: 12px; color: var(--muted); }
+  .sync.ok { color: var(--ok); }
+  nav.tabs { display: flex; gap: 4px; flex-wrap: wrap; width: 100%; border-bottom: 1px solid var(--line); }
+  nav.tabs button { border: 0; background: none; color: var(--muted); padding: 10px 12px; font: inherit; font-weight: 500; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -1px; }
+  nav.tabs button.active { color: var(--accent); border-bottom-color: var(--accent); }
+  section.tab { display: none; flex-direction: column; gap: 14px; padding-top: 14px; }
+  section.tab.active { display: flex; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+  .card h2 { font-family: var(--font-doc); font-size: 16px; margin: 0 0 12px; text-wrap: balance; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px 12px; }
+  label, .lbl { display: block; font-size: 12px; color: var(--muted); margin-bottom: 3px; letter-spacing: 0.02em; }
+  input, select, textarea { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 6px; font: inherit; font-size: 16px; background: var(--surface); color: var(--ink); min-width: 0; }
+  input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  textarea { min-height: 64px; resize: vertical; }
+  .num, input[type="number"] { font-variant-numeric: tabular-nums; }
+  button.btn { padding: 9px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); font: inherit; font-weight: 500; cursor: pointer; }
+  button.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button.btn.danger, button.btn.armed { color: var(--danger); border-color: var(--danger); }
+  button.btn:disabled { opacity: 0.5; cursor: default; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .hint { color: var(--muted); font-size: 12.5px; margin: 8px 0 0; }
+
+  /* 明細 */
+  .lines-head, .line { display: grid; grid-template-columns: 1.3fr 2.2fr 0.7fr 0.6fr 1fr 1fr 1fr 40px; gap: 6px; align-items: center; }
+  .lines-head { font-size: 12px; color: var(--muted); padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+  .line { padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .line .lbl { display: none; }
+  .line .amount { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+  .line .del { border: 0; background: none; color: var(--danger); font-size: 20px; cursor: pointer; }
+  .r { text-align: right; }
+  @media (max-width: 680px) {
+    .lines-head { display: none; }
+    .line { grid-template-columns: 1fr 1fr; grid-template-areas: "code code" "name name" "qty unit" "cost price" "amount del"; padding: 12px 0; }
+    .line .lbl { display: block; }
+    .line > :nth-child(1) { grid-area: code; } .line > :nth-child(2) { grid-area: name; }
+    .line > :nth-child(3) { grid-area: qty; } .line > :nth-child(4) { grid-area: unit; }
+    .line > :nth-child(5) { grid-area: cost; } .line > :nth-child(6) { grid-area: price; }
+    .line > :nth-child(7) { grid-area: amount; text-align: left; font-size: 16px; }
+    .line > :nth-child(8) { grid-area: del; justify-self: end; }
+  }
+  .scan { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px; margin-bottom: 12px; background: var(--accent-soft); border-radius: 8px; }
+  .scan-status { font-size: 13px; color: var(--muted); flex: 1 1 220px; min-width: 0; }
+  .line.unregistered input[data-k=cost] { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, var(--surface)); }
+  .totals { margin-left: auto; width: 300px; max-width: 100%; margin-top: 12px; display: grid; gap: 4px; }
+  .totals div { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+  .totals .grand { font-weight: 700; font-size: 18px; border-top: 2px solid var(--ink); padding-top: 4px; }
+  .totals .profit { color: var(--muted); font-size: 12.5px; }
+
+  /* プレビュー */
+  .preview { display: grid; gap: 12px; }
+  .preview img { width: 100%; max-width: 620px; border: 1px solid var(--line); box-shadow: 0 2px 10px rgb(0 0 0 / 0.08); background: #fff; justify-self: center; }
+
+  /* 一覧・マスタ */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { border-bottom: 1px solid var(--line); padding: 8px 6px; text-align: left; white-space: nowrap; }
+  th { font-size: 12px; color: var(--muted); font-weight: 500; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td .btn { padding: 5px 10px; font-size: 13px; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+  .empty { color: var(--muted); padding: 16px 4px; white-space: normal; }
+
+  .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-size: 14px; max-width: calc(100% - 32px); z-index: 20; }
+  .file-btn { position: relative; overflow: hidden; display: inline-block; }
+  .file-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  @media (prefers-reduced-motion: no-preference) { button.btn { transition: background 0.15s; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <h1>設備伝票ツール</h1>
+    <span class="sync" id="sync">読み込み中…</span>
+    <nav class="tabs">
+      <button data-tab="doc" class="active">伝票作成</button>
+      <button data-tab="history">伝票一覧</button>
+      <button data-tab="master">単価マスタ</button>
+      <button data-tab="settings">設定</button>
+    </nav>
+  </header>
+
+  <!-- 伝票作成 -->
+  <section class="tab active" id="tab-doc">
+    <div class="card">
+      <h2>伝票情報</h2>
+      <div class="grid">
+        <div><label for="d-type">種類</label>
+          <select id="d-type"><option>請求書</option><option>見積書</option></select></div>
+        <div><label for="d-no">伝票番号</label><input id="d-no"></div>
+        <div><label for="d-date">発行日</label><input id="d-date" type="date"></div>
+        <div><label for="d-to">宛先（お客様名）</label><input id="d-to" placeholder="株式会社○○"></div>
+        <div><label for="d-honor">敬称</label><select id="d-honor"><option>御中</option><option>様</option></select></div>
+        <div><label for="d-subject">件名・現場名</label><input id="d-subject" placeholder="○○様邸 給排水工事"></div>
+        <div><label for="d-due">お支払期限（請求書）</label><input id="d-due" type="date"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>明細</h2>
+      <div class="scan" id="scan-box" hidden>
+        <span class="file-btn btn primary">仕入先の納品書を写真で読み取る<input id="scan-file" type="file" accept="image/jpeg,image/png,image/webp"></span>
+        <span class="scan-status" id="scan-status">渡辺パイプ・小泉などの納品書を撮ると、品名・品番・数量を明細に追加します。</span>
+      </div>
+      <div class="lines-head"><span>品番（マスタ検索）</span><span>品名</span><span class="r">数量</span><span>単位</span><span class="r">仕入単価</span><span class="r">販売単価</span><span class="r">金額</span><span></span></div>
+      <div id="d-lines"></div>
+      <datalist id="master-list"></datalist>
+      <div class="actions"><button class="btn" id="add-line">＋ 行を追加</button></div>
+      <p class="hint">品番を選ぶと品名・仕入単価が入り、販売単価＝仕入単価×(1＋上乗せ率)を自動計算します。パイプ・架橋ポリなどはメーター単価になるので、数量はメーターで入れてください（例：12.5）。工賃などは販売単価を直接入れてください。</p>
+      <div class="totals">
+        <div><span>小計</span><span id="t-sub">0</span></div>
+        <div><span id="t-tax-label">消費税(10%)</span><span id="t-tax">0</span></div>
+        <div class="grand"><span>合計</span><span id="t-total">0</span></div>
+        <div class="profit"><span>(参考) 粗利</span><span id="t-profit">0</span></div>
+      </div>
+      <label for="d-note" style="margin-top:12px">備考</label>
+      <textarea id="d-note"></textarea>
+      <div class="actions">
+        <button class="btn primary" id="save-doc">保存</button>
+        <button class="btn" id="to-invoice" hidden>この見積書から請求書を作成</button>
+        <button class="btn" id="new-doc">新規</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>出力（A4）</h2>
+      <div class="actions" style="margin-top:0;margin-bottom:12px">
+        <button class="btn primary" id="out-pdf">PDFで保存</button>
+        <button class="btn" id="out-png">画像で保存</button>
+      </div>
+      <p class="hint" id="out-hint" style="margin-top:0;margin-bottom:12px">PDFは印刷・メール添付に、画像はLINEなどでの送付に使えます。</p>
+      <div class="preview" id="preview"></div>
+    </div>
+  </section>
+
+  <!-- 伝票一覧 -->
+  <section class="tab" id="tab-history">
+    <div class="card">
+      <h2>保存した伝票</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>種類</th><th>番号</th><th>発行日</th><th>宛先</th><th>件名</th><th class="num">合計</th><th></th></tr></thead>
+        <tbody id="h-list"></tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <!-- 単価マスタ -->
+  <section class="tab" id="tab-master">
+    <div class="card">
+      <h2>CSV取り込み（渡辺パイプ・小泉などの見積・注文履歴・価格表）</h2>
+      <div class="grid">
+        <div><label for="m-supplier">仕入先（CSVに仕入先列がないとき）</label><input id="m-supplier" placeholder="渡辺パイプ"></div>
+        <div><span class="lbl">CSVファイル（Shift_JIS／UTF-8）</span>
+          <span class="file-btn btn">ファイルを選ぶ<input id="m-file" type="file" accept=".csv,text/csv"></span></div>
+      </div>
+      <p class="hint">見出しに「品番・商品コード・型番」と「仕入単価・仕切単価・納入単価・単価」の列があれば自動認識します。同じ仕入先・品番は新しい価格で上書きします。パイプ類は品名から1本4m、架橋ポリは1巻50mと判断してメーター単価にします。違うものは一覧の「長さ」欄で直せます（個売りは空欄）。</p>
+    </div>
+    <div class="card">
+      <h2>単価マスタ <span class="pill" id="m-count">0件</span></h2>
+      <div class="grid">
+        <div><label for="m-new-supplier">仕入先</label><input id="m-new-supplier"></div>
+        <div><label for="m-new-code">品番</label><input id="m-new-code"></div>
+        <div><label for="m-new-name">品名</label><input id="m-new-name"></div>
+        <div><label for="m-new-unit">仕入単位</label><input id="m-new-unit" placeholder="本・巻・個"></div>
+        <div><label for="m-new-cost">仕入単価（1本・1巻あたり、税抜）</label><input id="m-new-cost" type="number" min="0" inputmode="decimal"></div>
+        <div><label for="m-new-len">長さ（m）</label><input id="m-new-len" type="number" min="0" step="any" inputmode="decimal" placeholder="空欄で自動（パイプ4・架橋ポリ50）"></div>
+      </div>
+      <div class="actions">
+        <button class="btn primary" id="m-add">追加・更新</button>
+        <button class="btn" id="m-export">CSVで書き出し</button>
+        <input id="m-search" placeholder="品番・品名で絞り込み" style="max-width:260px">
+      </div>
+      <div class="table-wrap" style="margin-top:12px"><table>
+        <thead><tr><th>仕入先</th><th>品番</th><th>品名</th><th class="num">仕入単価</th><th class="num">長さ(m)</th><th class="num">仕入／販売単位</th><th class="num">販売単価</th><th>更新日</th><th></th></tr></thead>
+        <tbody id="m-list"></tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <!-- 設定 -->
+  <section class="tab" id="tab-settings">
+    <div class="card">
+      <h2>自社情報（伝票に印字）</h2>
+      <div class="grid">
+        <div><label for="s-name">会社名・屋号</label><input id="s-name" placeholder="○○設備"></div>
+        <div><label for="s-rep">代表者名</label><input id="s-rep"></div>
+        <div><label for="s-zip">郵便番号</label><input id="s-zip" inputmode="numeric" placeholder="1890003"></div>
+        <div><label for="s-address">住所</label><input id="s-address"></div>
+        <div><label for="s-tel">TEL/FAX</label><input id="s-tel" inputmode="tel"></div>
+        <div><label for="s-email">E-MAIL</label><input id="s-email" type="email" inputmode="email"></div>
+        <div><label for="s-invoice">インボイス登録番号</label><input id="s-invoice" placeholder="T1234567890123"></div>
+      </div>
+      <label for="s-bank" style="margin-top:10px">振込先（請求書に印字）</label>
+      <textarea id="s-bank" placeholder="○○銀行 ○○支店 普通 1234567 カ）○○セツビ"></textarea>
+    </div>
+    <div class="card">
+      <h2>計算ルール</h2>
+      <div class="grid">
+        <div><label for="s-markup">上乗せ率（%）</label><input id="s-markup" type="number" step="0.1" inputmode="decimal"></div>
+        <div><label for="s-round">販売単価の端数</label>
+          <select id="s-round"><option value="ceil">切り上げ</option><option value="round">四捨五入</option><option value="floor">切り捨て</option></select></div>
+        <div><label for="s-tax">消費税率（%）</label><input id="s-tax" type="number" step="1" inputmode="decimal"></div>
+        <div><label for="s-taxround">消費税の端数</label>
+          <select id="s-taxround"><option value="floor">切り捨て</option><option value="round">四捨五入</option><option value="ceil">切り上げ</option></select></div>
+      </div>
+      <p class="hint">販売単価＝仕入単価×(1＋上乗せ率)。例：仕入1,000円→1,100円。パイプ4m 1,200円なら 1,200÷4×1.1＝1mあたり330円。消費税は伝票ごとに合計へ1回だけ計算します（インボイス制度の端数処理）。</p>
+      <div class="actions">
+        <button class="btn primary" id="s-save">設定を保存</button>
+        <button class="btn" id="backup">全データをバックアップ</button>
+        <span class="file-btn btn">バックアップから復元<input id="restore" type="file" accept=".json,application/json"></span>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const yen = (n) => Math.round(Number(n) || 0).toLocaleString('ja-JP');
+const today = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const useCap = (name) => (window.claude?.use ? window.claude.use(name).catch(() => null) : Promise.resolve(null));
+
+let toastTimer;
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 3200);
+}
+// 削除など: 1回目で確認表示、3秒以内の2回目で実行
+function armed(btn, run) {
+  if (btn.dataset.armed) { run(); return; }
+  const label = btn.textContent; btn.dataset.armed = '1'; btn.classList.add('armed'); btn.textContent = 'もう一度押して確定';
+  setTimeout(() => { delete btn.dataset.armed; btn.classList.remove('armed'); btn.textContent = label; }, 3000);
+}
+
+const DEFAULT_SETTINGS = { name: '', rep: '', zip: '', address: '', tel: '', email: '', invoice: '', bank: '', markup: 10, round: 'ceil', tax: 10, taxround: 'floor' };
+// 自社情報の初期値（このページの持ち主にだけ使う。共有相手は空欄から）
+const OWNER_DEFAULTS = {};
+let useOwnerDefaults = false;
+function withDefaults(saved = {}) {
+  const out = { ...DEFAULT_SETTINGS, ...(useOwnerDefaults ? OWNER_DEFAULTS : {}) };
+  Object.entries(saved || {}).forEach(([k, v]) => { if (v !== '' && v != null) out[k] = v; });
+  return out;
+}
+let settings = withDefaults();
+let master = [];  // {supplier, code, name, unit, cost, updated}
+let docs = [];    // 保存済み伝票
+let current = null;
+
+const roundBy = (v, mode) => (mode === 'ceil' ? Math.ceil(v - 1e-9) : mode === 'floor' ? Math.floor(v + 1e-9) : Math.round(v));
+const sellPrice = (cost) => roundBy(Number(cost) * (1 + Number(settings.markup) / 100), settings.round);
+const round2 = (n) => Math.round(Number(n) * 100) / 100;
+
+// メーター売り: 仕入1本(1巻)の長さで割って1mあたりの単価にする。len=0 は個売り
+const FITTING = /エルボ|チーズ|ソケット|継手|バルブ|キャップ|ニップル|ユニオン|フランジ|レジューサ|ブッシング|ベンド|ジョイント|アダプタ|ブラケット|バンド|サドル|ヘッダー|水栓|カバー/;
+function guessLen(m) {
+  const text = `${m.name || ''} ${m.code || ''}`;
+  if (FITTING.test(m.name || '')) return 0;
+  if (/架橋|ポリブテン|PEX|ペックス/i.test(text)) return 50;
+  if (/パイプ|管|(^|\s)(HI|HT)?VP\d|(^|\s)VU\d|SGP/i.test(text)) return 4;
+  return 0;
+}
+const packLen = (m) => { const n = Number(m.len ?? guessLen(m)); return isFinite(n) && n > 0 ? n : 0; };
+const unitCost = (m) => (packLen(m) ? Number(m.cost) / packLen(m) : Number(m.cost));
+const saleUnit = (m) => (packLen(m) ? 'm' : m.unit);
+
+// ===== 保存先: claude.ai のデータベース（スマホ・PCで共有）。使えない環境ではこの端末内 =====
+const MASTER_CHUNK = 700;
+const store = {
+  kind: 'none', db: null, base: null, masterChunks: 0, unsubs: [],
+  async init() {
+    const [db, user] = await Promise.all([useCap('db'), useCap('user')]);
+    const uid = user ? await user.id() : null;
+    useOwnerDefaults = user ? await user.isOwner() : false;
+    settings = withDefaults();
+    if (db && uid) {
+      this.kind = 'db'; this.db = db;
+      this.base = db.doc(`data/users/${uid}/app`);
+      this.unsubs.push(this.base.onSnapshot((s) => { settings = withDefaults(s.data()?.settings); onData('settings'); }, onDbError));
+      this.unsubs.push(this.base.collection('master').onSnapshot((q) => {
+        this.masterChunks = q.size;
+        master = q.docs.slice().sort((a, b) => a.id.localeCompare(b.id)).flatMap((d) => d.data().items || []);
+        onData('master');
+      }, onDbError));
+      this.unsubs.push(this.base.collection('docs').onSnapshot((q) => {
+        docs = q.docs.map((d) => d.data()).sort((a, b) => (b.created || 0) - (a.created || 0));
+        onData('docs');
+      }, onDbError));
+      $('sync').textContent = '保存先：アカウント（スマホ・PC共通）'; $('sync').className = 'sync ok';
+    } else {
+      this.kind = 'local';
+      settings = withDefaults(this.lget('settings', {}));
+      master = this.lget('master', []); docs = this.lget('docs', []);
+      $('sync').textContent = window.claude ? '保存先：この端末のみ（サインインすると端末間で共有されます）' : '保存先：この端末のみ（時々「設定」からバックアップしてください）'; $('sync').className = 'sync';
+      onData('settings'); onData('master'); onData('docs');
+    }
+  },
+  // 閲覧のみで共有された人はアカウントに保存できないため、この端末への保存に切り替える
+  toLocal() {
+    this.unsubs.forEach((u) => u()); this.unsubs = [];
+    this.kind = 'local';
+    if (!master.length) master = this.lget('master', []);
+    if (!docs.length) docs = this.lget('docs', []);
+    $('sync').textContent = '保存先：この端末のみ（この共有方法ではアカウントに保存できません）'; $('sync').className = 'sync';
+  },
+  async run(dbOp, localOp) {
+    if (this.kind === 'db') {
+      try { return await dbOp(); } catch (e) { if (e?.code !== 'invalid_argument') throw e; this.toLocal(); }
+    }
+    return localOp();
+  },
+  lget(k, f) { try { const v = localStorage.getItem('denpyo-' + k); return v ? JSON.parse(v) : f; } catch { return f; } },
+  lset(k, v) { try { localStorage.setItem('denpyo-' + k, JSON.stringify(v)); } catch { toast('この端末に保存できませんでした'); } },
+  saveSettings(s) {
+    return this.run(() => this.base.set({ settings: s }),
+      () => { settings = withDefaults(s); this.lset('settings', s); onData('settings'); });
+  },
+  saveMaster(list) {
+    return this.run(async () => {
+      const col = this.base.collection('master');
+      const n = Math.ceil(list.length / MASTER_CHUNK);
+      for (let i = 0; i < n; i++) await col.doc('chunk-' + String(i).padStart(3, '0')).set({ items: list.slice(i * MASTER_CHUNK, (i + 1) * MASTER_CHUNK) });
+      for (let i = n; i < this.masterChunks; i++) await col.doc('chunk-' + String(i).padStart(3, '0')).delete();
+    }, () => { master = list; this.lset('master', list); onData('master'); });
+  },
+  saveDoc(doc) {
+    return this.run(() => this.base.collection('docs').doc(doc.id).set(doc), () => {
+      docs = [doc, ...docs.filter((d) => d.id !== doc.id)].sort((a, b) => (b.created || 0) - (a.created || 0));
+      this.lset('docs', docs); onData('docs');
+    });
+  },
+  deleteDoc(id) {
+    return this.run(() => this.base.collection('docs').doc(id).delete(),
+      () => { docs = docs.filter((d) => d.id !== id); this.lset('docs', docs); onData('docs'); });
+  },
+};
+function onDbError(e) { if (e?.code !== 'revoked') toast('データの同期に失敗しました。ページを開き直してください。'); }
+function failSave(e) {
+  toast(e?.code === 'quota_exceeded' ? '保存容量の上限です。古い伝票を削除してください。' : '保存できませんでした。通信状態を確認してもう一度お試しください。');
+}
+
+let settingsLoaded = false;
+function onData(kind) {
+  if (kind === 'settings') {
+    if (!settingsLoaded || !$('tab-settings').classList.contains('active')) loadSettingsForm();
+    settingsLoaded = true;
+    if (current) renderTotals();
+  }
+  if (kind === 'master') { refreshDatalist(); renderMaster(); }
+  if (kind === 'docs') renderHistory();
+  if (current) schedulePreview();
+}
+
+// ===== タブ =====
+document.querySelectorAll('nav.tabs button').forEach((b) => b.addEventListener('click', () => {
+  document.querySelectorAll('nav.tabs button').forEach((x) => x.classList.toggle('active', x === b));
+  document.querySelectorAll('section.tab').forEach((s) => s.classList.toggle('active', s.id === 'tab-' + b.dataset.tab));
+  window.scrollTo(0, 0);
+}));
+
+// ===== 伝票 =====
+function nextNo(type) {
+  const prefix = { 請求書: 'S', 見積書: 'M' }[type] || 'D';
+  const head = prefix + today().slice(0, 7).replace('-', '') + '-';
+  const max = docs.filter((d) => d.no?.startsWith(head)).reduce((m, d) => Math.max(m, parseInt(d.no.slice(head.length), 10) || 0), 0);
+  return head + String(max + 1).padStart(3, '0');
+}
+const blankLine = () => ({ code: '', name: '', qty: 1, unit: '', cost: '', price: '' });
+function newDoc(type = '請求書') {
+  current = { id: null, type, no: nextNo(type), date: today(), to: '', subject: '', due: '', note: '', lines: [blankLine()] };
+  loadDocToForm();
+}
+const FIELDS = ['type', 'no', 'date', 'to', 'honor', 'subject', 'due', 'note'];
+function loadDocToForm() { if (!['請求書', '見積書'].includes(current.type)) current.type = '請求書'; FIELDS.forEach((k) => { $('d-' + k).value = current[k] || (k === 'honor' ? '御中' : ''); }); $('to-invoice').hidden = current.type !== '見積書'; renderLines(); }
+function readForm() { FIELDS.forEach((k) => { current[k] = $('d-' + k).value; }); }
+FIELDS.forEach((k) => $('d-' + k).addEventListener('input', () => { current[k] = $('d-' + k).value; schedulePreview(); }));
+
+const lineAmount = (l) => Math.round(Number(l.qty || 0) * Number(l.price || 0));
+function calc(doc) {
+  const sub = doc.lines.reduce((s, l) => s + lineAmount(l), 0);
+  const costSum = doc.lines.reduce((s, l) => s + Number(l.qty || 0) * Number(l.cost || 0), 0);
+  const tax = roundBy(sub * Number(settings.tax) / 100, settings.taxround);
+  return { sub, tax, total: sub + tax, profit: sub - costSum };
+}
+function renderLines() {
+  const box = $('d-lines');
+  box.innerHTML = '';
+  current.lines.forEach((l, i) => {
+    const row = document.createElement('div');
+    row.className = 'line' + (l.unregistered && l.cost === '' ? ' unregistered' : '');
+    row.innerHTML = `
+      <div><span class="lbl">品番（マスタ検索）</span><input list="master-list" data-k="code" value="${esc(l.code)}" autocomplete="off"></div>
+      <div><span class="lbl">品名</span><input data-k="name" value="${esc(l.name)}"></div>
+      <div><span class="lbl">数量</span><input data-k="qty" type="number" step="any" inputmode="decimal" class="r" value="${esc(l.qty)}"></div>
+      <div><span class="lbl">単位</span><input data-k="unit" value="${esc(l.unit)}"></div>
+      <div><span class="lbl">仕入単価</span><input data-k="cost" type="number" step="any" inputmode="decimal" class="r" value="${esc(l.cost)}"></div>
+      <div><span class="lbl">販売単価</span><input data-k="price" type="number" step="any" inputmode="decimal" class="r" value="${esc(l.price)}"></div>
+      <div class="amount" data-amount>${yen(lineAmount(l))}</div>
+      <button class="del" aria-label="この行を削除">×</button>`;
+    row.querySelectorAll('input').forEach((inp) => {
+      inp.addEventListener('input', () => {
+        const k = inp.dataset.k; l[k] = inp.value;
+        if (k === 'code') {
+          const hit = findMaster(inp.value);
+          if (hit) { Object.assign(l, { code: hit.code, name: hit.name, unit: saleUnit(hit), cost: round2(unitCost(hit)), price: sellPrice(unitCost(hit)) }); renderLines(); }
+          return;
+        }
+        if (k === 'cost' && l.cost !== '') { l.price = sellPrice(l.cost); row.querySelector('[data-k=price]').value = l.price; row.classList.remove('unregistered'); }
+        row.querySelector('[data-amount]').textContent = yen(lineAmount(l));
+        renderTotals();
+      });
+    });
+    row.querySelector('.del').addEventListener('click', () => {
+      current.lines.splice(i, 1);
+      if (!current.lines.length) current.lines.push(blankLine());
+      renderLines();
+    });
+    box.appendChild(row);
+  });
+  renderTotals();
+}
+function renderTotals() {
+  const t = calc(current);
+  $('t-sub').textContent = yen(t.sub);
+  $('t-tax-label').textContent = `消費税(${settings.tax}%)`;
+  $('t-tax').textContent = yen(t.tax);
+  $('t-total').textContent = yen(t.total);
+  $('t-profit').textContent = yen(t.profit);
+  schedulePreview();
+}
+function findMaster(text) {
+  // 候補の表示は「品番｜品名｜仕入先」
+  const [code, , supplier] = String(text).split('｜').map((s) => s?.trim());
+  return master.find((m) => m.code === code && (!supplier || m.supplier === supplier)) || null;
+}
+const normCode = (s) => String(s ?? '').normalize('NFKC').replace(/\s+/g, '').toUpperCase();
+function findByCode(code, supplier) {
+  const c = normCode(code); if (!c) return null;
+  const hits = master.filter((m) => normCode(m.code) === c);
+  return hits.find((m) => m.supplier === supplier) || hits[0] || null;
+}
+// マスタの品目を明細行にする。仕入単位(本・巻)の数量はメーターに換算
+function lineFromMaster(m, qty, unit) {
+  const len = packLen(m);
+  const q = len && /本|巻|束/.test(unit || m.unit || '') ? round2(Number(qty) * len) : Number(qty);
+  return { code: m.code, name: m.name, qty: q, unit: saleUnit(m), cost: round2(unitCost(m)), price: sellPrice(unitCost(m)) };
+}
+function refreshDatalist() {
+  $('master-list').innerHTML = master.map((m) => `<option value="${esc(`${m.code}｜${m.name}｜${m.supplier}`)}"></option>`).join('');
+}
+
+$('add-line').addEventListener('click', () => { current.lines.push(blankLine()); renderLines(); });
+$('d-type').addEventListener('change', () => {
+  current.type = $('d-type').value; $('to-invoice').hidden = current.type !== '見積書';
+  if (!current.id) { current.no = nextNo(current.type); $('d-no').value = current.no; }
+});
+$('new-doc').addEventListener('click', () => { newDoc(); toast('新しい伝票を開きました'); });
+$('save-doc').addEventListener('click', async () => { if (await saveDoc()) toast(`${current.type} ${current.no} を保存しました`); });
+$('to-invoice').addEventListener('click', async () => {
+  if (!(await saveDoc())) return;
+  const keep = { to: current.to, subject: current.subject, note: current.note, lines: clone(current.lines) };
+  newDoc('請求書');
+  Object.assign(current, keep);
+  loadDocToForm();
+  toast('請求書を作成しました。内容を確認して保存してください。');
+});
+
+async function saveDoc() {
+  readForm();
+  current.lines = current.lines.filter((l) => l.name || l.code || l.price);
+  if (!current.lines.length) current.lines.push(blankLine());
+  current.total = calc(current).total;
+  const learn = current.lines.filter((l) => l.unregistered && l.code && l.cost !== '');
+  if (learn.length) {
+    const list = clone(master);
+    learn.forEach((l) => {
+      upsert(list, { supplier: l.supplier || '', code: l.code, name: l.name, unit: l.unit, cost: l.cost, len: l.unit === 'm' ? 0 : '' });
+      delete l.unregistered; delete l.supplier;
+    });
+    commitMaster(list, `仕入単価 ${learn.length} 件を単価マスタに登録しました。次回から自動で入ります。`);
+  }
+  if (!current.id) { current.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6); current.created = Date.now(); }
+  current.updated = Date.now();
+  try { await store.saveDoc(clone(current)); } catch (e) { failSave(e); return false; }
+  renderLines();
+  return true;
+}
+
+// ===== A4 出力（キャンバスで描画 → PDF / PNG） =====
+const PAGE_W = 1240, PAGE_H = 1754, M = 90, R = PAGE_W - M;
+// ひな形の配色（Excel の青系）
+const TPL = { band: '#9dc3e6', bar: '#1f3864', head: '#8eb4e3', stripe: '#dde7f2', label: '#2e5a8f', ink: '#1f2a44' };
+const COLS = [ // 項目, 数量, 単位, 単価, 金額
+  { x: M, w: 640, align: 'left' }, { x: M + 640, w: 90, align: 'right' }, { x: M + 730, w: 70, align: 'left' },
+  { x: M + 800, w: 130, align: 'right' }, { x: M + 930, w: 130, align: 'right' },
+];
+const ROW_H = 40, HEAD_H = 44, FIRST_TOP = 860, CONT_TOP = 170, LAST_BOTTOM = 1380, BOTTOM = 1660;
+const rowCap = (top, bottom) => Math.floor((bottom - top - HEAD_H) / ROW_H);
+const docFont = (size, weight = 400) => `${weight} ${size}px "BIZ UDPGothic", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif`;
+const jpDate = (d) => { const m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[1]}年${+m[2]}月${+m[3]}日` : ''; };
+
+function fitText(ctx, text, width) {
+  text = String(text ?? '');
+  if (ctx.measureText(text).width <= width) return text;
+  while (text.length && ctx.measureText(text + '…').width > width) text = text.slice(0, -1);
+  return text + '…';
+}
+function cellText(ctx, text, col, y) {
+  ctx.textAlign = col.align;
+  const x = col.align === 'left' ? col.x + 10 : col.x + col.w - 10;
+  ctx.fillText(fitText(ctx, text, col.w - 20), x, y);
+}
+function paginate(doc) {
+  const rows = doc.lines.filter((l) => l.name || l.code || l.price !== '');
+  const pages = []; let i = 0; let top = FIRST_TOP;
+  for (;;) {
+    if (rows.length - i <= rowCap(top, LAST_BOTTOM)) { pages.push({ rows: rows.slice(i), top, bottom: LAST_BOTTOM, last: true }); break; }
+    const n = rowCap(top, BOTTOM);
+    pages.push({ rows: rows.slice(i, i + n), top, bottom: BOTTOM, last: false });
+    i += n; top = CONT_TOP;
+  }
+  return pages;
+}
+function drawPages(doc) {
+  const t = calc(doc); const s = settings; const pages = paginate(doc);
+  const isEst = doc.type === '見積書';
+  return pages.map((pg, pi) => {
+    const c = document.createElement('canvas'); c.width = PAGE_W; c.height = PAGE_H;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, PAGE_W, PAGE_H);
+    ctx.textBaseline = 'alphabetic';
+    const text = (str, x, y, size, opt = {}) => {
+      ctx.font = docFont(size, opt.bold ? 700 : 400); ctx.fillStyle = opt.color || TPL.ink; ctx.textAlign = opt.align || 'left';
+      ctx.fillText(opt.width ? fitText(ctx, str, opt.width) : str, x, y);
+    };
+    const box = (x, y, w, h, color) => { ctx.fillStyle = color; ctx.fillRect(x, y, w, h); };
+
+    if (pi === 0) {
+      // 右上: 日付・登録番号・番号
+      text(`No. ${doc.no}`, R, 78, 18, { align: 'right', color: '#555' });
+      text(isEst ? '見積日：' : '請求日：', 760, 112, 22);
+      text(jpDate(doc.date), R, 112, 22, { align: 'right' });
+      if (s.invoice) { text('登録番号', 760, 146, 22); text(s.invoice, R, 146, 22, { align: 'right' }); }
+      // 表題
+      box(M, 172, R - M, 72, TPL.band);
+      text(isEst ? '御見積書' : '御請求書', PAGE_W / 2, 224, 46, { align: 'center' });
+      // 宛名
+      box(M, 285, 530, 62, TPL.band); box(M, 347, 530, 5, TPL.bar);
+      text(doc.to || '', M + 30, 328, 32, { width: 400 });
+      text(doc.honor || '御中', M + 512, 328, 30, { align: 'right' });
+      text('件名：', M + 10, 398, 22); text(doc.subject || '', M + 150, 398, 22, { width: 560 });
+      text(isEst ? '下記のとおり、お見積り申し上げます。' : '下記のとおり、ご請求申し上げます。', M + 10, 456, 22);
+      // 金額
+      box(M, 484, 530, 60, TPL.band); box(M, 544, 530, 5, TPL.bar);
+      text(isEst ? '御見積金額' : '御請求金額', M + 12, 522, 22);
+      text('¥', M + 190, 526, 32);
+      text(yen(t.total), M + 438, 528, 38, { align: 'right', bold: true });
+      text('（税込）', M + 444, 526, 18);
+      if (!isEst && doc.due) text(`お支払期限：${jpDate(doc.due)}`, M + 10, 590, 20);
+      // 自社
+      let fy = 600; const fx = 740;
+      const line = (str, size = 22, opt = {}) => { if (str) { text(str, fx, fy, size, { width: R - fx, ...opt }); fy += size + 14; } };
+      line(s.name, 26, { bold: true });
+      line(s.rep && `代表　${s.rep}`);
+      fy += 18;
+      line(s.zip && `〒${s.zip.replace(/^〒/, '')}`);
+      line(s.address);
+      line(s.tel && `TEL/FAX：${s.tel}`);
+      line(s.email && `E-MAIL：${s.email}`);
+    } else {
+      text(`${isEst ? '御見積書' : '御請求書'}（続き）　No. ${doc.no}`, M, 130, 24);
+    }
+
+    // 明細表（空行も含めて枠を描く）
+    const cap = rowCap(pg.top, pg.bottom);
+    const bodyTop = pg.top + HEAD_H; const tableBottom = bodyTop + cap * ROW_H;
+    box(M, pg.top, R - M, HEAD_H, TPL.head);
+    ['項目', '数量', '単位', '単価', '金額'].forEach((h, i) => text(h, COLS[i].x + COLS[i].w / 2, pg.top + 30, 21, { align: 'center' }));
+    for (let r = 0; r < cap; r++) {
+      const y = bodyTop + r * ROW_H;
+      if (r % 2 === 1) box(M, y, R - M, ROW_H, TPL.stripe);
+      const l = pg.rows[r]; if (!l) continue;
+      ctx.font = docFont(22); ctx.fillStyle = '#000';
+      cellText(ctx, l.name || l.code, COLS[0], y + 28);
+      if (l.price !== '' && l.price != null) { // 単価のない行は見出し（例: 衛生設備工事）
+        cellText(ctx, l.qty, COLS[1], y + 28); cellText(ctx, l.unit, COLS[2], y + 28);
+        cellText(ctx, yen(l.price), COLS[3], y + 28); cellText(ctx, yen(lineAmount(l)), COLS[4], y + 28);
+      }
+    }
+    ctx.strokeStyle = TPL.ink; ctx.lineWidth = 1;
+    for (let y = bodyTop; y < tableBottom; y += ROW_H) { ctx.beginPath(); ctx.moveTo(M, y); ctx.lineTo(R, y); ctx.stroke(); }
+    COLS.slice(1).forEach((col) => { ctx.beginPath(); ctx.moveTo(col.x, pg.top); ctx.lineTo(col.x, tableBottom); ctx.stroke(); });
+    ctx.lineWidth = 2.5; ctx.strokeRect(M, pg.top, R - M, tableBottom - pg.top);
+
+    if (pg.last) {
+      // 小計・消費税・合計
+      const lx = 730, lw = 230, vw = R - lx - lw; let y = tableBottom + 18;
+      [['小計', yen(t.sub)], [`消費税${s.tax}%`, yen(t.tax)], ['合計（税込）', yen(t.total)]].forEach(([k, v], i) => {
+        box(lx, y, lw, 50, TPL.label);
+        text(k, lx + 14, y + 34, 22, { color: '#fff', bold: i === 2 });
+        text(v, R - 12, y + 35, 26, { align: 'right', bold: i === 2, color: '#000' });
+        ctx.lineWidth = 1.5; ctx.strokeStyle = TPL.ink; ctx.strokeRect(lx, y, lw + vw, 50);
+        ctx.beginPath(); ctx.moveTo(lx + lw, y); ctx.lineTo(lx + lw, y + 50); ctx.stroke();
+        y += 50;
+      });
+      // 備考（合計の左）
+      if (doc.note) {
+        let ny = tableBottom + 48; text('【備考】', M, ny, 22, { bold: true });
+        doc.note.split('\n').slice(0, 4).forEach((ln) => { ny += 32; text(ln, M + 10, ny, 20, { width: 600 }); });
+      }
+      // 振込先
+      if (!isEst && s.bank) {
+        const bankLines = s.bank.split('\n').slice(0, 3);
+        const by = y + 24; const bh = 58 + bankLines.length * 32;
+        ctx.lineWidth = 2; ctx.strokeRect(M, by, R - M, bh);
+        text('【御振込先】', M + 14, by + 38, 24, { bold: true });
+        bankLines.forEach((ln, i) => text(ln, M + 40, by + 76 + i * 32, 22, { width: R - M - 60 }));
+      }
+    }
+    if (pages.length > 1) text(`${pi + 1} / ${pages.length}`, PAGE_W / 2, PAGE_H - 40, 18, { align: 'center', color: '#555' });
+    return c;
+  });
+}
+
+let fontsReady = null;
+function ensureFonts() {
+  if (!fontsReady) {
+    fontsReady = document.fonts
+      ? Promise.race([Promise.all([document.fonts.load(docFont(24), '納品請求見積書御中合計金額小計消費税品名番数量単位価額円0123456789'), document.fonts.load(docFont(24, 700), '納品請求見積書御中合計')]), new Promise((r) => setTimeout(r, 2500))]).catch(() => {})
+      : Promise.resolve();
+  }
+  return fontsReady;
+}
+let previewTimer;
+function schedulePreview() { clearTimeout(previewTimer); previewTimer = setTimeout(renderPreview, 350); }
+async function renderPreview() {
+  if (!current) return;
+  readForm();
+  await ensureFonts();
+  const box = $('preview');
+  box.innerHTML = '';
+  drawPages(current).forEach((c, i) => {
+    const img = document.createElement('img');
+    img.src = c.toDataURL('image/png');
+    img.alt = `${current.type} プレビュー ${i + 1}ページ目`;
+    box.appendChild(img);
+  });
+}
+
+let downloads = null;
+async function saveFile(filename, data) {
+  if (downloads) {
+    try { await downloads.save({ filename, data }); toast(`${filename} を保存しました`); }
+    catch (e) { if (e?.code !== 'declined') toast('保存できませんでした。少し待ってからもう一度お試しください。'); }
+    return;
+  }
+  if (!window.claude) { // 単体で開いたとき
+    const a = document.createElement('a'); a.href = URL.createObjectURL(data instanceof Blob ? data : new Blob([data])); a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000); return;
+  }
+  toast('この画面ではファイル保存が使えません。プレビュー画像を長押しして保存してください。');
+}
+const outName = (ext, n = '') => `${current.type}_${current.no}_${(current.to || '').replace(/[\\/:*?"<>|\s]/g, '')}${n}.${ext}`;
+const canvasBlob = (c, type, q) => new Promise((r) => c.toBlob(r, type, q));
+$('out-pdf').addEventListener('click', async () => {
+  readForm(); await ensureFonts();
+  if (!window.jspdf) { toast('PDF機能を読み込めませんでした。通信状態を確認してください。'); return; }
+  const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
+  drawPages(current).forEach((c, i) => { if (i) pdf.addPage(); pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 210, 297); });
+  await saveFile(outName('pdf'), pdf.output('blob'));
+});
+$('out-png').addEventListener('click', async () => {
+  readForm(); await ensureFonts();
+  const pages = drawPages(current);
+  for (let i = 0; i < pages.length; i++) await saveFile(outName('png', pages.length > 1 ? `_${i + 1}` : ''), await canvasBlob(pages[i], 'image/png'));
+});
+
+// ===== 仕入先の納品書を写真で読み取る =====
+const SCAN_PROMPT = `この画像は設備資材の卸（渡辺パイプ、小泉など）が発行した納品書・仮納品書・請求書の写真です。紙が回転・湾曲していても読み取ってください。
+明細の各行を読み取り、次の形のJSONだけを返してください。
+{"supplier":"仕入先の会社名（例: 渡辺パイプ）","date":"YYYY-MM-DD","slipNo":"伝票No","site":"現場名（現場・現場名欄。なければ空文字）","items":[{"name":"品名","spec":"規格・品番（そのまま。なければ空文字）","maker":"メーカー名（あれば）","qty":数量の数値,"unit":"単位（個・本・巻・m など）","price":単価の数値（印字がなければ null）}]}
+空行は含めないでください。読めない文字は推測せず、読める範囲で書いてください。`;
+let sample = null;
+async function initScan() {
+  sample = await useCap('sample');
+  const lim = sample ? await sample.limits().catch(() => null) : null;
+  $('scan-box').hidden = !lim?.images;
+}
+function normSupplier(s) {
+  s = String(s || '').normalize('NFKC');
+  if (/渡辺パイプ|SEDIA/i.test(s)) return '渡辺パイプ';
+  if (/小泉/.test(s)) return '小泉';
+  return s.replace(/株式会社|\(株\)|㈱/g, '').trim();
+}
+$('scan-file').addEventListener('change', async (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  e.target.value = '';
+  const status = $('scan-status'); const input = $('scan-file');
+  input.disabled = true; status.textContent = '読み取り中です（30秒〜1分ほどかかります）…';
+  try {
+    const r = await sample.json(SCAN_PROMPT, { images: [file], cache: false });
+    const items = Array.isArray(r?.items) ? r.items.filter((it) => it && (it.name || it.spec)) : [];
+    if (!items.length) { status.textContent = '明細を読み取れませんでした。明るい場所で、紙全体が入るように撮り直してください。'; return; }
+    const supplier = normSupplier(r.supplier);
+    const list = clone(master); let learned = 0;
+    const lines = items.map((it) => {
+      const code = String(it.spec || it.name || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
+      const name = String(it.name || '').normalize('NFKC').trim();
+      const qty = Number(it.qty) || 1; const unit = String(it.unit || '').trim();
+      let m = findByCode(code, supplier);
+      if (!m && Number(it.price) > 0) { // 単価が印字されていればマスタに登録
+        const item = { supplier, code, name, unit, cost: Number(it.price), len: '' };
+        upsert(list, item); learned++; m = item;
+      }
+      if (m) return lineFromMaster(m, qty, unit);
+      return { code, name, qty, unit, cost: '', price: '', unregistered: true, supplier };
+    });
+    if (learned) await commitMaster(list, `単価 ${learned} 件を単価マスタに登録しました`);
+    current.lines = current.lines.filter((l) => l.name || l.code || l.price).concat(lines);
+    if (!current.subject && r.site) { current.subject = String(r.site); $('d-subject').value = current.subject; }
+    renderLines();
+    const missing = lines.filter((l) => l.unregistered).length;
+    status.textContent = `${supplier || '仕入先'}の伝票${r.slipNo ? ' No.' + r.slipNo : ''}から ${lines.length} 行を追加しました。`
+      + (missing ? `赤枠の ${missing} 行は単価が未登録です。仕入単価を入れて保存すると、次回から自動で入ります。` : '');
+  } catch (err) {
+    const msg = {
+      not_granted: '写真の読み取りが許可されていません。', sampling_disabled: 'このアカウントでは読み取りが使えません。',
+      rate_limited: '読み取りが混み合っています。少し待ってからもう一度お試しください。', image_rejected: 'この画像は読み込めません。JPEGかPNGの写真を選んでください。',
+      invalid_json: 'うまく読み取れませんでした。もう一度お試しください。', session_expired: 'もう一度サインインしてください。',
+    }[err?.code] || '読み取りに失敗しました。通信状態を確認してもう一度お試しください。';
+    status.textContent = msg;
+    if (['not_granted', 'sampling_disabled', 'images_unavailable', 'capability_disabled', 'capability_removed'].includes(err?.code)) $('scan-box').hidden = true;
+  } finally { input.disabled = false; }
+});
+
+// ===== 伝票一覧 =====
+function renderHistory() {
+  $('h-list').innerHTML = docs.map((d) => `<tr>
+    <td><span class="pill">${esc(d.type)}</span></td><td>${esc(d.no)}</td><td>${esc(d.date)}</td><td>${esc(d.to)}</td><td>${esc(d.subject)}</td>
+    <td class="num">${yen(d.total)}</td>
+    <td><button class="btn" data-open="${esc(d.id)}">開く</button> <button class="btn" data-copy="${esc(d.id)}">複製</button> <button class="btn danger" data-delete="${esc(d.id)}">削除</button></td></tr>`).join('')
+    || '<tr><td colspan="7" class="empty">保存した伝票はまだありません。「伝票作成」で作って「保存」するとここに並びます。</td></tr>';
+}
+$('h-list').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  const id = b.dataset.open || b.dataset.copy || b.dataset.delete;
+  const doc = docs.find((d) => d.id === id); if (!doc) return;
+  if (b.dataset.open || b.dataset.copy) {
+    current = clone(doc);
+    if (b.dataset.copy) Object.assign(current, { id: null, created: null, no: nextNo(doc.type), date: today() });
+    loadDocToForm(); document.querySelector('nav [data-tab=doc]').click();
+    toast(b.dataset.copy ? '複製しました。保存すると新しい伝票になります。' : `${doc.type} ${doc.no} を開きました`);
+  }
+  if (b.dataset.delete) armed(b, async () => {
+    try { await store.deleteDoc(id); toast(`${doc.type} ${doc.no} を削除しました`); } catch (err) { failSave(err); }
+  });
+});
+
+// ===== 単価マスタ =====
+function upsert(list, item) {
+  item.cost = Number(String(item.cost).replace(/[,，¥￥円\s]/g, ''));
+  if (!item.code || item.cost === '' || !isFinite(item.cost)) return false;
+  item.updated = today();
+  if (item.len === '' || item.len == null || !isFinite(Number(item.len))) item.len = guessLen(item); else item.len = Number(item.len);
+  const idx = list.findIndex((m) => m.code === item.code && m.supplier === item.supplier);
+  if (idx >= 0) list[idx] = { ...list[idx], ...item, name: item.name || list[idx].name, unit: item.unit || list[idx].unit };
+  else list.push(item);
+  return true;
+}
+async function commitMaster(list, msg) {
+  try { await store.saveMaster(list); toast(msg); } catch (e) { failSave(e); }
+}
+function renderMaster() {
+  const q = $('m-search').value.trim().toLowerCase();
+  const list = master.filter((m) => !q || (m.code + ' ' + m.name).toLowerCase().includes(q));
+  $('m-count').textContent = `${master.length.toLocaleString()}件`;
+  $('m-list').innerHTML = list.slice(0, 300).map((m) => `<tr>
+    <td>${esc(m.supplier)}</td><td>${esc(m.code)}</td><td>${esc(m.name)}</td>
+    <td class="num">${yen(m.cost)}${m.unit ? '/' + esc(m.unit) : ''}</td>
+    <td class="num"><input class="r len" type="number" min="0" step="any" inputmode="decimal" value="${packLen(m) || ''}" placeholder="個売り" data-lsupplier="${esc(m.supplier)}" data-lcode="${esc(m.code)}" style="width:84px;padding:5px 6px"></td>
+    <td class="num">${packLen(m) ? round2(unitCost(m)).toLocaleString('ja-JP') + '/m' : '—'}</td>
+    <td class="num">${yen(sellPrice(unitCost(m)))}${packLen(m) ? '/m' : (m.unit ? '/' + esc(m.unit) : '')}</td><td>${esc(m.updated)}</td>
+    <td><button class="btn danger" data-msupplier="${esc(m.supplier)}" data-mcode="${esc(m.code)}">削除</button></td></tr>`).join('')
+    + (list.length > 300 ? `<tr><td colspan="9" class="empty">ほか ${list.length - 300} 件。絞り込みで探してください。</td></tr>` : '')
+    || '<tr><td colspan="9" class="empty">まだ登録がありません。仕入先の見積・注文履歴をCSVで書き出して取り込むか、上の欄から1件ずつ追加してください。</td></tr>';
+}
+$('m-search').addEventListener('input', renderMaster);
+$('m-list').addEventListener('change', (e) => {
+  const inp = e.target.closest('input.len'); if (!inp) return;
+  const list = clone(master);
+  const m = list.find((x) => x.supplier === inp.dataset.lsupplier && x.code === inp.dataset.lcode); if (!m) return;
+  m.len = Number(inp.value) || 0;
+  commitMaster(list, m.len ? `${m.code} を ${m.len}m で割ったメーター単価にしました` : `${m.code} を個売りにしました`);
+});
+$('m-list').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-mcode]'); if (!b) return;
+  armed(b, () => commitMaster(master.filter((m) => !(m.supplier === b.dataset.msupplier && m.code === b.dataset.mcode)), `${b.dataset.mcode} を削除しました`));
+});
+$('m-add').addEventListener('click', () => {
+  const list = clone(master);
+  const item = { supplier: $('m-new-supplier').value.trim(), code: $('m-new-code').value.trim(), name: $('m-new-name').value.trim(), unit: $('m-new-unit').value.trim(), cost: $('m-new-cost').value, len: $('m-new-len').value };
+  if (!upsert(list, item)) { toast('品番と仕入単価を入力してください'); return; }
+  ['code', 'name', 'unit', 'cost', 'len'].forEach((k) => { $('m-new-' + k).value = ''; });
+  commitMaster(list, `${item.code} を登録しました（販売単価 ${yen(sellPrice(unitCost(item)))}円/${saleUnit(item) || '個'}）`);
+});
+
+function parseCSV(text) {
+  const rows = []; let row = []; let cell = ''; let q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (c === '"') q = false; else cell += c; }
+    else if (c === '"') q = true;
+    else if (c === ',') { row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += c;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter((r) => r.some((c) => c.trim()));
+}
+function decode(buf) {
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(buf).replace(/^﻿/, ''); }
+  catch { return new TextDecoder('shift_jis').decode(buf); }
+}
+const HEADERS = {
+  supplier: ['仕入先', 'メーカー', '取引先'],
+  code: ['品番', '商品コード', '型番', '品目コード', '商品番号', 'コード'],
+  name: ['品名', '商品名', '名称', '品目名'],
+  unit: ['単位'],
+  cost: ['仕入単価', '仕切単価', '納入単価', '仕切価格', '仕入価格', '単価', '価格'],
+  len: ['長さ', '定尺', '巻長', '入数'],
+};
+$('m-file').addEventListener('change', async (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  const rows = parseCSV(decode(await file.arrayBuffer()));
+  e.target.value = '';
+  let headIdx = -1; let col = {};
+  for (let i = 0; i < Math.min(rows.length, 10) && headIdx < 0; i++) {
+    const found = {};
+    for (const [key, names] of Object.entries(HEADERS)) {
+      for (const name of names) {
+        const j = rows[i].findIndex((h) => h.replace(/\s/g, '').includes(name));
+        if (j >= 0) { found[key] = j; break; }
+      }
+    }
+    if (found.code !== undefined && found.cost !== undefined) { headIdx = i; col = found; }
+  }
+  if (headIdx < 0) { toast('「品番」と「単価」の列が見つかりません。CSVの見出し行を確認してください。'); return; }
+  const defSupplier = $('m-supplier').value.trim();
+  const list = clone(master); let ok = 0;
+  rows.slice(headIdx + 1).forEach((r) => {
+    const get = (k) => (col[k] !== undefined ? (r[col[k]] || '').trim() : '');
+    if (upsert(list, { supplier: get('supplier') || defSupplier, code: get('code'), name: get('name'), unit: get('unit'), cost: get('cost'), len: get('len').replace(/[^\d.]/g, '') })) ok++;
+  });
+  commitMaster(list, `${file.name} から ${ok} 件を取り込みました`);
+});
+$('m-export').addEventListener('click', () => {
+  const lines = [['仕入先', '品番', '品名', '単位', '仕入単価', '長さ(m)', '販売単位', '販売単価', '更新日'],
+    ...master.map((m) => [m.supplier, m.code, m.name, m.unit, m.cost, packLen(m) || '', saleUnit(m), sellPrice(unitCost(m)), m.updated])];
+  const csv = lines.map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  saveFile(`単価マスタ_${today()}.csv`, '﻿' + csv);
+});
+
+// ===== 設定 =====
+const SETTING_KEYS = Object.keys(DEFAULT_SETTINGS);
+function loadSettingsForm() { SETTING_KEYS.forEach((k) => { $('s-' + k).value = settings[k] ?? ''; }); }
+$('s-save').addEventListener('click', async () => {
+  const s = {}; SETTING_KEYS.forEach((k) => { s[k] = $('s-' + k).value; });
+  try { await store.saveSettings(s); settings = withDefaults(s); renderLines(); renderMaster(); toast('設定を保存しました'); } catch (e) { failSave(e); }
+});
+$('backup').addEventListener('click', () => saveFile(`伝票ツール_バックアップ_${today()}.json`, JSON.stringify({ settings, master, docs }, null, 2)));
+$('restore').addEventListener('change', async (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  e.target.value = '';
+  let data;
+  try { data = JSON.parse(await file.text()); } catch { toast('バックアップファイルを読み込めませんでした'); return; }
+  try {
+    await store.saveSettings({ ...DEFAULT_SETTINGS, ...data.settings });
+    await store.saveMaster(data.master || []);
+    for (const d of data.docs || []) await store.saveDoc(d);
+    toast(`復元しました（単価 ${(data.master || []).length}件・伝票 ${(data.docs || []).length}件）`);
+  } catch (err) { failSave(err); }
+});
+
+// ===== 起動 =====
+newDoc();
+loadSettingsForm();
+renderMaster();
+renderHistory();
+useCap('downloads').then((d) => { downloads = d; if (!d && window.claude) $('out-hint').textContent = 'この画面ではファイル保存が使えません。下のプレビュー画像を長押しすると保存できます。'; });
+initScan();
+store.init().then(() => { if (!current.id) { current.no = nextNo(current.type); $('d-no').value = current.no; } schedulePreview(); });
+</script>
+
+</body>
+</html>
