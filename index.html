@@ -126,7 +126,8 @@
           <select id="d-type"><option>請求書</option><option>見積書</option></select></div>
         <div><label for="d-no">伝票番号</label><input id="d-no"></div>
         <div><label for="d-date">発行日</label><input id="d-date" type="date"></div>
-        <div><label for="d-to">宛先（お客様名）</label><input id="d-to" placeholder="○○工務店"></div>
+        <div><label for="d-to">宛先（お客様名）</label><input id="d-to" placeholder="株式会社○○"></div>
+        <div><label for="d-honor">敬称</label><select id="d-honor"><option>御中</option><option>様</option></select></div>
         <div><label for="d-subject">件名・現場名</label><input id="d-subject" placeholder="○○様邸 給排水工事"></div>
         <div><label for="d-due">お支払期限（請求書）</label><input id="d-due" type="date"></div>
       </div>
@@ -218,9 +219,12 @@
     <div class="card">
       <h2>自社情報（伝票に印字）</h2>
       <div class="grid">
-        <div><label for="s-name">会社名・屋号</label><input id="s-name"></div>
+        <div><label for="s-name">会社名・屋号</label><input id="s-name" placeholder="○○設備"></div>
+        <div><label for="s-rep">代表者名</label><input id="s-rep"></div>
+        <div><label for="s-zip">郵便番号</label><input id="s-zip" inputmode="numeric" placeholder="1890003"></div>
         <div><label for="s-address">住所</label><input id="s-address"></div>
-        <div><label for="s-tel">電話番号</label><input id="s-tel" inputmode="tel"></div>
+        <div><label for="s-tel">TEL/FAX</label><input id="s-tel" inputmode="tel"></div>
+        <div><label for="s-email">E-MAIL</label><input id="s-email" type="email" inputmode="email"></div>
         <div><label for="s-invoice">インボイス登録番号</label><input id="s-invoice" placeholder="T1234567890123"></div>
       </div>
       <label for="s-bank" style="margin-top:10px">振込先（請求書に印字）</label>
@@ -267,7 +271,7 @@ function armed(btn, run) {
   setTimeout(() => { delete btn.dataset.armed; btn.classList.remove('armed'); btn.textContent = label; }, 3000);
 }
 
-const DEFAULT_SETTINGS = { name: '', address: '', tel: '', invoice: '', bank: '', markup: 10, round: 'ceil', tax: 10, taxround: 'floor' };
+const DEFAULT_SETTINGS = { name: '', rep: '', zip: '', address: '', tel: '', email: '', invoice: '', bank: '', markup: 10, round: 'ceil', tax: 10, taxround: 'floor' };
 let settings = { ...DEFAULT_SETTINGS };
 let master = [];  // {supplier, code, name, unit, cost, updated}
 let docs = [];    // 保存済み伝票
@@ -394,8 +398,8 @@ function newDoc(type = '請求書') {
   current = { id: null, type, no: nextNo(type), date: today(), to: '', subject: '', due: '', note: '', lines: [blankLine()] };
   loadDocToForm();
 }
-const FIELDS = ['type', 'no', 'date', 'to', 'subject', 'due', 'note'];
-function loadDocToForm() { if (!['請求書', '見積書'].includes(current.type)) current.type = '請求書'; FIELDS.forEach((k) => { $('d-' + k).value = current[k] || ''; }); $('to-invoice').hidden = current.type !== '見積書'; renderLines(); }
+const FIELDS = ['type', 'no', 'date', 'to', 'honor', 'subject', 'due', 'note'];
+function loadDocToForm() { if (!['請求書', '見積書'].includes(current.type)) current.type = '請求書'; FIELDS.forEach((k) => { $('d-' + k).value = current[k] || (k === 'honor' ? '御中' : ''); }); $('to-invoice').hidden = current.type !== '見積書'; renderLines(); }
 function readForm() { FIELDS.forEach((k) => { current[k] = $('d-' + k).value; }); }
 FIELDS.forEach((k) => $('d-' + k).addEventListener('input', () => { current[k] = $('d-' + k).value; schedulePreview(); }));
 
@@ -511,13 +515,17 @@ async function saveDoc() {
 }
 
 // ===== A4 出力（キャンバスで描画 → PDF / PNG） =====
-const PAGE_W = 1240, PAGE_H = 1754, M = 90;
-const COLS = [ // 品名, 数量, 単位, 単価, 金額
-  { x: M, w: 560, align: 'left' }, { x: M + 560, w: 100, align: 'right' }, { x: M + 660, w: 80, align: 'center' },
-  { x: M + 740, w: 150, align: 'right' }, { x: M + 890, w: 170, align: 'right' },
+const PAGE_W = 1240, PAGE_H = 1754, M = 90, R = PAGE_W - M;
+// ひな形の配色（Excel の青系）
+const TPL = { band: '#9dc3e6', bar: '#1f3864', head: '#8eb4e3', stripe: '#dde7f2', label: '#2e5a8f', ink: '#1f2a44' };
+const COLS = [ // 項目, 数量, 単位, 単価, 金額
+  { x: M, w: 640, align: 'left' }, { x: M + 640, w: 90, align: 'right' }, { x: M + 730, w: 70, align: 'left' },
+  { x: M + 800, w: 130, align: 'right' }, { x: M + 930, w: 130, align: 'right' },
 ];
-const ROW_H = 62, HEAD_H = 46;
+const ROW_H = 40, HEAD_H = 44, FIRST_TOP = 860, CONT_TOP = 170, LAST_BOTTOM = 1380, BOTTOM = 1660;
+const rowCap = (top, bottom) => Math.floor((bottom - top - HEAD_H) / ROW_H);
 const docFont = (size, weight = 400) => `${weight} ${size}px "BIZ UDPGothic", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif`;
+const jpDate = (d) => { const m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[1]}年${+m[2]}月${+m[3]}日` : ''; };
 
 function fitText(ctx, text, width) {
   text = String(text ?? '');
@@ -527,100 +535,117 @@ function fitText(ctx, text, width) {
 }
 function cellText(ctx, text, col, y) {
   ctx.textAlign = col.align;
-  const x = col.align === 'left' ? col.x + 12 : col.align === 'right' ? col.x + col.w - 12 : col.x + col.w / 2;
-  ctx.fillText(fitText(ctx, text, col.w - 24), x, y);
-}
-function footerHeight(doc) {
-  const s = settings;
-  let h = 40 + 3 * 50;
-  if (doc.type === '請求書' && s.bank) h += 50 + s.bank.split('\n').length * 34;
-  if (doc.note) h += 50 + doc.note.split('\n').length * 34;
-  return h;
+  const x = col.align === 'left' ? col.x + 10 : col.x + col.w - 10;
+  ctx.fillText(fitText(ctx, text, col.w - 20), x, y);
 }
 function paginate(doc) {
-  const rows = doc.lines.filter((l) => l.name || l.code);
-  const pages = [[]]; let y = 640 + HEAD_H; const limit = PAGE_H - 110;
-  rows.forEach((r) => {
-    if (y + ROW_H > limit) { pages.push([]); y = 170 + HEAD_H; }
-    pages[pages.length - 1].push(r); y += ROW_H;
-  });
-  const needNewPage = y + footerHeight(doc) > limit;
-  if (needNewPage) pages.push([]);
+  const rows = doc.lines.filter((l) => l.name || l.code || l.price !== '');
+  const pages = []; let i = 0; let top = FIRST_TOP;
+  for (;;) {
+    if (rows.length - i <= rowCap(top, LAST_BOTTOM)) { pages.push({ rows: rows.slice(i), top, bottom: LAST_BOTTOM, last: true }); break; }
+    const n = rowCap(top, BOTTOM);
+    pages.push({ rows: rows.slice(i, i + n), top, bottom: BOTTOM, last: false });
+    i += n; top = CONT_TOP;
+  }
   return pages;
 }
 function drawPages(doc) {
   const t = calc(doc); const s = settings; const pages = paginate(doc);
-  return pages.map((rows, pi) => {
+  const isEst = doc.type === '見積書';
+  return pages.map((pg, pi) => {
     const c = document.createElement('canvas'); c.width = PAGE_W; c.height = PAGE_H;
     const ctx = c.getContext('2d');
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, PAGE_W, PAGE_H);
-    ctx.fillStyle = '#000'; ctx.strokeStyle = '#000'; ctx.textBaseline = 'alphabetic';
-    let y;
+    ctx.textBaseline = 'alphabetic';
+    const text = (str, x, y, size, opt = {}) => {
+      ctx.font = docFont(size, opt.bold ? 700 : 400); ctx.fillStyle = opt.color || TPL.ink; ctx.textAlign = opt.align || 'left';
+      ctx.fillText(opt.width ? fitText(ctx, str, opt.width) : str, x, y);
+    };
+    const box = (x, y, w, h, color) => { ctx.fillStyle = color; ctx.fillRect(x, y, w, h); };
+
     if (pi === 0) {
-      ctx.font = docFont(60, 700); ctx.textAlign = 'center';
-      ctx.fillText(doc.type.split('').join('　'), PAGE_W / 2, 170);
-      // 右上: 番号・日付・自社
-      ctx.textAlign = 'right'; ctx.font = docFont(24);
-      ctx.fillText(`No. ${doc.no}`, PAGE_W - M, 250);
-      ctx.fillText(`発行日 ${(doc.date || '').replace(/-/g, '/')}`, PAGE_W - M, 284);
-      const from = [[s.name, 30, 700], [s.address, 22], [s.tel && `TEL ${s.tel}`, 22], [s.invoice && `登録番号 ${s.invoice}`, 22]].filter((f) => f[0]);
-      let fy = 350;
-      from.forEach(([text, size, w]) => { ctx.font = docFont(size, w || 400); ctx.fillText(fitText(ctx, text, 470), PAGE_W - M, fy); fy += size + 14; });
-      // 左: 宛先・合計
-      ctx.textAlign = 'left'; ctx.font = docFont(38, 700);
-      ctx.fillText(fitText(ctx, `${doc.to || ''}　御中`, 560), M, 270);
-      ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(M, 288); ctx.lineTo(M + 580, 288); ctx.stroke();
-      ctx.font = docFont(24); let ly = 340;
-      if (doc.subject) { ctx.fillText(fitText(ctx, `件名：${doc.subject}`, 580), M, ly); ly += 40; }
-      ctx.fillText({ 請求書: '下記の通りご請求申し上げます。', 見積書: '下記の通りお見積り申し上げます。' }[doc.type] || '', M, ly);
-      ctx.font = docFont(24); ctx.fillText('合計金額（税込）', M, 490);
-      ctx.font = docFont(46, 700); ctx.fillText(`¥${yen(t.total)}-`, M + 220, 494);
-      ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(M, 512); ctx.lineTo(M + 580, 512); ctx.stroke();
-      if (doc.type === '請求書' && doc.due) { ctx.font = docFont(22); ctx.fillText(`お支払期限 ${doc.due.replace(/-/g, '/')}`, M, 556); }
-      y = 640;
+      // 右上: 日付・登録番号・番号
+      text(`No. ${doc.no}`, R, 78, 18, { align: 'right', color: '#555' });
+      text(isEst ? '見積日：' : '請求日：', 760, 112, 22);
+      text(jpDate(doc.date), R, 112, 22, { align: 'right' });
+      if (s.invoice) { text('登録番号', 760, 146, 22); text(s.invoice, R, 146, 22, { align: 'right' }); }
+      // 表題
+      box(M, 172, R - M, 72, TPL.band);
+      text(isEst ? '御見積書' : '御請求書', PAGE_W / 2, 224, 46, { align: 'center' });
+      // 宛名
+      box(M, 285, 530, 62, TPL.band); box(M, 347, 530, 5, TPL.bar);
+      text(doc.to || '', M + 30, 328, 32, { width: 400 });
+      text(doc.honor || '御中', M + 512, 328, 30, { align: 'right' });
+      text('件名：', M + 10, 398, 22); text(doc.subject || '', M + 150, 398, 22, { width: 560 });
+      text(isEst ? '下記のとおり、お見積り申し上げます。' : '下記のとおり、ご請求申し上げます。', M + 10, 456, 22);
+      // 金額
+      box(M, 484, 530, 60, TPL.band); box(M, 544, 530, 5, TPL.bar);
+      text(isEst ? '御見積金額' : '御請求金額', M + 12, 522, 22);
+      text('¥', M + 190, 526, 32);
+      text(yen(t.total), M + 438, 528, 38, { align: 'right', bold: true });
+      text('（税込）', M + 444, 526, 18);
+      if (!isEst && doc.due) text(`お支払期限：${jpDate(doc.due)}`, M + 10, 590, 20);
+      // 自社
+      let fy = 600; const fx = 740;
+      const line = (str, size = 22, opt = {}) => { if (str) { text(str, fx, fy, size, { width: R - fx, ...opt }); fy += size + 14; } };
+      line(s.name, 26, { bold: true });
+      line(s.rep && `代表　${s.rep}`);
+      fy += 18;
+      line(s.zip && `〒${s.zip.replace(/^〒/, '')}`);
+      line(s.address);
+      line(s.tel && `TEL/FAX：${s.tel}`);
+      line(s.email && `E-MAIL：${s.email}`);
     } else {
-      ctx.font = docFont(24); ctx.textAlign = 'left';
-      ctx.fillText(`${doc.type}（続き） No. ${doc.no}`, M, 130);
-      y = 170;
+      text(`${isEst ? '御見積書' : '御請求書'}（続き）　No. ${doc.no}`, M, 130, 24);
     }
-    // 明細表
-    const right = M + 1060;
-    ctx.fillStyle = '#ececec'; ctx.fillRect(M, y, 1060, HEAD_H); ctx.fillStyle = '#000';
-    ctx.font = docFont(22, 700);
-    ['品名・品番', '数量', '単位', '単価', '金額'].forEach((h, i) => { ctx.textAlign = 'center'; ctx.fillText(h, COLS[i].x + COLS[i].w / 2, y + 31); });
-    const top = y; y += HEAD_H;
-    rows.forEach((l) => {
-      ctx.font = docFont(24); cellText(ctx, l.name || l.code, COLS[0], y + (l.code && l.name ? 30 : 40));
-      if (l.code && l.name) { ctx.font = docFont(17); ctx.fillStyle = '#444'; cellText(ctx, l.code, COLS[0], y + 53); ctx.fillStyle = '#000'; }
-      ctx.font = docFont(24);
-      cellText(ctx, l.qty, COLS[1], y + 40); cellText(ctx, l.unit, COLS[2], y + 40);
-      cellText(ctx, yen(l.price), COLS[3], y + 40); cellText(ctx, yen(lineAmount(l)), COLS[4], y + 40);
-      y += ROW_H;
-    });
-    ctx.lineWidth = 1.5;
-    if (rows.length || pi === 0) {
-      ctx.strokeRect(M, top, 1060, y - top);
-      for (let ry = top + HEAD_H; ry < y; ry += ROW_H) { ctx.beginPath(); ctx.moveTo(M, ry); ctx.lineTo(right, ry); ctx.stroke(); }
-      COLS.slice(1).forEach((col) => { ctx.beginPath(); ctx.moveTo(col.x, top); ctx.lineTo(col.x, y); ctx.stroke(); });
+
+    // 明細表（空行も含めて枠を描く）
+    const cap = rowCap(pg.top, pg.bottom);
+    const bodyTop = pg.top + HEAD_H; const tableBottom = bodyTop + cap * ROW_H;
+    box(M, pg.top, R - M, HEAD_H, TPL.head);
+    ['項目', '数量', '単位', '単価', '金額'].forEach((h, i) => text(h, COLS[i].x + COLS[i].w / 2, pg.top + 30, 21, { align: 'center' }));
+    for (let r = 0; r < cap; r++) {
+      const y = bodyTop + r * ROW_H;
+      if (r % 2 === 1) box(M, y, R - M, ROW_H, TPL.stripe);
+      const l = pg.rows[r]; if (!l) continue;
+      ctx.font = docFont(22); ctx.fillStyle = '#000';
+      cellText(ctx, l.name || l.code, COLS[0], y + 28);
+      if (l.price !== '' && l.price != null) { // 単価のない行は見出し（例: 衛生設備工事）
+        cellText(ctx, l.qty, COLS[1], y + 28); cellText(ctx, l.unit, COLS[2], y + 28);
+        cellText(ctx, yen(l.price), COLS[3], y + 28); cellText(ctx, yen(lineAmount(l)), COLS[4], y + 28);
+      }
     }
-    if (pi === pages.length - 1) {
-      // 合計欄
-      y += 30;
-      const sumX = right - 470; const rowsSum = [['小計（税抜）', yen(t.sub)], [`消費税（${s.tax}%対象 ${yen(t.sub)}）`, yen(t.tax)], ['合計', yen(t.total)]];
-      rowsSum.forEach(([k, v], i) => {
-        ctx.strokeRect(sumX, y, 470, 50); ctx.beginPath(); ctx.moveTo(sumX + 310, y); ctx.lineTo(sumX + 310, y + 50); ctx.stroke();
-        ctx.font = docFont(i === 2 ? 24 : 20, i === 2 ? 700 : 400); ctx.textAlign = 'left'; ctx.fillText(k, sumX + 12, y + 33);
-        ctx.textAlign = 'right'; ctx.font = docFont(24, i === 2 ? 700 : 400); ctx.fillText(v, right - 12, y + 34);
+    ctx.strokeStyle = TPL.ink; ctx.lineWidth = 1;
+    for (let y = bodyTop; y < tableBottom; y += ROW_H) { ctx.beginPath(); ctx.moveTo(M, y); ctx.lineTo(R, y); ctx.stroke(); }
+    COLS.slice(1).forEach((col) => { ctx.beginPath(); ctx.moveTo(col.x, pg.top); ctx.lineTo(col.x, tableBottom); ctx.stroke(); });
+    ctx.lineWidth = 2.5; ctx.strokeRect(M, pg.top, R - M, tableBottom - pg.top);
+
+    if (pg.last) {
+      // 小計・消費税・合計
+      const lx = 730, lw = 230, vw = R - lx - lw; let y = tableBottom + 18;
+      [['小計', yen(t.sub)], [`消費税${s.tax}%`, yen(t.tax)], ['合計（税込）', yen(t.total)]].forEach(([k, v], i) => {
+        box(lx, y, lw, 50, TPL.label);
+        text(k, lx + 14, y + 34, 22, { color: '#fff', bold: i === 2 });
+        text(v, R - 12, y + 35, 26, { align: 'right', bold: i === 2, color: '#000' });
+        ctx.lineWidth = 1.5; ctx.strokeStyle = TPL.ink; ctx.strokeRect(lx, y, lw + vw, 50);
+        ctx.beginPath(); ctx.moveTo(lx + lw, y); ctx.lineTo(lx + lw, y + 50); ctx.stroke();
         y += 50;
       });
-      const block = (label, text) => {
-        y += 50; ctx.textAlign = 'left'; ctx.font = docFont(22, 700); ctx.fillText(label, M, y);
-        ctx.font = docFont(22); text.split('\n').forEach((line) => { y += 34; ctx.fillText(fitText(ctx, line, 1060), M, y); });
-      };
-      if (doc.type === '請求書' && s.bank) block('【お振込先】', s.bank);
-      if (doc.note) block('【備考】', doc.note);
+      // 備考（合計の左）
+      if (doc.note) {
+        let ny = tableBottom + 48; text('【備考】', M, ny, 22, { bold: true });
+        doc.note.split('\n').slice(0, 4).forEach((ln) => { ny += 32; text(ln, M + 10, ny, 20, { width: 600 }); });
+      }
+      // 振込先
+      if (!isEst && s.bank) {
+        const bankLines = s.bank.split('\n').slice(0, 3);
+        const by = y + 24; const bh = 58 + bankLines.length * 32;
+        ctx.lineWidth = 2; ctx.strokeRect(M, by, R - M, bh);
+        text('【御振込先】', M + 14, by + 38, 24, { bold: true });
+        bankLines.forEach((ln, i) => text(ln, M + 40, by + 76 + i * 32, 22, { width: R - M - 60 }));
+      }
     }
-    if (pages.length > 1) { ctx.font = docFont(20); ctx.textAlign = 'center'; ctx.fillText(`${pi + 1} / ${pages.length}`, PAGE_W / 2, PAGE_H - 60); }
+    if (pages.length > 1) text(`${pi + 1} / ${pages.length}`, PAGE_W / 2, PAGE_H - 40, 18, { align: 'center', color: '#555' });
     return c;
   });
 }
