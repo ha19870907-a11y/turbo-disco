@@ -11,6 +11,7 @@ import datetime as dt
 import json
 import os
 import sys
+import time
 
 from . import fetch, parse, secure
 from .predict import best_course, predict
@@ -24,6 +25,7 @@ RESULT_GIVE_UP_MIN = 90  # 締切からこれだけ過ぎても結果が取れ�
 RECENT_TTL_DAYS = 1   # 直近成績の取り直し間隔
 COURSE_TTL_DAYS = 7   # コース別成績の取り直し間隔
 HISTORY_KEEP = 40     # 選手ごとに残す自前の結果記録数
+RACER_BUDGET_SEC = 25 * 60  # 選手ページの取得にかける上限。超えたら残りは前回の記録を使う
 
 
 def now_jst():
@@ -276,10 +278,15 @@ def prep(hd, online=True, with_racers=True):
 
     tobans = {b["toban"] for v in day["venues"] for r in v["races"] for b in r.get("boats", [])}
     if with_racers:
+        started = time.monotonic()
         for i, t in enumerate(sorted(tobans)):
+            if time.monotonic() - started > RACER_BUDGET_SEC:
+                log(f"選手データの取得を時間切れで打ち切りました（{i}/{len(tobans)}）。残りは次回取得します")
+                break
             store.refresh(t, hd, online)
             if i % 50 == 0:
                 log(f"選手データ {i}/{len(tobans)}")
+                store.save()  # 途中で止まっても取れた分は次回に引き継ぐ
         store.save()
     day["racers"] = {t: store.summary(t) for t in tobans}
 
