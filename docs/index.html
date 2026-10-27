@@ -40,6 +40,8 @@
     color-scheme: dark;
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; }
   body { background: var(--bg); color: var(--ink); font-family: var(--font-ui); font-size: 15px; line-height: 1.5; }
   .wrap { max-width: 1040px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 12px 96px; }
   header.top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding-block: 8px 12px; }
@@ -65,6 +67,7 @@
   button.btn:disabled { opacity: 0.5; cursor: default; }
   .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
   .hint { color: var(--muted); font-size: 12.5px; margin: 8px 0 0; }
+  .hint.warn { color: var(--danger); font-size: 13px; margin: 0 0 12px; }
 
   /* 明細 */
   .lines-head, .line { display: grid; grid-template-columns: 1.3fr 2.2fr 0.7fr 0.6fr 1fr 1fr 1fr 40px; gap: 6px; align-items: center; }
@@ -169,9 +172,11 @@
     <div class="card">
       <h2>出力（A4）</h2>
       <div class="actions" style="margin-top:0;margin-bottom:12px">
-        <button class="btn primary" id="out-pdf">PDFで保存</button>
+        <button class="btn primary" id="out-share" hidden>PDFを送る（メール・LINEなど）</button>
+        <button class="btn" id="out-pdf">PDFを保存</button>
         <button class="btn" id="out-png">画像で保存</button>
       </div>
+      <p class="hint warn" id="inapp-hint" hidden>LINEなどのアプリの中で開いているため、PDFの保存や送信ができないことがあります。画面の「…」やメニューから「ブラウザで開く」（iPhoneは「Safariで開く」）を選んでから使ってください。</p>
       <p class="hint" id="out-hint" style="margin-top:0;margin-bottom:12px">PDFは印刷・メール添付に、画像はLINEなどでの送付に使えます。</p>
       <div class="preview" id="preview"></div>
     </div>
@@ -507,7 +512,7 @@ $('new-doc').addEventListener('click', () => { newDoc(); toast('新しい伝票�
 $('save-doc').addEventListener('click', async () => { if (await saveDoc()) toast(`${current.type} ${current.no} を保存しました`); });
 $('to-invoice').addEventListener('click', async () => {
   if (!(await saveDoc())) return;
-  const keep = { to: current.to, subject: current.subject, note: current.note, lines: clone(current.lines) };
+  const keep = { to: current.to, honor: current.honor, subject: current.subject, note: current.note, lines: clone(current.lines) };
   newDoc('請求書');
   Object.assign(current, keep);
   loadDocToForm();
@@ -681,19 +686,46 @@ function ensureFonts() {
   return fontsReady;
 }
 let previewTimer;
-function schedulePreview() { clearTimeout(previewTimer); previewTimer = setTimeout(renderPreview, 350); }
+function schedulePreview() { outFiles = null; clearTimeout(previewTimer); previewTimer = setTimeout(() => { previewTimer = null; renderPreview(); }, 350); }
+// 出力ファイル（PDF・画像）はプレビューと一緒に作っておく。
+// スマホの共有メニューはボタンを押した直後に呼ばないと開かないため。
+let outFiles = null; let previewSeq = 0; let previewUrls = [];
+function makePdf(pages) {
+  if (!window.jspdf) return null;
+  const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
+  pages.forEach((c, i) => { if (i) pdf.addPage(); pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 210, 297); });
+  return pdf.output('blob');
+}
 async function renderPreview() {
   if (!current) return;
+  const seq = ++previewSeq;
   readForm();
   await ensureFonts();
+  if (seq !== previewSeq) return;
+  const pages = drawPages(current);
+  const pngs = await Promise.all(pages.map((c) => canvasBlob(c, 'image/png')));
+  if (seq !== previewSeq) return;
+  let pdfBlob = null;
+  try { pdfBlob = makePdf(pages); } catch { pdfBlob = null; }
+  outFiles = {
+    pdf: pdfBlob && new File([pdfBlob], outName('pdf'), { type: 'application/pdf' }),
+    png: pngs.map((b, i) => new File([b], outName('png', pngs.length > 1 ? `_${i + 1}` : ''), { type: 'image/png' })),
+  };
+  previewUrls.forEach((u) => URL.revokeObjectURL(u));
+  previewUrls = pngs.map((b) => URL.createObjectURL(b));
   const box = $('preview');
   box.innerHTML = '';
-  drawPages(current).forEach((c, i) => {
+  previewUrls.forEach((u, i) => {
     const img = document.createElement('img');
-    img.src = c.toDataURL('image/png');
+    img.src = u;
     img.alt = `${current.type} プレビュー ${i + 1}ページ目`;
     box.appendChild(img);
   });
+}
+async function readyOutFiles() {
+  // 入力直後に押されたときは、最新の内容で作り直してから渡す
+  for (let i = 0; i < 3 && (!outFiles || previewTimer); i++) { clearTimeout(previewTimer); previewTimer = null; await renderPreview(); }
+  return outFiles;
 }
 
 let downloads = null;
@@ -703,27 +735,40 @@ async function saveFile(filename, data) {
     catch (e) { if (e?.code !== 'declined') toast('保存できませんでした。少し待ってからもう一度お試しください。'); }
     return;
   }
-  if (!window.claude) { // 単体で開いたとき
+  if (!window.claude) { // 単体で開いたとき（GitHub Pages）
     const a = document.createElement('a'); a.href = URL.createObjectURL(data instanceof Blob ? data : new Blob([data])); a.download = filename;
     document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 2000); return;
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+    toast(`${filename} を保存しました（ダウンロード／ファイルAppに入ります）`); return;
   }
   toast('この画面ではファイル保存が使えません。プレビュー画像を長押しして保存してください。');
 }
 const outName = (ext, n = '') => `${current.type}_${current.no}_${(current.to || '').replace(/[\\/:*?"<>|\s]/g, '')}${n}.${ext}`;
 const canvasBlob = (c, type, q) => new Promise((r) => c.toBlob(r, type, q));
+// スマホの共有メニュー（メール・LINE・「ファイルに保存」）。claude.ai の中では使えない
+const canShareFiles = (files) => { try { return !window.claude && !!navigator.canShare && navigator.canShare({ files }); } catch { return false; } };
+async function shareFiles(files) {
+  try { await navigator.share({ files, title: `${current.type} ${current.no}` }); return 'done'; }
+  catch (e) { return e?.name === 'AbortError' ? 'cancel' : 'fail'; }
+}
+const noPdf = () => toast('PDFを作れませんでした。通信状態を確認して、ページを開き直してください。');
+$('out-share').addEventListener('click', async () => {
+  const f = (await readyOutFiles())?.pdf; if (!f) { noPdf(); return; }
+  if (canShareFiles([f]) && (await shareFiles([f])) !== 'fail') return;
+  await saveFile(f.name, f);
+  toast('PDFを保存しました。メールの添付でこのファイルを選んでください。');
+});
 $('out-pdf').addEventListener('click', async () => {
-  readForm(); await ensureFonts();
-  if (!window.jspdf) { toast('PDF機能を読み込めませんでした。通信状態を確認してください。'); return; }
-  const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
-  drawPages(current).forEach((c, i) => { if (i) pdf.addPage(); pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 210, 297); });
-  await saveFile(outName('pdf'), pdf.output('blob'));
+  const f = (await readyOutFiles())?.pdf; if (!f) { noPdf(); return; }
+  await saveFile(f.name, f);
 });
 $('out-png').addEventListener('click', async () => {
-  readForm(); await ensureFonts();
-  const pages = drawPages(current);
-  for (let i = 0; i < pages.length; i++) await saveFile(outName('png', pages.length > 1 ? `_${i + 1}` : ''), await canvasBlob(pages[i], 'image/png'));
+  const files = (await readyOutFiles())?.png || [];
+  if (canShareFiles(files) && (await shareFiles(files)) !== 'fail') return;
+  for (const f of files) await saveFile(f.name, f);
 });
+$('out-share').hidden = !canShareFiles([new File(['%PDF'], 'test.pdf', { type: 'application/pdf' })]);
+$('inapp-hint').hidden = !/\bLine\/|FBAN|FBAV|Instagram|KAKAOTALK|YJApp/i.test(navigator.userAgent);
 
 // ===== 仕入先の納品書を写真で読み取る =====
 const SCAN_PROMPT = `この画像は設備資材の卸（渡辺パイプ、小泉など）が発行した納品書・仮納品書・請求書の写真です。紙が回転・湾曲していても読み取ってください。
@@ -808,11 +853,13 @@ $('h-list').addEventListener('click', (e) => {
 
 // ===== 単価マスタ =====
 function upsert(list, item) {
-  item.cost = Number(String(item.cost).replace(/[,，¥￥円\s]/g, ''));
-  if (!item.code || item.cost === '' || !isFinite(item.cost)) return false;
+  const rawCost = String(item.cost ?? '').replace(/[,，¥￥円\s]/g, '');
+  item.cost = Number(rawCost);
+  if (!item.code || rawCost === '' || !isFinite(item.cost)) return false;
   item.updated = today();
-  if (item.len === '' || item.len == null || !isFinite(Number(item.len))) item.len = guessLen(item); else item.len = Number(item.len);
   const idx = list.findIndex((m) => m.code === item.code && m.supplier === item.supplier);
+  const lenBlank = item.len === '' || item.len == null || !isFinite(Number(item.len));
+  if (lenBlank) item.len = idx >= 0 ? packLen(list[idx]) : guessLen(item); else item.len = Number(item.len);
   if (idx >= 0) list[idx] = { ...list[idx], ...item, name: item.name || list[idx].name, unit: item.unit || list[idx].unit };
   else list.push(item);
   return true;
@@ -877,7 +924,7 @@ const HEADERS = {
   name: ['品名', '商品名', '名称', '品目名'],
   unit: ['単位'],
   cost: ['仕入単価', '仕切単価', '納入単価', '仕切価格', '仕入価格', '単価', '価格'],
-  len: ['長さ', '定尺', '巻長', '入数'],
+  len: ['長さ', '定尺', '巻長'],
 };
 $('m-file').addEventListener('change', async (e) => {
   const file = e.target.files[0]; if (!file) return;
