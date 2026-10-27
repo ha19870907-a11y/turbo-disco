@@ -4,7 +4,9 @@ import tempfile
 import unittest
 from unittest import mock
 
-from boatrace import parse, predict, secure, update
+import time
+
+from boatrace import fetch, parse, predict, secure, update
 
 FX = os.path.join(os.path.dirname(__file__), "fixtures")
 
@@ -95,6 +97,25 @@ class PredictTest(unittest.TestCase):
         top = p["picks"][0]
         self.assertEqual(top["odds"], o3[top["combo"]])
         self.assertAlmostEqual(top["ev"], round(top["prob"] * top["odds"], 2))
+
+
+class FetchTest(unittest.TestCase):
+    def test_pmap_keeps_order_and_runs_in_parallel(self):
+        def slow(x):
+            time.sleep(0.2)
+            return x * 2
+        t0 = time.monotonic()
+        self.assertEqual(fetch.pmap(slow, range(6)), [0, 2, 4, 6, 8, 10])
+        self.assertLess(time.monotonic() - t0, 0.6)  # 順番に処理すれば1.2秒かかる
+
+    def test_access_start_is_spaced(self):
+        starts = []
+        with mock.patch.object(fetch, "INTERVAL", 0.05), \
+                mock.patch.object(fetch.urllib.request, "urlopen",
+                                  side_effect=lambda *a, **k: starts.append(time.monotonic()) or mock.MagicMock()):
+            fetch.pmap(lambda i: fetch.get("/x", i=i), range(6))
+        starts.sort()
+        self.assertTrue(all(b - a >= 0.045 for a, b in zip(starts, starts[1:])))
 
 
 class BugfixTest(unittest.TestCase):
