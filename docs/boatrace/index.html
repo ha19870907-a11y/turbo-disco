@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>ボートレース予想</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<style>
+  :root {
+    --bg: #f4f5f7; --card: #ffffff; --ink: #1c1f24; --sub: #5f6773; --line: #e2e5ea;
+    --accent: #0b5cad; --accent-weak: #e6f0fa; --good: #1d7a3a; --good-weak: #e5f4ea;
+    --warn: #a35a00; --warn-weak: #fdf1e1; --bad: #b42318; --chip: #eef0f3;
+    --b1: #ffffff; --b1i: #1c1f24; --b2: #1c1f24; --b2i: #ffffff; --b3: #d7263d; --b3i: #ffffff;
+    --b4: #1f6fd1; --b4i: #ffffff; --b5: #f2c618; --b5i: #1c1f24; --b6: #2e9e4f; --b6i: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121417; --card: #1b1e23; --ink: #e8eaed; --sub: #9aa3ad; --line: #2c3138;
+      --accent: #6aa9ec; --accent-weak: #1b2a3a; --good: #5cc27f; --good-weak: #183020;
+      --warn: #e7a54a; --warn-weak: #33260f; --bad: #f07167; --chip: #262a30; --b1: #f2f2f2;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121417; --card: #1b1e23; --ink: #e8eaed; --sub: #9aa3ad; --line: #2c3138;
+    --accent: #6aa9ec; --accent-weak: #1b2a3a; --good: #5cc27f; --good-weak: #183020;
+    --warn: #e7a54a; --warn-weak: #33260f; --bad: #f07167; --chip: #262a30; --b1: #f2f2f2;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 14px/1.5 "Noto Sans JP", system-ui, sans-serif; -webkit-text-size-adjust: 100%; }
+  header { position: sticky; top: 0; z-index: 5; background: var(--card); border-bottom: 1px solid var(--line);
+    padding: 10px 16px 8px; padding-top: max(10px, env(safe-area-inset-top)); }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 17px; margin: 0; margin-right: auto; }
+  select, button { font: inherit; color: var(--ink); background: var(--chip); border: 1px solid var(--line);
+    border-radius: 8px; padding: 4px 8px; }
+  .meta { color: var(--sub); font-size: 12px; }
+  .venues { display: flex; gap: 6px; overflow-x: auto; max-width: 1100px; margin: 8px auto 0; padding-bottom: 2px;
+    scrollbar-width: none; }
+  .venues::-webkit-scrollbar { display: none; }
+  .vchip { flex: none; border: 1px solid var(--line); background: var(--chip); border-radius: 999px;
+    padding: 3px 10px; font-size: 12px; cursor: pointer; white-space: nowrap; color: var(--ink); text-decoration: none; }
+  .vchip b { font-weight: 700; }
+  main { max-width: 1100px; margin: 0 auto; padding: 12px 16px 60px; }
+  .notice { background: var(--warn-weak); color: var(--warn); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
+  .summary { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; min-width: 150px; flex: 1; }
+  .stat .k { color: var(--sub); font-size: 12px; }
+  .stat .v { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  section.venue { margin-bottom: 22px; scroll-margin-top: 110px; }
+  .vhead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0 0 8px; }
+  .vhead h2 { font-size: 18px; margin: 0; }
+  .vhead .t { color: var(--sub); font-size: 13px; }
+  details.race { background: var(--card); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 6px; }
+  details.race[open] { box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  details.race > summary { list-style: none; cursor: pointer; padding: 9px 12px; display: grid;
+    grid-template-columns: 44px 48px 1fr auto; gap: 4px 10px; align-items: center; }
+  details.race > summary::-webkit-details-marker { display: none; }
+  .rno { font-weight: 700; font-size: 16px; }
+  .time { color: var(--sub); font-variant-numeric: tabular-nums; }
+  .marks { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; min-width: 0; }
+  .mk { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
+  .badge { font-size: 11px; border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
+  .badge.pre { background: var(--chip); color: var(--sub); }
+  .badge.live { background: var(--accent-weak); color: var(--accent); }
+  .badge.odds { background: var(--chip); color: var(--sub); }
+  .badge.hit { background: var(--good-weak); color: var(--good); font-weight: 700; }
+  .badge.miss { background: var(--chip); color: var(--sub); }
+  .right { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+  .done { opacity: .72; }
+  .next > summary { box-shadow: inset 3px 0 0 var(--accent); border-radius: 12px; }
+  .boat { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 4px; font-weight: 700;
+    font-size: 12px; border: 1px solid var(--line); flex: none; font-variant-numeric: tabular-nums; }
+  .w1 { background: var(--b1); color: var(--b1i); } .w2 { background: var(--b2); color: var(--b2i); }
+  .w3 { background: var(--b3); color: var(--b3i); } .w4 { background: var(--b4); color: var(--b4i); }
+  .w5 { background: var(--b5); color: var(--b5i); } .w6 { background: var(--b6); color: var(--b6i); }
+  .body { padding: 0 12px 12px; border-top: 1px solid var(--line); }
+  .info { color: var(--sub); font-size: 12px; margin: 8px 0; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+  .boats { display: grid; gap: 6px; }
+  .brow { display: grid; grid-template-columns: 28px minmax(130px, 1.3fr) 110px minmax(0, 2.2fr) minmax(0, 2fr);
+    gap: 6px 12px; align-items: start; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+  .brow:last-child { border-bottom: 0; }
+  .brow .boat { width: 26px; height: 26px; font-size: 14px; }
+  .name { font-weight: 700; }
+  .small { font-size: 12px; color: var(--sub); }
+  .prob .mark { font-size: 18px; font-weight: 700; margin-right: 4px; }
+  .pbar { height: 6px; background: var(--chip); border-radius: 3px; overflow: hidden; margin-top: 3px; }
+  .pbar i { display: block; height: 100%; background: var(--accent); }
+  .kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 2px 10px; font-size: 12px; }
+  .kv span { color: var(--sub); margin-right: 3px; }
+  .kv b { font-weight: 500; font-variant-numeric: tabular-nums; }
+  .kv .top { color: var(--good); font-weight: 700; }
+  .recent { display: flex; gap: 2px; flex-wrap: wrap; margin-top: 3px; }
+  .fin { width: 18px; height: 18px; display: inline-grid; place-items: center; font-size: 11px; border-radius: 3px;
+    background: var(--chip); color: var(--sub); font-variant-numeric: tabular-nums; }
+  .fin.f1 { background: #f5c542; color: #1c1f24; font-weight: 700; }
+  .fin.f2 { background: #c9ced6; color: #1c1f24; font-weight: 700; }
+  .fin.f3 { background: #d9a074; color: #1c1f24; font-weight: 700; }
+  .fin.fx { background: var(--bad); color: #fff; }
+  .reasons { font-size: 12px; color: var(--sub); margin-top: 3px; }
+  .picks { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; margin-top: 10px; }
+  .pbox { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+  .pbox h4 { margin: 0 0 4px; font-size: 13px; }
+  .pbox table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .pbox td { padding: 2px 4px; border-top: 1px solid var(--line); }
+  .pbox td.n { text-align: right; }
+  .pbox tr.hit td { background: var(--good-weak); color: var(--good); font-weight: 700; }
+  .pbox tr.val td:first-child::after { content: " 妙味"; color: var(--warn); font-size: 11px; }
+  .combo { display: inline-flex; gap: 2px; }
+  .combo .boat { width: 18px; height: 18px; font-size: 11px; }
+  .ev-hi { color: var(--good); font-weight: 700; }
+  .result { margin-top: 8px; font-size: 13px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .lock { max-width: 360px; margin: 40px auto; background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px; display: grid; gap: 10px; }
+  .lock input { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .lock button { background: var(--accent); color: #fff; border-color: var(--accent); padding: 8px; }
+  .lock .err { color: var(--bad); }
+  .empty { color: var(--sub); padding: 30px 0; text-align: center; }
+  footer { color: var(--sub); font-size: 12px; max-width: 1100px; margin: 0 auto; padding: 0 16px 30px; }
+  @media (max-width: 760px) {
+    details.race > summary { grid-template-columns: 38px 42px 1fr; }
+    details.race > summary .right { grid-column: 1 / -1; justify-content: flex-start; }
+    .brow { grid-template-columns: 28px 1fr 96px; }
+    .brow .stats, .brow .form { grid-column: 2 / -1; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <h1>ボートレース予想</h1>
+    <select id="date" aria-label="開催日"></select>
+    <span class="meta" id="updated"></span>
+    <button id="reload" type="button">更新</button>
+    <button id="logout" type="button" hidden>ロック</button>
+  </div>
+  <nav class="venues" id="venues"></nav>
+</header>
+<main id="main"><div class="empty">読み込み中…</div></main>
+<footer>
+  個人利用のためのページです。データは BOATRACE 公式サイトの出走表・直前情報・オッズ・結果をもとに自動作成し、パスワードで暗号化しています。
+  展示前は「前日データ」、展示が出ると「展示反映」に切り替わります。予想は参考情報です。舟券の購入は自己責任でお願いします。
+</footer>
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmt = (v, d = 2) => v == null || v === "" ? "-" : Number(v).toFixed(d);
+const pct = v => v == null ? "-" : (v * 100).toFixed(0) + "%";
+const boat = w => `<span class="boat w${w}">${w}</span>`;
+const combo = c => `<span class="combo">${c.split("-").map(boat).join("")}</span>`;
+let state = { date: null, data: null, open: new Set(), pw: null, locked: false };
+try { state.pw = localStorage.getItem("boatrace-pw"); } catch {}
+
+async function getJSON(path) {
+  const r = await fetch(`${path}?t=${Date.now()}`, { cache: "no-store" });
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+
+function jstNow() {
+  const d = new Date(Date.now() + 9 * 3600e3);
+  return { ymd: d.toISOString().slice(0, 10).replace(/-/g, ""), min: d.getUTCHours() * 60 + d.getUTCMinutes() };
+}
+const toMin = hhmm => hhmm ? +hhmm.split(":")[0] * 60 + +hhmm.split(":")[1] : null;
+
+async function init() {
+  let idx;
+  try { idx = await getJSON("data/index.json"); }
+  catch { $("#main").innerHTML = `<div class="empty">まだ予想データがありません。初回の自動更新をお待ちください。</div>`; return; }
+  const sel = $("#date");
+  const today = jstNow().ymd;
+  sel.innerHTML = idx.dates.map(d => `<option value="${d}">${d.slice(0, 4)}/${d.slice(4, 6)}/${d.slice(6)}${d === today ? "（今日）" : ""}</option>`).join("");
+  const q = new URLSearchParams(location.search).get("d");
+  state.date = idx.dates.includes(q) ? q : (idx.dates.includes(today) ? today : idx.dates.filter(d => d >= today).pop() || idx.dates[0]);
+  sel.value = state.date;
+  sel.onchange = () => { state.date = sel.value; state.open.clear(); load(); };
+  $("#reload").onclick = load;
+  if (idx.encrypted) { const b = $("#logout"); b.hidden = false; b.onclick = logout; }
+  await load();
+  setInterval(() => { if (!state.locked) load(); }, 60 * 1000);
+}
+
+async function load() {
+  let raw;
+  try { raw = await getJSON(`data/${state.date}.json`); }
+  catch { $("#main").innerHTML = `<div class="empty">この日のデータを読み込めませんでした。</div>`; return; }
+  try { state.data = await openData(raw); }
+  catch { askPassword(state.pw ? "パスワードが違います。" : ""); return; }
+  if (raw.enc) { try { localStorage.setItem(PW_KEY, state.pw); } catch {} }
+  state.locked = false;
+  render();
+}
+
+// データはパスワードで暗号化して置いている（AES-GCM、鍵は PBKDF2-SHA256。boatrace/secure.py と同じ手順）
+const PW_KEY = "boatrace-pw";
+const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+async function openData(raw) {
+  if (!raw.enc) return raw;
+  if (!state.pw) throw new Error("no password");
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(state.pw), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: b64(raw.salt), iterations: raw.iter, hash: "SHA-256" },
+    base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(raw.iv) }, key, b64(raw.data));
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+
+function askPassword(msg) {
+  state.locked = true;
+  $("#venues").innerHTML = "";
+  $("#main").innerHTML = `<form class="lock" id="lock">
+    <div><b>パスワードを入力してください</b></div>
+    <div class="small">このページの予想データは非公開です。</div>
+    ${msg ? `<div class="err">${esc(msg)}</div>` : ""}
+    <input type="password" id="pw" autocomplete="current-password" aria-label="パスワード" required>
+    <button type="submit">表示する</button></form>`;
+  $("#pw").focus();
+  $("#lock").onsubmit = e => { e.preventDefault(); state.pw = $("#pw").value; load(); };
+}
+
+function logout() {
+  try { localStorage.removeItem(PW_KEY); } catch {}
+  state.pw = null; state.data = null;
+  askPassword("");
+}
+
+function render() {
+  const d = state.data, now = jstNow(), isToday = d.date === now.ymd;
+  $("#updated").textContent = `最終更新 ${d.updated.slice(5).replace("-", "/")}`;
+  document.querySelectorAll("details.race[open]").forEach(el => state.open.add(el.id));
+
+  const nextOf = v => v.races.find(r => !r.result && (!isToday || toMin(r.deadline) >= now.min));
+  $("#venues").innerHTML = d.venues.map(v => {
+    const n = nextOf(v);
+    const tail = v.canceled ? "中止" : n ? `${n.rno}R ${n.deadline || ""}` : "終了";
+    return `<a class="vchip" href="#v${v.jcd}"><b>${esc(v.name)}</b> ${esc(tail)}</a>`;
+  }).join("");
+
+  const h = d.hits || {};
+  const rate = (a, i) => a && a[0] ? `${a[i]}/${a[0]}（${Math.round(a[i] / a[0] * 100)}%）` : "-";
+  let html = "";
+  if (!d.venues.length) html += `<div class="notice">この日の開催情報を取得できませんでした。</div>`;
+  html += `<div class="summary">
+    <div class="stat"><div class="k">開催</div><div class="v">${d.venues.length}場</div></div>
+    <div class="stat"><div class="k">◎の1着率 前日 / 直前</div><div class="v">${rate(h.pre, 1)} / ${rate(h.live, 1)}</div></div>
+    <div class="stat"><div class="k">3連単 上位5点的中 前日 / 直前</div><div class="v">${rate(h.pre, 2)} / ${rate(h.live, 2)}</div></div>
+  </div>`;
+
+  for (const v of d.venues) {
+    const n = nextOf(v);
+    html += `<section class="venue" id="v${v.jcd}"><div class="vhead"><h2>${esc(v.name)}</h2>
+      <span class="t">${esc(v.title)} ${esc(v.day)}</span>${v.canceled ? '<span class="badge miss">中止</span>' : ""}</div>`;
+    if (!v.races.length) html += `<div class="small">出走表がまだありません。</div>`;
+    for (const r of v.races) html += raceHTML(d, v, r, n && n.rno === r.rno && isToday);
+    html += `</section>`;
+  }
+  $("#main").innerHTML = html;
+  state.open.forEach(id => { const el = document.getElementById(id); if (el) el.open = true; });
+  document.querySelectorAll("details.race").forEach(el => el.addEventListener("toggle", () => {
+    el.open ? state.open.add(el.id) : state.open.delete(el.id);
+  }));
+}
+
+function raceHTML(d, v, r, isNext) {
+  const p = r.live || r.pre;
+  const id = `r${v.jcd}-${r.rno}`;
+  const order = p ? Object.entries(p.marks).filter(([, m]) => m).sort((a, b) => p.probs[b[0]] - p.probs[a[0]]) : [];
+  const marks = order.slice(0, 4).map(([w, m]) => `<span class="mk">${m}${boat(w)}</span>`).join("");
+  const top = p && p.picks[0];
+  const badges = [
+    r.stage === "展示反映" ? `<span class="badge live">展示反映${r.updated ? " " + r.updated : ""}</span>` : `<span class="badge pre">前日データ</span>`,
+    r.odds3t || r.odds_win ? `<span class="badge odds">オッズ ${r.odds_at || ""}</span>` : "",
+  ];
+  if (r.result && r.result.trifecta) {
+    const hit = r.hits && r.hits.live && r.hits.live.trifecta;
+    badges.push(`<span class="badge ${hit ? "hit" : "miss"}">結果 ${r.result.trifecta}${hit ? " 的中" : ""}</span>`);
+  }
+  const cls = ["race", r.result ? "done" : "", isNext ? "next" : ""].join(" ");
+  return `<details class="${cls}" id="${id}"><summary>
+    <span class="rno">${r.rno}R</span><span class="time">${esc(r.deadline || "")}</span>
+    <span class="marks">${marks}${top ? `<span class="small">本命 ${combo(top.combo)}${top.odds ? ` ${top.odds}倍` : ""}</span>` : ""}</span>
+    <span class="right">${badges.join("")}</span></summary>
+    <div class="body">${raceBody(d, r)}</div></details>`;
+}
+
+function raceBody(d, r) {
+  const p = r.live || r.pre, pre = r.pre, bf = r.before || {}, w = bf.weather || {};
+  if (!p) return `<div class="small">予想データがありません。</div>`;
+  const info = [esc(r.title)];
+  if (w["天候"]) info.push(`天候 ${esc(w["天候"])}`);
+  for (const k of Object.keys(w)) if (/気温|風速|水温|波高/.test(k)) info.push(`${esc(k)} ${esc(w[k])}`);
+  if (bf.start && bf.start.length) info.push(`展示進入 ${bf.start.map(s => s.waku).join("")}`);
+  if (r.pc && r.pc.focus && r.pc.focus.length) info.push(`公式コンピュータ予想 ${r.pc.focus.slice(0, 3).join(" / ")}`);
+  if (!bf.boats) info.push("展示前のため前日データで予想しています");
+
+  const stOf = Object.fromEntries((bf.start || []).map(s => [s.waku, s]));
+  const rows = r.boats.map(b => {
+    const w = b.waku, rc = d.racers[b.toban] || {}, ex = (bf.boats || {})[w] || {};
+    const prob = p.probs[w], preP = pre && pre.probs[w];
+    const delta = pre && r.live && r.stage === "展示反映" && preP != null ? Math.round((prob - preP) * 100) : null;
+    const st = stOf[w];
+    const bc = rc.best_course;
+    const vs = (rc.venue_stats || []).map(x => `${esc(x.venue)}(${x.avg}着)`).join(" ");
+    const locDiff = b.loc_win && b.nat_win ? b.loc_win - b.nat_win : null;
+    const odds = r.odds_win && r.odds_win[w];
+    const pcm = r.pc && r.pc.marks && r.pc.marks[w];
+    const recent = (rc.recent || []).map(x => {
+      const f = String(x.finish), n = /^[1-6]$/.test(f) ? f : null;
+      const c = n ? (n <= 3 ? `f${n}` : "") : "fx";
+      const tip = [x.date, x.venue, x.course ? `${x.course}コース` : "", x.st != null ? `ST${x.st}` : ""].filter(Boolean).join(" ");
+      return `<span class="fin ${c}" title="${esc(tip)}">${esc(f)}</span>`;
+    }).join("");
+    return `<div class="brow">
+      ${boat(w)}
+      <div><div class="name">${esc(b.name)}</div>
+        <div class="small">${esc(b.cls || "")} ${esc(b.toban)} ${esc(b.branch || "")} ${b.age ? b.age + "歳" : ""}</div></div>
+      <div class="prob"><span class="mark">${p.marks[w] || ""}</span><b>${prob == null ? "欠場" : pct(prob)}</b>
+        ${delta ? `<span class="small">${delta > 0 ? "+" : ""}${delta}</span>` : ""}
+        <div class="pbar"><i style="width:${Math.round((prob || 0) * 100)}%"></i></div>
+        <div class="small">${odds ? `単勝 ${odds}倍` : ""}${pcm ? ` 公式${pcm}` : ""}</div></div>
+      <div class="stats kv">
+        <div><span>全国</span><b>${fmt(b.nat_win)}</b></div>
+        <div><span>当地</span><b class="${locDiff >= 0.5 ? "top" : ""}">${fmt(b.loc_win)}</b></div>
+        <div><span>モーター</span><b class="${b.motor_2 >= 45 ? "top" : ""}">${b.motor_no ?? "-"}号 ${fmt(b.motor_2, 0)}%</b></div>
+        <div><span>平均ST</span><b>${fmt(b.avg_st)}</b>${b.f ? ` <b style="color:var(--bad)">F${b.f}</b>` : ""}</div>
+        <div><span>展示</span><b>${fmt(ex.ex_time)}</b></div>
+        <div><span>スタ展</span><b>${st ? `${st.course}c ${esc(st.raw ?? fmt(st.st))}` : "-"}</b></div>
+        <div><span>チルト</span><b>${fmt(ex.tilt, 1)}</b></div>
+        <div><span>進入</span><b>${p.course ? p.course[w] : w}コース</b></div>
+      </div>
+      <div class="form">
+        <div class="small">得意コース ${bc ? `<b>${bc.course}コース</b>（${esc(bc.label)} ${fmt(bc.value, 0)}%）` : "-"}
+          ・得意場 ${vs || (locDiff != null ? `当地 ${locDiff >= 0 ? "+" : ""}${locDiff.toFixed(2)}` : "-")}</div>
+        <div class="small">直近10走（左が最新）</div><div class="recent">${recent || '<span class="small">-</span>'}</div>
+        ${(p.reasons[w] || []).length ? `<div class="reasons">${p.reasons[w].map(esc).join("・")}</div>` : ""}
+      </div></div>`;
+  }).join("");
+
+  const tri = r.result && r.result.trifecta;
+  const pickTable = (pp, title) => pp ? `<div class="pbox"><h4>${title}</h4><table>
+    ${pp.picks.map(x => `<tr class="${x.combo === tri ? "hit" : ""} ${x.value ? "val" : ""}"><td>${combo(x.combo)}</td>
+      <td class="n">${pct(x.prob)}</td><td class="n">${x.odds ? x.odds + "倍" : "-"}</td>
+      <td class="n ${x.ev >= 1 ? "ev-hi" : ""}">${x.ev != null ? "期待値 " + x.ev.toFixed(2) : ""}</td></tr>`).join("")}
+    </table></div>` : "";
+  const res = r.result ? `<div class="result">結果 ${(r.result.order || []).map(o => boat(o.waku)).join("")}
+    ${r.result.payout ? `3連単 ¥${r.result.payout.toLocaleString()}` : ""}</div>` : "";
+  return `<div class="info">${info.filter(Boolean).map(x => `<span>${x}</span>`).join("")}</div>
+    <div class="boats">${rows}</div>${res}
+    <div class="picks">${r.stage === "展示反映" ? pickTable(r.live, "直前予想（展示・オッズ反映）") : ""}${pickTable(pre, "前日予想")}</div>`;
+}
+
+init();
+</script>
+</body>
+</html>
