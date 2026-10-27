@@ -18,6 +18,19 @@
 | 公式予想 | 公式サイトのコンピュータ予想が取れればレース情報に表示し、印を少し加点 |
 | 成績 | 結果確定後に的中を表示し、その日の◎1着率・3連単的中率（前日 / 直前）を集計 |
 
+## 非公開（パスワード）
+
+予想データは公開ページに置くため、パスワードで暗号化しています（AES-256-GCM、鍵は PBKDF2-SHA256）。
+ページを開くとパスワードを聞かれ、正しく入れるとその端末では次回から自動で表示されます（「ロック」で解除）。
+
+1. GitHub のリポジトリ → Settings → Secrets and variables → Actions → New repository secret
+2. 名前 `BOATRACE_PASSWORD`、値に好きなパスワードを入れて保存
+3. このパスワードを知っている人だけが予想を見られます。変えたいときは同じ手順で値を更新すると、次の更新から新しいパスワードになります
+
+`BOATRACE_PASSWORD` が未設定のまま GitHub Actions で動いた場合は、平文のデータを公開しないよう処理を中止します。
+ページの見た目（HTML）とプログラムは公開のままですが、予想・オッズ・選手データは暗号化されていて読めません。
+検索エンジンには載らないよう noindex も付けています。
+
 ## 更新のタイミング（日本時間）
 
 - 7:20 当日の前日予想を作り直し（欠場などを反映）
@@ -32,6 +45,7 @@
 pip install -r boatrace/requirements.txt
 python -m boatrace.update prep --tomorrow   # 翌日の前日予想
 python -m boatrace.update live              # 今日の展示・オッズ・結果を反映
+# BOATRACE_PASSWORD=... を付けて実行すると暗号化して保存（付けなければ平文。手元で見るだけならそれで可）
 python -m unittest boatrace.tests.test_boatrace
 ```
 

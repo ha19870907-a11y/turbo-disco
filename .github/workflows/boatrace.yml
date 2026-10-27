@@ -32,6 +32,7 @@ jobs:
       - run: pip install -r boatrace/requirements.txt
       - name: 予想データを作成
         env:
+          BOATRACE_PASSWORD: ${{ secrets.BOATRACE_PASSWORD }}
           SCHEDULE: ${{ github.event.schedule }}
           MODE: ${{ inputs.mode }}
           DATE: ${{ inputs.date }}

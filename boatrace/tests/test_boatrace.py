@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from boatrace import parse, predict, update
+from boatrace import parse, predict, secure, update
 
 FX = os.path.join(os.path.dirname(__file__), "fixtures")
 
@@ -158,6 +158,32 @@ class UpdateTest(unittest.TestCase):
         store = update.RacerStore()
         self.assertEqual(store.history["4001"][0]["finish"], 1)
         self.assertEqual(store.summary("4003")["recent"][0]["course"], 2)
+
+
+class SecureTest(unittest.TestCase):
+    def test_roundtrip(self):
+        data = {"date": "20261028", "名前": "峰竜太"}
+        enc = secure.encrypt(data, "pw")
+        self.assertTrue(secure.is_encrypted(enc))
+        self.assertNotIn("峰", str(enc))
+        self.assertEqual(secure.decrypt(enc, "pw"), data)
+        with self.assertRaises(Exception):
+            secure.decrypt(enc, "wrong")
+
+    def test_files_encrypted_with_password(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {"BOATRACE_PASSWORD": "pw"}), \
+                mock.patch.object(update, "OUT_DIR", tmp):
+            update.write({"date": "20261028", "updated": "x", "venues": []})
+            with open(os.path.join(tmp, "20261028.json"), encoding="utf-8") as f:
+                self.assertIn('"enc":"aes-gcm"', f.read())
+            self.assertEqual(update.load_json(os.path.join(tmp, "20261028.json"), None)["date"], "20261028")
+            self.assertTrue(update.load_json(os.path.join(tmp, "index.json"), None)["encrypted"])
+
+    def test_actions_requires_password(self):
+        env = {k: v for k, v in os.environ.items() if k != "BOATRACE_PASSWORD"}
+        env["GITHUB_ACTIONS"] = "true"
+        with mock.patch.dict(os.environ, env, clear=True):
+            self.assertEqual(update.main(["live"]), 1)
 
 
 if __name__ == "__main__":

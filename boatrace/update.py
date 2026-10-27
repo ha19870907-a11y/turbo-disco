@@ -12,7 +12,7 @@ import json
 import os
 import sys
 
-from . import fetch, parse
+from . import fetch, parse, secure
 from .predict import best_course, predict
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -36,13 +36,20 @@ def log(*a):
 def load_json(path, default):
     try:
         with open(path, encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
     except (OSError, ValueError):
         return default
+    if secure.is_encrypted(data):
+        return secure.decrypt(data, secure.password())
+    return data
 
 
-def save_json(path, data, compact=True):
+def save_json(path, data, compact=True, encrypt=True):
+    """BOATRACE_PASSWORD があれば暗号化して保存する（index.json のような目次は encrypt=False）。"""
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    pw = secure.password()
+    if encrypt and pw:
+        data = secure.encrypt(data, pw)
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         if compact:
@@ -368,7 +375,8 @@ def write(day):
     for name in os.listdir(OUT_DIR):
         if name.endswith(".json") and name[:8].isdigit() and name[:8] not in dates:
             os.remove(os.path.join(OUT_DIR, name))
-    save_json(idx_path, {"dates": dates, "updated": day["updated"]}, compact=False)
+    save_json(idx_path, {"dates": dates, "updated": day["updated"], "encrypted": bool(secure.password())},
+              compact=False, encrypt=False)
 
 
 def main(argv=None):
@@ -382,6 +390,9 @@ def main(argv=None):
     if a.tomorrow:
         d += dt.timedelta(days=1)
     hd = a.date or d.strftime("%Y%m%d")
+    if os.environ.get("GITHUB_ACTIONS") and not secure.password():
+        log("BOATRACE_PASSWORD が未設定です。公開ページに平文のデータを置かないよう中止します")
+        return 1
     day = prep(hd, with_racers=not a.skip_racers) if a.mode == "prep" else live(hd)
     if not day:
         return 1
