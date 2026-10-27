@@ -15,14 +15,14 @@ def get(path, **params):
     global _last
     q = "&".join(f"{k}={v}" for k, v in params.items())
     url = f"{BASE}{path}?{q}" if q else f"{BASE}{path}"
-    for attempt in range(3):
+    for attempt in range(2):
         wait = INTERVAL - (time.time() - _last)
         if wait > 0:
             time.sleep(wait)
         _last = time.time()
         try:
             req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept-Language": "ja"})
-            with urllib.request.urlopen(req, timeout=30) as r:
+            with urllib.request.urlopen(req, timeout=15) as r:
                 return r.read().decode("utf-8", "replace")
         except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
             if isinstance(e, urllib.error.HTTPError) and e.code == 404:
