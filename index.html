@@ -77,6 +77,9 @@
     .line > :nth-child(7) { grid-area: amount; text-align: left; font-size: 16px; }
     .line > :nth-child(8) { grid-area: del; justify-self: end; }
   }
+  .scan { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px; margin-bottom: 12px; background: var(--accent-soft); border-radius: 8px; }
+  .scan-status { font-size: 13px; color: var(--muted); flex: 1 1 220px; min-width: 0; }
+  .line.unregistered input[data-k=cost] { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, var(--surface)); }
   .totals { margin-left: auto; width: 300px; max-width: 100%; margin-top: 12px; display: grid; gap: 4px; }
   .totals div { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
   .totals .grand { font-weight: 700; font-size: 18px; border-top: 2px solid var(--ink); padding-top: 4px; }
@@ -131,6 +134,10 @@
 
     <div class="card">
       <h2>明細</h2>
+      <div class="scan" id="scan-box" hidden>
+        <span class="file-btn btn primary">仕入先の納品書を写真で読み取る<input id="scan-file" type="file" accept="image/jpeg,image/png,image/webp"></span>
+        <span class="scan-status" id="scan-status">渡辺パイプ・小泉などの納品書を撮ると、品名・品番・数量を明細に追加します。</span>
+      </div>
       <div class="lines-head"><span>品番（マスタ検索）</span><span>品名</span><span class="r">数量</span><span>単位</span><span class="r">仕入単価</span><span class="r">販売単価</span><span class="r">金額</span><span></span></div>
       <div id="d-lines"></div>
       <datalist id="master-list"></datalist>
@@ -388,7 +395,7 @@ function renderLines() {
   box.innerHTML = '';
   current.lines.forEach((l, i) => {
     const row = document.createElement('div');
-    row.className = 'line';
+    row.className = 'line' + (l.unregistered && l.cost === '' ? ' unregistered' : '');
     row.innerHTML = `
       <div><span class="lbl">品番（マスタ検索）</span><input list="master-list" data-k="code" value="${esc(l.code)}" autocomplete="off"></div>
       <div><span class="lbl">品名</span><input data-k="name" value="${esc(l.name)}"></div>
@@ -406,7 +413,7 @@ function renderLines() {
           if (hit) { Object.assign(l, { code: hit.code, name: hit.name, unit: saleUnit(hit), cost: round2(unitCost(hit)), price: sellPrice(unitCost(hit)) }); renderLines(); }
           return;
         }
-        if (k === 'cost' && l.cost !== '') { l.price = sellPrice(l.cost); row.querySelector('[data-k=price]').value = l.price; }
+        if (k === 'cost' && l.cost !== '') { l.price = sellPrice(l.cost); row.querySelector('[data-k=price]').value = l.price; row.classList.remove('unregistered'); }
         row.querySelector('[data-amount]').textContent = yen(lineAmount(l));
         renderTotals();
       });
@@ -434,6 +441,18 @@ function findMaster(text) {
   const [code, , supplier] = String(text).split('｜').map((s) => s?.trim());
   return master.find((m) => m.code === code && (!supplier || m.supplier === supplier)) || null;
 }
+const normCode = (s) => String(s ?? '').normalize('NFKC').replace(/\s+/g, '').toUpperCase();
+function findByCode(code, supplier) {
+  const c = normCode(code); if (!c) return null;
+  const hits = master.filter((m) => normCode(m.code) === c);
+  return hits.find((m) => m.supplier === supplier) || hits[0] || null;
+}
+// マスタの品目を明細行にする。仕入単位(本・巻)の数量はメーターに換算
+function lineFromMaster(m, qty, unit) {
+  const len = packLen(m);
+  const q = len && /本|巻|束/.test(unit || m.unit || '') ? round2(Number(qty) * len) : Number(qty);
+  return { code: m.code, name: m.name, qty: q, unit: saleUnit(m), cost: round2(unitCost(m)), price: sellPrice(unitCost(m)) };
+}
 function refreshDatalist() {
   $('master-list').innerHTML = master.map((m) => `<option value="${esc(`${m.code}｜${m.name}｜${m.supplier}`)}"></option>`).join('');
 }
@@ -459,6 +478,15 @@ async function saveDoc() {
   current.lines = current.lines.filter((l) => l.name || l.code || l.price);
   if (!current.lines.length) current.lines.push(blankLine());
   current.total = calc(current).total;
+  const learn = current.lines.filter((l) => l.unregistered && l.code && l.cost !== '');
+  if (learn.length) {
+    const list = clone(master);
+    learn.forEach((l) => {
+      upsert(list, { supplier: l.supplier || '', code: l.code, name: l.name, unit: l.unit, cost: l.cost, len: l.unit === 'm' ? 0 : '' });
+      delete l.unregistered; delete l.supplier;
+    });
+    commitMaster(list, `仕入単価 ${learn.length} 件を単価マスタに登録しました。次回から自動で入ります。`);
+  }
   if (!current.id) { current.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6); current.created = Date.now(); }
   current.updated = Date.now();
   try { await store.saveDoc(clone(current)); } catch (e) { failSave(e); return false; }
@@ -634,6 +662,64 @@ $('out-png').addEventListener('click', async () => {
   for (let i = 0; i < pages.length; i++) await saveFile(outName('png', pages.length > 1 ? `_${i + 1}` : ''), await canvasBlob(pages[i], 'image/png'));
 });
 
+// ===== 仕入先の納品書を写真で読み取る =====
+const SCAN_PROMPT = `この画像は設備資材の卸（渡辺パイプ、小泉など）が発行した納品書・仮納品書・請求書の写真です。紙が回転・湾曲していても読み取ってください。
+明細の各行を読み取り、次の形のJSONだけを返してください。
+{"supplier":"仕入先の会社名（例: 渡辺パイプ）","date":"YYYY-MM-DD","slipNo":"伝票No","site":"現場名（現場・現場名欄。なければ空文字）","items":[{"name":"品名","spec":"規格・品番（そのまま。なければ空文字）","maker":"メーカー名（あれば）","qty":数量の数値,"unit":"単位（個・本・巻・m など）","price":単価の数値（印字がなければ null）}]}
+空行は含めないでください。読めない文字は推測せず、読める範囲で書いてください。`;
+let sample = null;
+async function initScan() {
+  sample = await useCap('sample');
+  const lim = sample ? await sample.limits().catch(() => null) : null;
+  $('scan-box').hidden = !lim?.images;
+}
+function normSupplier(s) {
+  s = String(s || '').normalize('NFKC');
+  if (/渡辺パイプ|SEDIA/i.test(s)) return '渡辺パイプ';
+  if (/小泉/.test(s)) return '小泉';
+  return s.replace(/株式会社|\(株\)|㈱/g, '').trim();
+}
+$('scan-file').addEventListener('change', async (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  e.target.value = '';
+  const status = $('scan-status'); const input = $('scan-file');
+  input.disabled = true; status.textContent = '読み取り中です（30秒〜1分ほどかかります）…';
+  try {
+    const r = await sample.json(SCAN_PROMPT, { images: [file], cache: false });
+    const items = Array.isArray(r?.items) ? r.items.filter((it) => it && (it.name || it.spec)) : [];
+    if (!items.length) { status.textContent = '明細を読み取れませんでした。明るい場所で、紙全体が入るように撮り直してください。'; return; }
+    const supplier = normSupplier(r.supplier);
+    const list = clone(master); let learned = 0;
+    const lines = items.map((it) => {
+      const code = String(it.spec || it.name || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
+      const name = String(it.name || '').normalize('NFKC').trim();
+      const qty = Number(it.qty) || 1; const unit = String(it.unit || '').trim();
+      let m = findByCode(code, supplier);
+      if (!m && Number(it.price) > 0) { // 単価が印字されていればマスタに登録
+        const item = { supplier, code, name, unit, cost: Number(it.price), len: '' };
+        upsert(list, item); learned++; m = item;
+      }
+      if (m) return lineFromMaster(m, qty, unit);
+      return { code, name, qty, unit, cost: '', price: '', unregistered: true, supplier };
+    });
+    if (learned) await commitMaster(list, `単価 ${learned} 件を単価マスタに登録しました`);
+    current.lines = current.lines.filter((l) => l.name || l.code || l.price).concat(lines);
+    if (!current.subject && r.site) { current.subject = String(r.site); $('d-subject').value = current.subject; }
+    renderLines();
+    const missing = lines.filter((l) => l.unregistered).length;
+    status.textContent = `${supplier || '仕入先'}の伝票${r.slipNo ? ' No.' + r.slipNo : ''}から ${lines.length} 行を追加しました。`
+      + (missing ? `赤枠の ${missing} 行は単価が未登録です。仕入単価を入れて保存すると、次回から自動で入ります。` : '');
+  } catch (err) {
+    const msg = {
+      not_granted: '写真の読み取りが許可されていません。', sampling_disabled: 'このアカウントでは読み取りが使えません。',
+      rate_limited: '読み取りが混み合っています。少し待ってからもう一度お試しください。', image_rejected: 'この画像は読み込めません。JPEGかPNGの写真を選んでください。',
+      invalid_json: 'うまく読み取れませんでした。もう一度お試しください。', session_expired: 'もう一度サインインしてください。',
+    }[err?.code] || '読み取りに失敗しました。通信状態を確認してもう一度お試しください。';
+    status.textContent = msg;
+    if (['not_granted', 'sampling_disabled', 'images_unavailable', 'capability_disabled', 'capability_removed'].includes(err?.code)) $('scan-box').hidden = true;
+  } finally { input.disabled = false; }
+});
+
 // ===== 伝票一覧 =====
 function renderHistory() {
   $('h-list').innerHTML = docs.map((d) => `<tr>
@@ -788,5 +874,6 @@ loadSettingsForm();
 renderMaster();
 renderHistory();
 useCap('downloads').then((d) => { downloads = d; if (!d && window.claude) $('out-hint').textContent = 'この画面ではファイル保存が使えません。下のプレビュー画像を長押しすると保存できます。'; });
+initScan();
 store.init().then(() => { if (!current.id) { current.no = nextNo(current.type); $('d-no').value = current.no; } schedulePreview(); });
 </script>
