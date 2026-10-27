@@ -151,7 +151,7 @@ const fmt = (v, d = 2) => v == null || v === "" ? "-" : Number(v).toFixed(d);
 const pct = v => v == null ? "-" : (v * 100).toFixed(0) + "%";
 const boat = w => `<span class="boat w${w}">${w}</span>`;
 const combo = c => `<span class="combo">${c.split("-").map(boat).join("")}</span>`;
-let state = { date: null, data: null, open: new Set(), pw: null, locked: false };
+let state = { date: null, data: null, open: new Set(), pw: null, locked: false, seen: null };
 try { state.pw = localStorage.getItem("boatrace-pw"); } catch {}
 
 async function getJSON(path) {
@@ -180,7 +180,18 @@ async function init() {
   $("#reload").onclick = load;
   if (idx.encrypted) { const b = $("#logout"); b.hidden = false; b.onclick = logout; }
   await load();
-  setInterval(() => { if (!state.locked) load(); }, 60 * 1000);
+  state.seen = idx.updated;
+  setInterval(refresh, 60 * 1000);
+}
+
+// 1分ごとに小さな目次（index.json）だけを見て、データが更新されたときだけ本体（約1MB）を読み直す
+async function refresh() {
+  if (state.locked) return;
+  let idx;
+  try { idx = await getJSON("data/index.json"); } catch { return; }
+  if (idx.updated === state.seen) return;
+  state.seen = idx.updated;
+  await load();
 }
 
 async function load() {
