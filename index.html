@@ -277,7 +277,7 @@ const OWNER_DEFAULTS = {
   name: 'RY住設', rep: '安本竜太', zip: '1890003', address: '東京都東村山市久米川町3-16-6-110',
   tel: '042-306-0206', email: 'yasumoto9999n@outlook.jp', invoice: 'T9810652297331',
 };
-let useOwnerDefaults = !window.claude;
+let useOwnerDefaults = false;
 function withDefaults(saved = {}) {
   const out = { ...DEFAULT_SETTINGS, ...(useOwnerDefaults ? OWNER_DEFAULTS : {}) };
   Object.entries(saved || {}).forEach(([k, v]) => { if (v !== '' && v != null) out[k] = v; });
@@ -312,7 +312,7 @@ const store = {
   async init() {
     const [db, user] = await Promise.all([useCap('db'), useCap('user')]);
     const uid = user ? await user.id() : null;
-    useOwnerDefaults = !window.claude || (user ? await user.isOwner() : false);
+    useOwnerDefaults = user ? await user.isOwner() : false;
     settings = withDefaults();
     if (db && uid) {
       this.kind = 'db'; this.db = db;
@@ -332,7 +332,7 @@ const store = {
       this.kind = 'local';
       settings = withDefaults(this.lget('settings', {}));
       master = this.lget('master', []); docs = this.lget('docs', []);
-      $('sync').textContent = '保存先：この端末のみ（サインインすると端末間で共有されます）'; $('sync').className = 'sync';
+      $('sync').textContent = window.claude ? '保存先：この端末のみ（サインインすると端末間で共有されます）' : '保存先：この端末のみ（時々「設定」からバックアップしてください）'; $('sync').className = 'sync';
       onData('settings'); onData('master'); onData('docs');
     }
   },
@@ -696,7 +696,8 @@ async function saveFile(filename, data) {
     return;
   }
   if (!window.claude) { // 単体で開いたとき
-    const a = document.createElement('a'); a.href = URL.createObjectURL(data instanceof Blob ? data : new Blob([data])); a.download = filename; a.click();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(data instanceof Blob ? data : new Blob([data])); a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000); return;
   }
   toast('この画面ではファイル保存が使えません。プレビュー画像を長押しして保存してください。');
