@@ -120,7 +120,7 @@
       <h2>伝票情報</h2>
       <div class="grid">
         <div><label for="d-type">種類</label>
-          <select id="d-type"><option>納品書</option><option>請求書</option><option>見積書</option></select></div>
+          <select id="d-type"><option>請求書</option><option>見積書</option></select></div>
         <div><label for="d-no">伝票番号</label><input id="d-no"></div>
         <div><label for="d-date">発行日</label><input id="d-date" type="date"></div>
         <div><label for="d-to">宛先（お客様名）</label><input id="d-to" placeholder="○○工務店"></div>
@@ -131,11 +131,11 @@
 
     <div class="card">
       <h2>明細</h2>
-      <div class="lines-head"><span>品番（マスタ検索）</span><span>品名</span><span class="r">数量</span><span>単位</span><span class="r">仕入単価</span><span class="r">納品単価</span><span class="r">金額</span><span></span></div>
+      <div class="lines-head"><span>品番（マスタ検索）</span><span>品名</span><span class="r">数量</span><span>単位</span><span class="r">仕入単価</span><span class="r">販売単価</span><span class="r">金額</span><span></span></div>
       <div id="d-lines"></div>
       <datalist id="master-list"></datalist>
       <div class="actions"><button class="btn" id="add-line">＋ 行を追加</button></div>
-      <p class="hint">品番を選ぶと品名・仕入単価が入り、納品単価＝仕入単価×(1＋上乗せ率)を自動計算します。工賃などは納品単価を直接入れてください。</p>
+      <p class="hint">品番を選ぶと品名・仕入単価が入り、販売単価＝仕入単価×(1＋上乗せ率)を自動計算します。パイプ・架橋ポリなどはメーター単価になるので、数量はメーターで入れてください（例：12.5）。工賃などは販売単価を直接入れてください。</p>
       <div class="totals">
         <div><span>小計</span><span id="t-sub">0</span></div>
         <div><span id="t-tax-label">消費税(10%)</span><span id="t-tax">0</span></div>
@@ -146,7 +146,7 @@
       <textarea id="d-note"></textarea>
       <div class="actions">
         <button class="btn primary" id="save-doc">保存</button>
-        <button class="btn" id="to-invoice">この内容で請求書を作成</button>
+        <button class="btn" id="to-invoice" hidden>この見積書から請求書を作成</button>
         <button class="btn" id="new-doc">新規</button>
       </div>
     </div>
@@ -182,7 +182,7 @@
         <div><span class="lbl">CSVファイル（Shift_JIS／UTF-8）</span>
           <span class="file-btn btn">ファイルを選ぶ<input id="m-file" type="file" accept=".csv,text/csv"></span></div>
       </div>
-      <p class="hint">見出しに「品番・商品コード・型番」と「仕入単価・仕切単価・納入単価・単価」の列があれば自動認識します。同じ仕入先・品番は新しい価格で上書きします。</p>
+      <p class="hint">見出しに「品番・商品コード・型番」と「仕入単価・仕切単価・納入単価・単価」の列があれば自動認識します。同じ仕入先・品番は新しい価格で上書きします。パイプ類は品名から1本4m、架橋ポリは1巻50mと判断してメーター単価にします。違うものは一覧の「長さ」欄で直せます（個売りは空欄）。</p>
     </div>
     <div class="card">
       <h2>単価マスタ <span class="pill" id="m-count">0件</span></h2>
@@ -190,8 +190,9 @@
         <div><label for="m-new-supplier">仕入先</label><input id="m-new-supplier"></div>
         <div><label for="m-new-code">品番</label><input id="m-new-code"></div>
         <div><label for="m-new-name">品名</label><input id="m-new-name"></div>
-        <div><label for="m-new-unit">単位</label><input id="m-new-unit" placeholder="本・個・m"></div>
-        <div><label for="m-new-cost">仕入単価（税抜）</label><input id="m-new-cost" type="number" min="0" inputmode="decimal"></div>
+        <div><label for="m-new-unit">仕入単位</label><input id="m-new-unit" placeholder="本・巻・個"></div>
+        <div><label for="m-new-cost">仕入単価（1本・1巻あたり、税抜）</label><input id="m-new-cost" type="number" min="0" inputmode="decimal"></div>
+        <div><label for="m-new-len">長さ（m）</label><input id="m-new-len" type="number" min="0" step="any" inputmode="decimal" placeholder="空欄で自動（パイプ4・架橋ポリ50）"></div>
       </div>
       <div class="actions">
         <button class="btn primary" id="m-add">追加・更新</button>
@@ -199,7 +200,7 @@
         <input id="m-search" placeholder="品番・品名で絞り込み" style="max-width:260px">
       </div>
       <div class="table-wrap" style="margin-top:12px"><table>
-        <thead><tr><th>仕入先</th><th>品番</th><th>品名</th><th>単位</th><th class="num">仕入単価</th><th class="num">納品単価</th><th>更新日</th><th></th></tr></thead>
+        <thead><tr><th>仕入先</th><th>品番</th><th>品名</th><th class="num">仕入単価</th><th class="num">長さ(m)</th><th class="num">仕入／販売単位</th><th class="num">販売単価</th><th>更新日</th><th></th></tr></thead>
         <tbody id="m-list"></tbody>
       </table></div>
     </div>
@@ -222,13 +223,13 @@
       <h2>計算ルール</h2>
       <div class="grid">
         <div><label for="s-markup">上乗せ率（%）</label><input id="s-markup" type="number" step="0.1" inputmode="decimal"></div>
-        <div><label for="s-round">納品単価の端数</label>
+        <div><label for="s-round">販売単価の端数</label>
           <select id="s-round"><option value="ceil">切り上げ</option><option value="round">四捨五入</option><option value="floor">切り捨て</option></select></div>
         <div><label for="s-tax">消費税率（%）</label><input id="s-tax" type="number" step="1" inputmode="decimal"></div>
         <div><label for="s-taxround">消費税の端数</label>
           <select id="s-taxround"><option value="floor">切り捨て</option><option value="round">四捨五入</option><option value="ceil">切り上げ</option></select></div>
       </div>
-      <p class="hint">納品単価＝仕入単価×(1＋上乗せ率)。例：仕入1,000円→納品1,100円。消費税は伝票ごとに合計へ1回だけ計算します（インボイス制度の端数処理）。</p>
+      <p class="hint">販売単価＝仕入単価×(1＋上乗せ率)。例：仕入1,000円→1,100円。パイプ4m 1,200円なら 1,200÷4×1.1＝1mあたり330円。消費税は伝票ごとに合計へ1回だけ計算します（インボイス制度の端数処理）。</p>
       <div class="actions">
         <button class="btn primary" id="s-save">設定を保存</button>
         <button class="btn" id="backup">全データをバックアップ</button>
@@ -267,6 +268,20 @@ let current = null;
 
 const roundBy = (v, mode) => (mode === 'ceil' ? Math.ceil(v - 1e-9) : mode === 'floor' ? Math.floor(v + 1e-9) : Math.round(v));
 const sellPrice = (cost) => roundBy(Number(cost) * (1 + Number(settings.markup) / 100), settings.round);
+const round2 = (n) => Math.round(Number(n) * 100) / 100;
+
+// メーター売り: 仕入1本(1巻)の長さで割って1mあたりの単価にする。len=0 は個売り
+const FITTING = /エルボ|チーズ|ソケット|継手|バルブ|キャップ|ニップル|ユニオン|フランジ|レジューサ|ブッシング|ベンド|ジョイント|アダプタ|ブラケット|バンド|サドル|ヘッダー|水栓|カバー/;
+function guessLen(m) {
+  const text = `${m.name || ''} ${m.code || ''}`;
+  if (FITTING.test(m.name || '')) return 0;
+  if (/架橋|ポリブテン|PEX|ペックス/i.test(text)) return 50;
+  if (/パイプ|管|(^|\s)(HI|HT)?VP\d|(^|\s)VU\d|SGP/i.test(text)) return 4;
+  return 0;
+}
+const packLen = (m) => { const n = Number(m.len ?? guessLen(m)); return isFinite(n) && n > 0 ? n : 0; };
+const unitCost = (m) => (packLen(m) ? Number(m.cost) / packLen(m) : Number(m.cost));
+const saleUnit = (m) => (packLen(m) ? 'm' : m.unit);
 
 // ===== 保存先: claude.ai のデータベース（スマホ・PCで共有）。使えない環境ではこの端末内 =====
 const MASTER_CHUNK = 700;
@@ -346,18 +361,18 @@ document.querySelectorAll('nav.tabs button').forEach((b) => b.addEventListener('
 
 // ===== 伝票 =====
 function nextNo(type) {
-  const prefix = { 納品書: 'N', 請求書: 'S', 見積書: 'M' }[type] || 'D';
+  const prefix = { 請求書: 'S', 見積書: 'M' }[type] || 'D';
   const head = prefix + today().slice(0, 7).replace('-', '') + '-';
   const max = docs.filter((d) => d.no?.startsWith(head)).reduce((m, d) => Math.max(m, parseInt(d.no.slice(head.length), 10) || 0), 0);
   return head + String(max + 1).padStart(3, '0');
 }
 const blankLine = () => ({ code: '', name: '', qty: 1, unit: '', cost: '', price: '' });
-function newDoc(type = '納品書') {
+function newDoc(type = '請求書') {
   current = { id: null, type, no: nextNo(type), date: today(), to: '', subject: '', due: '', note: '', lines: [blankLine()] };
   loadDocToForm();
 }
 const FIELDS = ['type', 'no', 'date', 'to', 'subject', 'due', 'note'];
-function loadDocToForm() { FIELDS.forEach((k) => { $('d-' + k).value = current[k] || ''; }); renderLines(); }
+function loadDocToForm() { if (!['請求書', '見積書'].includes(current.type)) current.type = '請求書'; FIELDS.forEach((k) => { $('d-' + k).value = current[k] || ''; }); $('to-invoice').hidden = current.type !== '見積書'; renderLines(); }
 function readForm() { FIELDS.forEach((k) => { current[k] = $('d-' + k).value; }); }
 FIELDS.forEach((k) => $('d-' + k).addEventListener('input', () => { current[k] = $('d-' + k).value; schedulePreview(); }));
 
@@ -380,7 +395,7 @@ function renderLines() {
       <div><span class="lbl">数量</span><input data-k="qty" type="number" step="any" inputmode="decimal" class="r" value="${esc(l.qty)}"></div>
       <div><span class="lbl">単位</span><input data-k="unit" value="${esc(l.unit)}"></div>
       <div><span class="lbl">仕入単価</span><input data-k="cost" type="number" step="any" inputmode="decimal" class="r" value="${esc(l.cost)}"></div>
-      <div><span class="lbl">納品単価</span><input data-k="price" type="number" step="any" inputmode="decimal" class="r" value="${esc(l.price)}"></div>
+      <div><span class="lbl">販売単価</span><input data-k="price" type="number" step="any" inputmode="decimal" class="r" value="${esc(l.price)}"></div>
       <div class="amount" data-amount>${yen(lineAmount(l))}</div>
       <button class="del" aria-label="この行を削除">×</button>`;
     row.querySelectorAll('input').forEach((inp) => {
@@ -388,7 +403,7 @@ function renderLines() {
         const k = inp.dataset.k; l[k] = inp.value;
         if (k === 'code') {
           const hit = findMaster(inp.value);
-          if (hit) { Object.assign(l, { code: hit.code, name: hit.name, unit: hit.unit, cost: hit.cost, price: sellPrice(hit.cost) }); renderLines(); }
+          if (hit) { Object.assign(l, { code: hit.code, name: hit.name, unit: saleUnit(hit), cost: round2(unitCost(hit)), price: sellPrice(unitCost(hit)) }); renderLines(); }
           return;
         }
         if (k === 'cost' && l.cost !== '') { l.price = sellPrice(l.cost); row.querySelector('[data-k=price]').value = l.price; }
@@ -424,7 +439,10 @@ function refreshDatalist() {
 }
 
 $('add-line').addEventListener('click', () => { current.lines.push(blankLine()); renderLines(); });
-$('d-type').addEventListener('change', () => { if (!current.id) { current.no = nextNo($('d-type').value); $('d-no').value = current.no; } });
+$('d-type').addEventListener('change', () => {
+  current.type = $('d-type').value; $('to-invoice').hidden = current.type !== '見積書';
+  if (!current.id) { current.no = nextNo(current.type); $('d-no').value = current.no; }
+});
 $('new-doc').addEventListener('click', () => { newDoc(); toast('新しい伝票を開きました'); });
 $('save-doc').addEventListener('click', async () => { if (await saveDoc()) toast(`${current.type} ${current.no} を保存しました`); });
 $('to-invoice').addEventListener('click', async () => {
@@ -510,7 +528,7 @@ function drawPages(doc) {
       ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(M, 288); ctx.lineTo(M + 580, 288); ctx.stroke();
       ctx.font = docFont(24); let ly = 340;
       if (doc.subject) { ctx.fillText(fitText(ctx, `件名：${doc.subject}`, 580), M, ly); ly += 40; }
-      ctx.fillText({ 納品書: '下記の通り納品いたしました。', 請求書: '下記の通りご請求申し上げます。', 見積書: '下記の通りお見積り申し上げます。' }[doc.type] || '', M, ly);
+      ctx.fillText({ 請求書: '下記の通りご請求申し上げます。', 見積書: '下記の通りお見積り申し上げます。' }[doc.type] || '', M, ly);
       ctx.font = docFont(24); ctx.fillText('合計金額（税込）', M, 490);
       ctx.font = docFont(46, 700); ctx.fillText(`¥${yen(t.total)}-`, M + 220, 494);
       ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(M, 512); ctx.lineTo(M + 580, 512); ctx.stroke();
@@ -644,6 +662,7 @@ function upsert(list, item) {
   item.cost = Number(String(item.cost).replace(/[,，¥￥円\s]/g, ''));
   if (!item.code || item.cost === '' || !isFinite(item.cost)) return false;
   item.updated = today();
+  if (item.len === '' || item.len == null || !isFinite(Number(item.len))) item.len = guessLen(item); else item.len = Number(item.len);
   const idx = list.findIndex((m) => m.code === item.code && m.supplier === item.supplier);
   if (idx >= 0) list[idx] = { ...list[idx], ...item, name: item.name || list[idx].name, unit: item.unit || list[idx].unit };
   else list.push(item);
@@ -657,23 +676,33 @@ function renderMaster() {
   const list = master.filter((m) => !q || (m.code + ' ' + m.name).toLowerCase().includes(q));
   $('m-count').textContent = `${master.length.toLocaleString()}件`;
   $('m-list').innerHTML = list.slice(0, 300).map((m) => `<tr>
-    <td>${esc(m.supplier)}</td><td>${esc(m.code)}</td><td>${esc(m.name)}</td><td>${esc(m.unit)}</td>
-    <td class="num">${yen(m.cost)}</td><td class="num">${yen(sellPrice(m.cost))}</td><td>${esc(m.updated)}</td>
+    <td>${esc(m.supplier)}</td><td>${esc(m.code)}</td><td>${esc(m.name)}</td>
+    <td class="num">${yen(m.cost)}${m.unit ? '/' + esc(m.unit) : ''}</td>
+    <td class="num"><input class="r len" type="number" min="0" step="any" inputmode="decimal" value="${packLen(m) || ''}" placeholder="個売り" data-lsupplier="${esc(m.supplier)}" data-lcode="${esc(m.code)}" style="width:84px;padding:5px 6px"></td>
+    <td class="num">${packLen(m) ? round2(unitCost(m)).toLocaleString('ja-JP') + '/m' : '—'}</td>
+    <td class="num">${yen(sellPrice(unitCost(m)))}${packLen(m) ? '/m' : (m.unit ? '/' + esc(m.unit) : '')}</td><td>${esc(m.updated)}</td>
     <td><button class="btn danger" data-msupplier="${esc(m.supplier)}" data-mcode="${esc(m.code)}">削除</button></td></tr>`).join('')
-    + (list.length > 300 ? `<tr><td colspan="8" class="empty">ほか ${list.length - 300} 件。絞り込みで探してください。</td></tr>` : '')
-    || '<tr><td colspan="8" class="empty">まだ登録がありません。仕入先の見積・注文履歴をCSVで書き出して取り込むか、上の欄から1件ずつ追加してください。</td></tr>';
+    + (list.length > 300 ? `<tr><td colspan="9" class="empty">ほか ${list.length - 300} 件。絞り込みで探してください。</td></tr>` : '')
+    || '<tr><td colspan="9" class="empty">まだ登録がありません。仕入先の見積・注文履歴をCSVで書き出して取り込むか、上の欄から1件ずつ追加してください。</td></tr>';
 }
 $('m-search').addEventListener('input', renderMaster);
+$('m-list').addEventListener('change', (e) => {
+  const inp = e.target.closest('input.len'); if (!inp) return;
+  const list = clone(master);
+  const m = list.find((x) => x.supplier === inp.dataset.lsupplier && x.code === inp.dataset.lcode); if (!m) return;
+  m.len = Number(inp.value) || 0;
+  commitMaster(list, m.len ? `${m.code} を ${m.len}m で割ったメーター単価にしました` : `${m.code} を個売りにしました`);
+});
 $('m-list').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-mcode]'); if (!b) return;
   armed(b, () => commitMaster(master.filter((m) => !(m.supplier === b.dataset.msupplier && m.code === b.dataset.mcode)), `${b.dataset.mcode} を削除しました`));
 });
 $('m-add').addEventListener('click', () => {
   const list = clone(master);
-  const item = { supplier: $('m-new-supplier').value.trim(), code: $('m-new-code').value.trim(), name: $('m-new-name').value.trim(), unit: $('m-new-unit').value.trim(), cost: $('m-new-cost').value };
+  const item = { supplier: $('m-new-supplier').value.trim(), code: $('m-new-code').value.trim(), name: $('m-new-name').value.trim(), unit: $('m-new-unit').value.trim(), cost: $('m-new-cost').value, len: $('m-new-len').value };
   if (!upsert(list, item)) { toast('品番と仕入単価を入力してください'); return; }
-  ['code', 'name', 'unit', 'cost'].forEach((k) => { $('m-new-' + k).value = ''; });
-  commitMaster(list, `${item.code} を登録しました（納品単価 ${yen(sellPrice(item.cost))}円）`);
+  ['code', 'name', 'unit', 'cost', 'len'].forEach((k) => { $('m-new-' + k).value = ''; });
+  commitMaster(list, `${item.code} を登録しました（販売単価 ${yen(sellPrice(unitCost(item)))}円/${saleUnit(item) || '個'}）`);
 });
 
 function parseCSV(text) {
@@ -699,6 +728,7 @@ const HEADERS = {
   name: ['品名', '商品名', '名称', '品目名'],
   unit: ['単位'],
   cost: ['仕入単価', '仕切単価', '納入単価', '仕切価格', '仕入価格', '単価', '価格'],
+  len: ['長さ', '定尺', '巻長', '入数'],
 };
 $('m-file').addEventListener('change', async (e) => {
   const file = e.target.files[0]; if (!file) return;
@@ -720,13 +750,13 @@ $('m-file').addEventListener('change', async (e) => {
   const list = clone(master); let ok = 0;
   rows.slice(headIdx + 1).forEach((r) => {
     const get = (k) => (col[k] !== undefined ? (r[col[k]] || '').trim() : '');
-    if (upsert(list, { supplier: get('supplier') || defSupplier, code: get('code'), name: get('name'), unit: get('unit'), cost: get('cost') })) ok++;
+    if (upsert(list, { supplier: get('supplier') || defSupplier, code: get('code'), name: get('name'), unit: get('unit'), cost: get('cost'), len: get('len').replace(/[^\d.]/g, '') })) ok++;
   });
   commitMaster(list, `${file.name} から ${ok} 件を取り込みました`);
 });
 $('m-export').addEventListener('click', () => {
-  const lines = [['仕入先', '品番', '品名', '単位', '仕入単価', '納品単価', '更新日'],
-    ...master.map((m) => [m.supplier, m.code, m.name, m.unit, m.cost, sellPrice(m.cost), m.updated])];
+  const lines = [['仕入先', '品番', '品名', '単位', '仕入単価', '長さ(m)', '販売単位', '販売単価', '更新日'],
+    ...master.map((m) => [m.supplier, m.code, m.name, m.unit, m.cost, packLen(m) || '', saleUnit(m), sellPrice(unitCost(m)), m.updated])];
   const csv = lines.map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
   saveFile(`単価マスタ_${today()}.csv`, '﻿' + csv);
 });
