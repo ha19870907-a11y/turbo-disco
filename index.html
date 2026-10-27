@@ -272,7 +272,18 @@ function armed(btn, run) {
 }
 
 const DEFAULT_SETTINGS = { name: '', rep: '', zip: '', address: '', tel: '', email: '', invoice: '', bank: '', markup: 10, round: 'ceil', tax: 10, taxround: 'floor' };
-let settings = { ...DEFAULT_SETTINGS };
+// 自社情報の初期値（このページの持ち主にだけ使う。共有相手は空欄から）
+const OWNER_DEFAULTS = {
+  name: 'RY住設', rep: '安本竜太', zip: '1890003', address: '東京都東村山市久米川町3-16-6-110',
+  tel: '042-306-0206', email: 'yasumoto9999n@outlook.jp', invoice: 'T9810652297331',
+};
+let useOwnerDefaults = !window.claude;
+function withDefaults(saved = {}) {
+  const out = { ...DEFAULT_SETTINGS, ...(useOwnerDefaults ? OWNER_DEFAULTS : {}) };
+  Object.entries(saved || {}).forEach(([k, v]) => { if (v !== '' && v != null) out[k] = v; });
+  return out;
+}
+let settings = withDefaults();
 let master = [];  // {supplier, code, name, unit, cost, updated}
 let docs = [];    // 保存済み伝票
 let current = null;
@@ -301,10 +312,12 @@ const store = {
   async init() {
     const [db, user] = await Promise.all([useCap('db'), useCap('user')]);
     const uid = user ? await user.id() : null;
+    useOwnerDefaults = !window.claude || (user ? await user.isOwner() : false);
+    settings = withDefaults();
     if (db && uid) {
       this.kind = 'db'; this.db = db;
       this.base = db.doc(`data/users/${uid}/app`);
-      this.unsubs.push(this.base.onSnapshot((s) => { settings = { ...DEFAULT_SETTINGS, ...(s.data()?.settings || {}) }; onData('settings'); }, onDbError));
+      this.unsubs.push(this.base.onSnapshot((s) => { settings = withDefaults(s.data()?.settings); onData('settings'); }, onDbError));
       this.unsubs.push(this.base.collection('master').onSnapshot((q) => {
         this.masterChunks = q.size;
         master = q.docs.slice().sort((a, b) => a.id.localeCompare(b.id)).flatMap((d) => d.data().items || []);
@@ -317,7 +330,7 @@ const store = {
       $('sync').textContent = '保存先：アカウント（スマホ・PC共通）'; $('sync').className = 'sync ok';
     } else {
       this.kind = 'local';
-      settings = { ...DEFAULT_SETTINGS, ...this.lget('settings', {}) };
+      settings = withDefaults(this.lget('settings', {}));
       master = this.lget('master', []); docs = this.lget('docs', []);
       $('sync').textContent = '保存先：この端末のみ（サインインすると端末間で共有されます）'; $('sync').className = 'sync';
       onData('settings'); onData('master'); onData('docs');
@@ -341,7 +354,7 @@ const store = {
   lset(k, v) { try { localStorage.setItem('denpyo-' + k, JSON.stringify(v)); } catch { toast('この端末に保存できませんでした'); } },
   saveSettings(s) {
     return this.run(() => this.base.set({ settings: s }),
-      () => { settings = { ...DEFAULT_SETTINGS, ...s }; this.lset('settings', s); onData('settings'); });
+      () => { settings = withDefaults(s); this.lset('settings', s); onData('settings'); });
   },
   saveMaster(list) {
     return this.run(async () => {
@@ -893,7 +906,7 @@ const SETTING_KEYS = Object.keys(DEFAULT_SETTINGS);
 function loadSettingsForm() { SETTING_KEYS.forEach((k) => { $('s-' + k).value = settings[k] ?? ''; }); }
 $('s-save').addEventListener('click', async () => {
   const s = {}; SETTING_KEYS.forEach((k) => { s[k] = $('s-' + k).value; });
-  try { await store.saveSettings(s); settings = { ...DEFAULT_SETTINGS, ...s }; renderLines(); renderMaster(); toast('設定を保存しました'); } catch (e) { failSave(e); }
+  try { await store.saveSettings(s); settings = withDefaults(s); renderLines(); renderMaster(); toast('設定を保存しました'); } catch (e) { failSave(e); }
 });
 $('backup').addEventListener('click', () => saveFile(`伝票ツール_バックアップ_${today()}.json`, JSON.stringify({ settings, master, docs }, null, 2)));
 $('restore').addEventListener('change', async (e) => {
