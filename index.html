@@ -273,10 +273,8 @@ function armed(btn, run) {
 
 const DEFAULT_SETTINGS = { name: '', rep: '', zip: '', address: '', tel: '', email: '', invoice: '', bank: '', markup: 10, round: 'ceil', tax: 10, taxround: 'floor' };
 // 自社情報の初期値（このページの持ち主にだけ使う。共有相手は空欄から）
-const OWNER_DEFAULTS = {
-  name: 'RY住設', rep: '安本竜太', zip: '1890003', address: '東京都東村山市久米川町3-16-6-110',
-  tel: '042-306-0206', email: 'yasumoto9999n@outlook.jp', invoice: 'T9810652297331',
-};
+// 中身は claude.ai に公開するときだけ owner-defaults.json として添付する（リポジトリには置かない）
+let OWNER_DEFAULTS = {};
 let useOwnerDefaults = false;
 function withDefaults(saved = {}) {
   const out = { ...DEFAULT_SETTINGS, ...(useOwnerDefaults ? OWNER_DEFAULTS : {}) };
@@ -313,6 +311,9 @@ const store = {
     const [db, user] = await Promise.all([useCap('db'), useCap('user')]);
     const uid = user ? await user.id() : null;
     useOwnerDefaults = user ? await user.isOwner() : false;
+    if (useOwnerDefaults) {
+      try { const r = await fetch('owner-defaults.json'); if (r.ok) OWNER_DEFAULTS = await r.json(); } catch {}
+    }
     settings = withDefaults();
     if (db && uid) {
       this.kind = 'db'; this.db = db;
