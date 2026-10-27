@@ -293,23 +293,23 @@ const saleUnit = (m) => (packLen(m) ? 'm' : m.unit);
 // ===== 保存先: claude.ai のデータベース（スマホ・PCで共有）。使えない環境ではこの端末内 =====
 const MASTER_CHUNK = 700;
 const store = {
-  kind: 'none', db: null, base: null, masterChunks: 0,
+  kind: 'none', db: null, base: null, masterChunks: 0, unsubs: [],
   async init() {
     const [db, user] = await Promise.all([useCap('db'), useCap('user')]);
     const uid = user ? await user.id() : null;
     if (db && uid) {
       this.kind = 'db'; this.db = db;
       this.base = db.doc(`data/users/${uid}/app`);
-      this.base.onSnapshot((s) => { settings = { ...DEFAULT_SETTINGS, ...(s.data()?.settings || {}) }; onData('settings'); }, onDbError);
-      this.base.collection('master').onSnapshot((q) => {
+      this.unsubs.push(this.base.onSnapshot((s) => { settings = { ...DEFAULT_SETTINGS, ...(s.data()?.settings || {}) }; onData('settings'); }, onDbError));
+      this.unsubs.push(this.base.collection('master').onSnapshot((q) => {
         this.masterChunks = q.size;
         master = q.docs.slice().sort((a, b) => a.id.localeCompare(b.id)).flatMap((d) => d.data().items || []);
         onData('master');
-      }, onDbError);
-      this.base.collection('docs').onSnapshot((q) => {
+      }, onDbError));
+      this.unsubs.push(this.base.collection('docs').onSnapshot((q) => {
         docs = q.docs.map((d) => d.data()).sort((a, b) => (b.created || 0) - (a.created || 0));
         onData('docs');
-      }, onDbError);
+      }, onDbError));
       $('sync').textContent = '保存先：アカウント（スマホ・PC共通）'; $('sync').className = 'sync ok';
     } else {
       this.kind = 'local';
@@ -319,27 +319,43 @@ const store = {
       onData('settings'); onData('master'); onData('docs');
     }
   },
+  // 閲覧のみで共有された人はアカウントに保存できないため、この端末への保存に切り替える
+  toLocal() {
+    this.unsubs.forEach((u) => u()); this.unsubs = [];
+    this.kind = 'local';
+    if (!master.length) master = this.lget('master', []);
+    if (!docs.length) docs = this.lget('docs', []);
+    $('sync').textContent = '保存先：この端末のみ（この共有方法ではアカウントに保存できません）'; $('sync').className = 'sync';
+  },
+  async run(dbOp, localOp) {
+    if (this.kind === 'db') {
+      try { return await dbOp(); } catch (e) { if (e?.code !== 'invalid_argument') throw e; this.toLocal(); }
+    }
+    return localOp();
+  },
   lget(k, f) { try { const v = localStorage.getItem('denpyo-' + k); return v ? JSON.parse(v) : f; } catch { return f; } },
   lset(k, v) { try { localStorage.setItem('denpyo-' + k, JSON.stringify(v)); } catch { toast('この端末に保存できませんでした'); } },
-  async saveSettings(s) {
-    if (this.kind === 'db') return this.base.set({ settings: s });
-    settings = { ...DEFAULT_SETTINGS, ...s }; this.lset('settings', s); onData('settings');
+  saveSettings(s) {
+    return this.run(() => this.base.set({ settings: s }),
+      () => { settings = { ...DEFAULT_SETTINGS, ...s }; this.lset('settings', s); onData('settings'); });
   },
-  async saveMaster(list) {
-    if (this.kind !== 'db') { master = list; this.lset('master', list); onData('master'); return; }
-    const col = this.base.collection('master');
-    const n = Math.ceil(list.length / MASTER_CHUNK);
-    for (let i = 0; i < n; i++) await col.doc('chunk-' + String(i).padStart(3, '0')).set({ items: list.slice(i * MASTER_CHUNK, (i + 1) * MASTER_CHUNK) });
-    for (let i = n; i < this.masterChunks; i++) await col.doc('chunk-' + String(i).padStart(3, '0')).delete();
+  saveMaster(list) {
+    return this.run(async () => {
+      const col = this.base.collection('master');
+      const n = Math.ceil(list.length / MASTER_CHUNK);
+      for (let i = 0; i < n; i++) await col.doc('chunk-' + String(i).padStart(3, '0')).set({ items: list.slice(i * MASTER_CHUNK, (i + 1) * MASTER_CHUNK) });
+      for (let i = n; i < this.masterChunks; i++) await col.doc('chunk-' + String(i).padStart(3, '0')).delete();
+    }, () => { master = list; this.lset('master', list); onData('master'); });
   },
-  async saveDoc(doc) {
-    if (this.kind === 'db') return this.base.collection('docs').doc(doc.id).set(doc);
-    docs = [doc, ...docs.filter((d) => d.id !== doc.id)].sort((a, b) => (b.created || 0) - (a.created || 0));
-    this.lset('docs', docs); onData('docs');
+  saveDoc(doc) {
+    return this.run(() => this.base.collection('docs').doc(doc.id).set(doc), () => {
+      docs = [doc, ...docs.filter((d) => d.id !== doc.id)].sort((a, b) => (b.created || 0) - (a.created || 0));
+      this.lset('docs', docs); onData('docs');
+    });
   },
-  async deleteDoc(id) {
-    if (this.kind === 'db') return this.base.collection('docs').doc(id).delete();
-    docs = docs.filter((d) => d.id !== id); this.lset('docs', docs); onData('docs');
+  deleteDoc(id) {
+    return this.run(() => this.base.collection('docs').doc(id).delete(),
+      () => { docs = docs.filter((d) => d.id !== id); this.lset('docs', docs); onData('docs'); });
   },
 };
 function onDbError(e) { if (e?.code !== 'revoked') toast('データの同期に失敗しました。ページを開き直してください。'); }
