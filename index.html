@@ -33,6 +33,8 @@
     color-scheme: dark;
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; }
   body { background: var(--bg); color: var(--ink); font-family: var(--font-ui); font-size: 15px; line-height: 1.5; }
   .wrap { max-width: 1040px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 12px 96px; }
   header.top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding-block: 8px 12px; }
@@ -500,7 +502,7 @@ $('new-doc').addEventListener('click', () => { newDoc(); toast('新しい伝票�
 $('save-doc').addEventListener('click', async () => { if (await saveDoc()) toast(`${current.type} ${current.no} を保存しました`); });
 $('to-invoice').addEventListener('click', async () => {
   if (!(await saveDoc())) return;
-  const keep = { to: current.to, subject: current.subject, note: current.note, lines: clone(current.lines) };
+  const keep = { to: current.to, honor: current.honor, subject: current.subject, note: current.note, lines: clone(current.lines) };
   newDoc('請求書');
   Object.assign(current, keep);
   loadDocToForm();
@@ -801,11 +803,13 @@ $('h-list').addEventListener('click', (e) => {
 
 // ===== 単価マスタ =====
 function upsert(list, item) {
-  item.cost = Number(String(item.cost).replace(/[,，¥￥円\s]/g, ''));
-  if (!item.code || item.cost === '' || !isFinite(item.cost)) return false;
+  const rawCost = String(item.cost ?? '').replace(/[,，¥￥円\s]/g, '');
+  item.cost = Number(rawCost);
+  if (!item.code || rawCost === '' || !isFinite(item.cost)) return false;
   item.updated = today();
-  if (item.len === '' || item.len == null || !isFinite(Number(item.len))) item.len = guessLen(item); else item.len = Number(item.len);
   const idx = list.findIndex((m) => m.code === item.code && m.supplier === item.supplier);
+  const lenBlank = item.len === '' || item.len == null || !isFinite(Number(item.len));
+  if (lenBlank) item.len = idx >= 0 ? packLen(list[idx]) : guessLen(item); else item.len = Number(item.len);
   if (idx >= 0) list[idx] = { ...list[idx], ...item, name: item.name || list[idx].name, unit: item.unit || list[idx].unit };
   else list.push(item);
   return true;
@@ -870,7 +874,7 @@ const HEADERS = {
   name: ['品名', '商品名', '名称', '品目名'],
   unit: ['単位'],
   cost: ['仕入単価', '仕切単価', '納入単価', '仕切価格', '仕入価格', '単価', '価格'],
-  len: ['長さ', '定尺', '巻長', '入数'],
+  len: ['長さ', '定尺', '巻長'],
 };
 $('m-file').addEventListener('change', async (e) => {
   const file = e.target.files[0]; if (!file) return;
