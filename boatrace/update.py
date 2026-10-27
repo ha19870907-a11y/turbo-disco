@@ -11,6 +11,7 @@ import datetime as dt
 import json
 import os
 import sys
+import threading
 import time
 
 from . import fetch, parse, secure
@@ -256,11 +257,13 @@ def prep(hd, online=True, with_racers=True):
     old_races = {(v["jcd"], r["rno"]): r for v in (old or {}).get("venues", []) for r in v["races"]}
     store = RacerStore()
     day = {"date": hd, "venues": [], "racers": {}}
+    tasks = [(v["jcd"], rno) for v in venues if not v["canceled"] for rno in range(1, 13)]
+    pages = dict(zip(tasks, fetch.pmap(lambda t: fetch.race_page("racelist", t[0], t[1], hd), tasks)))
     for v in venues:
         v["races"] = []
         if not v["canceled"]:
             for rno in range(1, 13):
-                html = fetch.race_page("racelist", v["jcd"], rno, hd)
+                html = pages.get((v["jcd"], rno))
                 rl = parse.parse_racelist(html) if html else None
                 prev = old_races.get((v["jcd"], rno), {})
                 if not rl or not rl["boats"]:
@@ -279,24 +282,21 @@ def prep(hd, online=True, with_racers=True):
     tobans = {b["toban"] for v in day["venues"] for r in v["races"] for b in r.get("boats", [])}
     if with_racers:
         started = time.monotonic()
-        for i, t in enumerate(sorted(tobans)):
+        order = sorted(tobans)
+        chunk = 60
+        for i in range(0, len(order), chunk):
             if time.monotonic() - started > RACER_BUDGET_SEC:
-                log(f"選手データの取得を時間切れで打ち切りました（{i}/{len(tobans)}）。残りは次回取得します")
+                log(f"選手データの取得を時間切れで打ち切りました（{i}/{len(order)}）。残りは次回取得します")
                 break
-            store.refresh(t, hd, online)
-            if i % 50 == 0:
-                log(f"選手データ {i}/{len(tobans)}")
-                store.save()  # 途中で止まっても取れた分は次回に引き継ぐ
+            fetch.pmap(lambda t: store.refresh(t, hd, online), order[i:i + chunk])
+            log(f"選手データ {min(i + chunk, len(order))}/{len(order)}")
+            store.save()  # 途中で止まっても取れた分は次回に引き継ぐ
         store.save()
     day["racers"] = {t: store.summary(t) for t in tobans}
 
+    # 公式のコンピュータ予想は当日の live で締切前に取る（前日には出ていないことが多い）
     for v in day["venues"]:
         for r in v["races"]:
-            if online and not r.get("pc"):
-                html = fetch.race_page("pcexpect", v["jcd"], r["rno"], hd)
-                pc = parse.parse_pcexpect(html) if html else None
-                if pc and (pc["marks"] or pc["focus"]):
-                    r["pc"] = pc
             repredict(r, day["racers"])
     finish(day)
     return day
@@ -311,57 +311,61 @@ def live(hd, now=None, online=True):
         if not day:
             return None
     store = RacerStore()
-    changed_racers = False
-    for v in day["venues"]:
-        for r in v["races"]:
-            dl = deadline_dt(hd, r.get("deadline"))
-            if dl is None or r.get("result"):
-                continue
-            mins = (dl - now).total_seconds() / 60
-            got = False
-            if -3 <= mins <= 35:
-                html = fetch.race_page("beforeinfo", v["jcd"], r["rno"], hd)
-                info = parse.parse_beforeinfo(html) if html else None
-                if info and parse.has_exhibition(info):
-                    info["boats"] = {str(k): x for k, x in info["boats"].items()}
-                    r["before"] = info
-                    got = True
-                if not r.get("pc") and not r.get("pc_tried"):
-                    r["pc_tried"] = True
-                    html = fetch.race_page("pcexpect", v["jcd"], r["rno"], hd)
-                    pc = parse.parse_pcexpect(html) if html else None
-                    if pc and (pc["marks"] or pc["focus"]):
-                        r["pc"] = pc
-            stale = _age_min(r.get("odds_at"), now)
-            if -2 <= mins <= 60 or (60 < mins <= 180 and stale >= 30):
-                html = fetch.race_page("oddstf", v["jcd"], r["rno"], hd)
-                win = parse.parse_oddstf(html) if html else {}
-                if win:
-                    r["odds_win"] = {str(k): x for k, x in win.items()}
-                    r["odds_at"] = now.strftime("%H:%M")
-                    got = True
-                if mins <= 60:
-                    html = fetch.race_page("odds3t", v["jcd"], r["rno"], hd)
-                    o3 = parse.parse_odds3t(html) if html else {}
-                    if o3:
-                        r["odds3t"] = o3
-                        r["odds_at"] = now.strftime("%H:%M")
-                        got = True
-            if -RESULT_GIVE_UP_MIN <= mins <= -6:
-                html = fetch.race_page("raceresult", v["jcd"], r["rno"], hd)
-                res = parse.parse_result(html) if html else None
-                if res and res["order"]:
-                    r["result"] = res
-                    _record(store, hd, v["jcd"], r, res)
-                    changed_racers = True
-                    got = True
-            if got:
-                r["updated"] = now.strftime("%H:%M")
-                repredict(r, day["racers"])
+    lock = threading.Lock()
+    todo = [(v, r) for v in day["venues"] for r in v["races"]
+            if deadline_dt(hd, r.get("deadline")) is not None and not r.get("result")]
+    recorded = fetch.pmap(lambda vr: _live_race(hd, vr[0], vr[1], now, day["racers"], store, lock), todo)
+    changed_racers = any(recorded)
     if changed_racers:
         store.save()
     finish(day, now)
     return day
+
+
+def _live_race(hd, v, r, now, racers, store, lock):
+    """1レースぶんの展示・オッズ・結果を取り込む。結果を記録したら True。"""
+    mins = (deadline_dt(hd, r["deadline"]) - now).total_seconds() / 60
+    got = recorded = False
+    if -3 <= mins <= 35:
+        html = fetch.race_page("beforeinfo", v["jcd"], r["rno"], hd)
+        info = parse.parse_beforeinfo(html) if html else None
+        if info and parse.has_exhibition(info):
+            info["boats"] = {str(k): x for k, x in info["boats"].items()}
+            r["before"] = info
+            got = True
+        if not r.get("pc") and not r.get("pc_tried"):
+            r["pc_tried"] = True
+            html = fetch.race_page("pcexpect", v["jcd"], r["rno"], hd)
+            pc = parse.parse_pcexpect(html) if html else None
+            if pc and (pc["marks"] or pc["focus"]):
+                r["pc"] = pc
+    stale = _age_min(r.get("odds_at"), now)
+    if -2 <= mins <= 60 or (60 < mins <= 180 and stale >= 30):
+        html = fetch.race_page("oddstf", v["jcd"], r["rno"], hd)
+        win = parse.parse_oddstf(html) if html else {}
+        if win:
+            r["odds_win"] = {str(k): x for k, x in win.items()}
+            r["odds_at"] = now.strftime("%H:%M")
+            got = True
+        if mins <= 60:
+            html = fetch.race_page("odds3t", v["jcd"], r["rno"], hd)
+            o3 = parse.parse_odds3t(html) if html else {}
+            if o3:
+                r["odds3t"] = o3
+                r["odds_at"] = now.strftime("%H:%M")
+                got = True
+    if -RESULT_GIVE_UP_MIN <= mins <= -6:
+        html = fetch.race_page("raceresult", v["jcd"], r["rno"], hd)
+        res = parse.parse_result(html) if html else None
+        if res and res["order"]:
+            r["result"] = res
+            with lock:
+                _record(store, hd, v["jcd"], r, res)
+            recorded = got = True
+    if got:
+        r["updated"] = now.strftime("%H:%M")
+        repredict(r, racers)
+    return recorded
 
 
 def _age_min(hhmm, now):
@@ -426,6 +430,7 @@ def main(argv=None):
     write(day)
     n = sum(len(v["races"]) for v in day["venues"])
     log(f"{hd}: {len(day['venues'])}場 {n}レース を書き出しました")
+    log(fetch.summary())
     return 0
 
 
