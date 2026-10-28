@@ -168,6 +168,32 @@ def _softmax(xs, temp=1.0):
     return [x / t for x in e]
 
 
+def longshot(order, model, market, course, tri, odds3t, taken):
+    """穴予想: 人気より力がある艇（オッズが無ければ外コースで一番強い艇）と、その艇が絡む高配当の3連単。"""
+    cands = [k for k in order[3:] if model[k] >= 0.04]  # ◎○▲より下の艇から選ぶ
+    if not cands:
+        return None
+    if market:
+        boat = max(cands, key=lambda k: model[k] / max(market[k], 1e-3))
+        if model[boat] > market[boat]:
+            reason = f"予想{model[boat] * 100:.0f}%に対して人気は{market[boat] * 100:.0f}%。オッズ以上の力"
+        else:
+            reason = f"人気薄の中では最も期待できる（予想{model[boat] * 100:.0f}%・人気{market[boat] * 100:.0f}%）"
+    else:
+        outer = [k for k in cands if course[k] >= 4]
+        boat = max(outer or cands, key=lambda k: model[k])
+        reason = f"{course[boat]}コースから一発（予想{model[boat] * 100:.0f}%）"
+    combos = [(c, p) for c, p in tri.items() if c not in taken and str(boat) in c.split("-")[:2]]
+    if odds3t:
+        combos = [(c, p, odds3t[c]) for c, p in combos if odds3t.get(c, 0) >= 20]
+        combos.sort(key=lambda x: -x[1] * x[2])
+        picks = [{"combo": c, "prob": round(p, 4), "odds": o, "ev": round(p * o, 2)} for c, p, o in combos[:3]]
+    else:
+        combos.sort(key=lambda x: -x[1])
+        picks = [{"combo": c, "prob": round(p, 4), "odds": None, "ev": None} for c, p in combos[:3]]
+    return {"boat": boat, "reason": reason, "picks": picks}
+
+
 def trifecta_probs(p):
     """Harville 式で3連単120通りの確率。p は 枠→1着確率。"""
     out = {}
@@ -228,7 +254,7 @@ def predict(race):
     model = dict(zip(keys, _softmax([scores[k] for k in keys], temp)))
 
     odds_win = {int(k): v for k, v in (race.get("odds_win") or {}).items() if v}
-    probs = model
+    probs, market = model, None
     if len(odds_win) >= len(keys) - 1 and odds_win:
         inv = {k: 1 / odds_win[k] for k in keys if odds_win.get(k)}
         t = sum(inv.values())
@@ -256,7 +282,11 @@ def predict(race):
             picks.append({"combo": c, "prob": round(p, 4), "odds": o, "ev": round(p * o, 2),
                           "value": True})
 
+    ana = longshot(order, model, market, {k: course_of.get(k, k) for k in keys}, tri, odds3t,
+                   {x["combo"] for x in picks})
+
     return {
+        "ana": ana,
         "probs": {k: round(probs[k], 4) for k in keys},
         "model_probs": {k: round(model[k], 4) for k in keys},
         "marks": marks,

@@ -80,8 +80,19 @@
   .body { padding: 0 12px 12px; border-top: 1px solid var(--line); }
   .info { color: var(--sub); font-size: 12px; margin: 8px 0; display: flex; flex-wrap: wrap; gap: 4px 14px; }
   .boats { display: grid; gap: 6px; }
-  .brow { display: grid; grid-template-columns: 28px minmax(130px, 1.3fr) 110px minmax(0, 2.2fr) minmax(0, 2fr);
-    gap: 6px 12px; align-items: start; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+  .brow { display: grid; grid-template-columns: 28px minmax(120px, 1.2fr) 110px minmax(0, 2fr);
+    gap: 4px 12px; align-items: start; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+  .brow .past { grid-column: 2 / -1; font-size: 11px; color: var(--sub); line-height: 1.6; }
+  .brow .past b { font-weight: 500; color: var(--ink); }
+  .brow .past b.top { color: var(--good); }
+  .brow .past b.bad { color: var(--bad); }
+  .brow.out { opacity: .45; }
+  .brow.is-ana .name::after { content: "穴"; margin-left: 6px; font-size: 11px; color: var(--warn); background: var(--warn-weak);
+    border-radius: 4px; padding: 0 4px; }
+  .badge.ana { background: var(--warn-weak); color: var(--warn); display: inline-flex; align-items: center; gap: 3px; }
+  .badge.ana .boat { width: 16px; height: 16px; font-size: 10px; }
+  .pbox.ana { border-color: var(--warn); background: var(--warn-weak); }
+  .pbox.ana h4 { display: flex; align-items: center; gap: 6px; color: var(--warn); }
   .brow:last-child { border-bottom: 0; }
   .brow .boat { width: 26px; height: 26px; font-size: 14px; }
   .name { font-weight: 700; }
@@ -93,8 +104,8 @@
   .kv span { color: var(--sub); margin-right: 3px; }
   .kv b { font-weight: 500; font-variant-numeric: tabular-nums; }
   .kv .top { color: var(--good); font-weight: 700; }
-  .recent { display: flex; gap: 2px; flex-wrap: wrap; margin-top: 3px; }
-  .fin { width: 18px; height: 18px; display: inline-grid; place-items: center; font-size: 11px; border-radius: 3px;
+  .recent { display: inline-flex; gap: 1px; flex-wrap: wrap; vertical-align: middle; margin-left: 6px; }
+  .fin { width: 14px; height: 14px; font-size: 10px; display: inline-grid; place-items: center; border-radius: 3px;
     background: var(--chip); color: var(--sub); font-variant-numeric: tabular-nums; }
   .fin.f1 { background: #f5c542; color: #1c1f24; font-weight: 700; }
   .fin.f2 { background: #c9ced6; color: #1c1f24; font-weight: 700; }
@@ -124,7 +135,7 @@
     details.race > summary { grid-template-columns: 38px 42px 1fr; }
     details.race > summary .right { grid-column: 1 / -1; justify-content: flex-start; }
     .brow { grid-template-columns: 28px 1fr 96px; }
-    .brow .stats, .brow .form { grid-column: 2 / -1; }
+    .brow .today { grid-column: 2 / -1; }
   }
 </style>
 </head>
@@ -132,7 +143,7 @@
 <header>
   <div class="bar">
     <h1>ボートレース予想</h1>
-    <select id="date" aria-label="開催日"></select>
+    <span class="meta" id="today"></span>
     <span class="meta" id="updated"></span>
     <button id="reload" type="button">更新</button>
     <button id="logout" type="button" hidden>ロック</button>
@@ -167,21 +178,26 @@ function jstNow() {
 const toMin = hhmm => hhmm ? +hhmm.split(":")[0] * 60 + +hhmm.split(":")[1] : null;
 
 async function init() {
+  $("#reload").onclick = load;
+  state.date = jstNow().ymd;
+  showDate();
   let idx;
   try { idx = await getJSON("data/index.json"); }
   catch { $("#main").innerHTML = `<div class="empty">まだ予想データがありません。初回の自動更新をお待ちください。</div>`; return; }
-  const sel = $("#date");
-  const today = jstNow().ymd;
-  sel.innerHTML = idx.dates.map(d => `<option value="${d}">${d.slice(0, 4)}/${d.slice(4, 6)}/${d.slice(6)}${d === today ? "（今日）" : ""}</option>`).join("");
-  const q = new URLSearchParams(location.search).get("d");
-  state.date = idx.dates.includes(q) ? q : (idx.dates.includes(today) ? today : idx.dates.filter(d => d >= today).pop() || idx.dates[0]);
-  sel.value = state.date;
-  sel.onchange = () => { state.date = sel.value; state.open.clear(); load(); };
-  $("#reload").onclick = load;
   if (idx.encrypted) { const b = $("#logout"); b.hidden = false; b.onclick = logout; }
-  await load();
   state.seen = idx.updated;
+  if (idx.dates.includes(state.date)) await load(); else noToday();
   setInterval(refresh, 60 * 1000);
+}
+
+function showDate() {
+  const d = state.date;
+  $("#today").textContent = `${+d.slice(4, 6)}月${+d.slice(6)}日の開催`;
+}
+
+function noToday() {
+  $("#venues").innerHTML = "";
+  $("#main").innerHTML = `<div class="empty">本日の予想データはまだありません。毎朝7時20分ごろに作成されます。</div>`;
 }
 
 // 1分ごとに小さな目次（index.json）だけを見て、データが更新されたときだけ本体（約1MB）を読み直す
@@ -189,15 +205,17 @@ async function refresh() {
   if (state.locked) return;
   let idx;
   try { idx = await getJSON("data/index.json"); } catch { return; }
-  if (idx.updated === state.seen) return;
+  const today = jstNow().ymd;
+  if (idx.updated === state.seen && today === state.date) return;
   state.seen = idx.updated;
-  await load();
+  if (today !== state.date) { state.date = today; state.open.clear(); showDate(); }  // 日付が変わったら翌日の分へ
+  if (idx.dates.includes(state.date)) await load(); else noToday();
 }
 
 async function load() {
   let raw;
   try { raw = await getJSON(`data/${state.date}.json`); }
-  catch { $("#main").innerHTML = `<div class="empty">この日のデータを読み込めませんでした。</div>`; return; }
+  catch { noToday(); return; }
   try { state.data = await openData(raw); }
   catch { askPassword(state.pw ? "パスワードが違います。" : ""); return; }
   if (raw.enc) { try { localStorage.setItem(PW_KEY, state.pw); } catch {} }
@@ -281,6 +299,7 @@ function raceHTML(d, v, r, isNext) {
   const marks = order.slice(0, 4).map(([w, m]) => `<span class="mk">${m}${boat(w)}</span>`).join("");
   const top = p && p.picks[0];
   const badges = [
+    p && p.ana ? `<span class="badge ana">穴 ${boat(p.ana.boat)}</span>` : "",
     r.stage === "展示反映" ? `<span class="badge live">展示反映${r.updated ? " " + r.updated : ""}</span>` : `<span class="badge pre">前日データ</span>`,
     r.odds3t || r.odds_win ? `<span class="badge odds">オッズ ${r.odds_at || ""}</span>` : "",
   ];
@@ -323,28 +342,29 @@ function raceBody(d, r) {
       const tip = [x.date, x.venue, x.course ? `${x.course}コース` : "", x.st != null ? `ST${x.st}` : ""].filter(Boolean).join(" ");
       return `<span class="fin ${c}" title="${esc(tip)}">${esc(f)}</span>`;
     }).join("");
-    return `<div class="brow">
+    const past = [
+      `全国${fmt(b.nat_win)}`,
+      `当地<b class="${locDiff >= 0.5 ? "top" : ""}">${fmt(b.loc_win)}</b>`,
+      `モーター${b.motor_no ?? "-"}号<b class="${b.motor_2 >= 45 ? "top" : ""}">${fmt(b.motor_2, 0)}%</b>`,
+      `平均ST${fmt(b.avg_st)}${b.f ? ` <b class="bad">F${b.f}</b>` : ""}`,
+      `得意 ${bc ? `${bc.course}コース(${esc(bc.label)}${fmt(bc.value, 0)}%)` : "-"} ${vs || (locDiff != null ? `当地${locDiff >= 0 ? "+" : ""}${locDiff.toFixed(2)}` : "")}`,
+    ];
+    return `<div class="brow${prob == null ? " out" : ""}${p.ana && p.ana.boat == w ? " is-ana" : ""}">
       ${boat(w)}
       <div><div class="name">${esc(b.name)}</div>
-        <div class="small">${esc(b.cls || "")} ${esc(b.toban)} ${esc(b.branch || "")} ${b.age ? b.age + "歳" : ""}</div></div>
+        <div class="small">${esc(b.cls || "")} ${esc(b.branch || "")} ${b.age ? b.age + "歳" : ""}</div></div>
       <div class="prob"><span class="mark">${p.marks[w] || ""}</span><b>${prob == null ? "欠場" : pct(prob)}</b>
         ${delta ? `<span class="small">${delta > 0 ? "+" : ""}${delta}</span>` : ""}
         <div class="pbar"><i style="width:${Math.round((prob || 0) * 100)}%"></i></div>
         <div class="small">${odds ? `単勝 ${odds}倍` : ""}${pcm ? ` 公式${pcm}` : ""}</div></div>
-      <div class="stats kv">
-        <div><span>全国</span><b>${fmt(b.nat_win)}</b></div>
-        <div><span>当地</span><b class="${locDiff >= 0.5 ? "top" : ""}">${fmt(b.loc_win)}</b></div>
-        <div><span>モーター</span><b class="${b.motor_2 >= 45 ? "top" : ""}">${b.motor_no ?? "-"}号 ${fmt(b.motor_2, 0)}%</b></div>
-        <div><span>平均ST</span><b>${fmt(b.avg_st)}</b>${b.f ? ` <b style="color:var(--bad)">F${b.f}</b>` : ""}</div>
+      <div class="today kv">
+        <div><span>進入</span><b>${p.course ? p.course[w] ?? w : w}コース</b></div>
         <div><span>展示</span><b>${fmt(ex.ex_time)}</b></div>
-        <div><span>スタ展</span><b>${st ? `${st.course}c ${esc(st.raw ?? fmt(st.st))}` : "-"}</b></div>
+        <div><span>スタ展</span><b>${st ? esc(st.raw ?? fmt(st.st)) : "-"}</b></div>
         <div><span>チルト</span><b>${fmt(ex.tilt, 1)}</b></div>
-        <div><span>進入</span><b>${p.course ? p.course[w] : w}コース</b></div>
       </div>
-      <div class="form">
-        <div class="small">得意コース ${bc ? `<b>${bc.course}コース</b>（${esc(bc.label)} ${fmt(bc.value, 0)}%）` : "-"}
-          ・得意場 ${vs || (locDiff != null ? `当地 ${locDiff >= 0 ? "+" : ""}${locDiff.toFixed(2)}` : "-")}</div>
-        <div class="small">直近10走（左が最新）</div><div class="recent">${recent || '<span class="small">-</span>'}</div>
+      <div class="past">${past.join(" ・ ")}
+        <span class="recent" title="直近10走（左が最新）">直近 ${recent || "-"}</span>
         ${(p.reasons[w] || []).length ? `<div class="reasons">${p.reasons[w].map(esc).join("・")}</div>` : ""}
       </div></div>`;
   }).join("");
@@ -355,11 +375,17 @@ function raceBody(d, r) {
       <td class="n">${pct(x.prob)}</td><td class="n">${x.odds ? x.odds + "倍" : "-"}</td>
       <td class="n ${x.ev >= 1 ? "ev-hi" : ""}">${x.ev != null ? "期待値 " + x.ev.toFixed(2) : ""}</td></tr>`).join("")}
     </table></div>` : "";
+  const anaBox = (a, tri) => a ? `<div class="pbox ana"><h4>穴予想 ${boat(a.boat)}</h4>
+    <div class="small">${esc(a.reason)}</div><table>
+    ${a.picks.map(x => `<tr class="${x.combo === tri ? "hit" : ""}"><td>${combo(x.combo)}</td>
+      <td class="n">${pct(x.prob)}</td><td class="n">${x.odds ? x.odds + "倍" : "-"}</td>
+      <td class="n ${x.ev >= 1 ? "ev-hi" : ""}">${x.ev != null ? "期待値 " + x.ev.toFixed(2) : ""}</td></tr>`).join("")}
+    </table></div>` : "";
   const res = r.result ? `<div class="result">結果 ${(r.result.order || []).map(o => boat(o.waku)).join("")}
     ${r.result.payout ? `3連単 ¥${r.result.payout.toLocaleString()}` : ""}</div>` : "";
   return `<div class="info">${info.filter(Boolean).map(x => `<span>${x}</span>`).join("")}</div>
     <div class="boats">${rows}</div>${res}
-    <div class="picks">${r.stage === "展示反映" ? pickTable(r.live, "直前予想（展示・オッズ反映）") : ""}${pickTable(pre, "前日予想")}</div>`;
+    <div class="picks">${anaBox(p.ana, tri)}${r.stage === "展示反映" ? pickTable(r.live, "直前予想（展示・オッズ反映）") : ""}${pickTable(pre, "前日予想")}</div>`;
 }
 
 init();

@@ -401,8 +401,9 @@ def write(day):
     save_json(day_path(day["date"]), day)
     idx_path = os.path.join(OUT_DIR, "index.json")
     idx = load_json(idx_path, {"dates": []})
-    dates = sorted(set(idx.get("dates", [])) | {day["date"]}, reverse=True)[:14]
-    # 古い日のファイルは消す（2週間分だけ残す）
+    # ページは当日分だけを見せるので、今日より前の日のファイルは残さない（翌日分の前日予想は残す）
+    today = now_jst().strftime("%Y%m%d")
+    dates = sorted(d for d in set(idx.get("dates", [])) | {day["date"]} if d >= today or d == day["date"])
     for name in os.listdir(OUT_DIR):
         if name.endswith(".json") and name[:8].isdigit() and name[:8] not in dates:
             os.remove(os.path.join(OUT_DIR, name))

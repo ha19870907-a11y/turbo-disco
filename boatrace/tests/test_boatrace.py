@@ -145,6 +145,43 @@ class BugfixTest(unittest.TestCase):
         self.assertEqual([(r["venue"], str(r["finish"])) for r in recent], [("桐生", "3"), ("大村", "2")])
 
 
+class LongshotTest(unittest.TestCase):
+    def race(self, **kw):
+        return dict({"boats": parse.parse_racelist(fx("racelist"))["boats"]}, **kw)
+
+    def test_without_odds_picks_outer_boat(self):
+        p = predict.predict(self.race())
+        ana = p["ana"]
+        self.assertGreaterEqual(p["course"][ana["boat"]], 4)
+        self.assertNotIn(p["marks"][ana["boat"]], ("◎", "○", "▲"))
+        self.assertEqual(len(ana["picks"]), 3)
+        normal = {x["combo"] for x in p["picks"]}
+        for x in ana["picks"]:
+            self.assertNotIn(x["combo"], normal)
+            self.assertIn(str(ana["boat"]), x["combo"].split("-")[:2])
+
+    def test_with_odds_picks_undervalued_boat_and_high_payouts(self):
+        # 5号艇を極端な不人気にして、予想との差が最も大きくなるようにする
+        win = {1: 1.2, 2: 4.0, 3: 6.0, 4: 15.0, 5: 300.0, 6: 80.0}
+        o3 = {k: 10.0 * (i + 1) for i, k in enumerate(sorted(predict.trifecta_probs({w: 1 / 6 for w in range(1, 7)})))}
+        p = predict.predict(self.race(odds_win=win, odds3t=o3))
+        ana = p["ana"]
+        self.assertEqual(ana["boat"], 5)
+        self.assertIn("人気", ana["reason"])
+        self.assertTrue(all(x["odds"] >= 20 for x in ana["picks"]))
+        evs = [x["ev"] for x in ana["picks"]]
+        self.assertEqual(evs, sorted(evs, reverse=True))
+
+
+class LongshotAlwaysTest(unittest.TestCase):
+    def test_every_race_gets_a_longshot_even_when_odds_match_the_model(self):
+        boats = parse.parse_racelist(fx("racelist"))["boats"]
+        p = predict.predict({"boats": boats, "odds_win": parse.parse_oddstf(fx("oddstf")),
+                             "odds3t": parse.parse_odds3t(fx("odds3t"))})
+        self.assertIsNotNone(p["ana"])
+        self.assertNotIn(p["marks"][p["ana"]["boat"]], ("◎", "○", "▲"))
+
+
 class UpdateTest(unittest.TestCase):
     """fetch を差し替えて prep → live（展示・オッズ・結果）の一連を確認する。"""
 
@@ -222,6 +259,16 @@ class SecureTest(unittest.TestCase):
         self.assertEqual(secure.decrypt(enc, "pw"), data)
         with self.assertRaises(Exception):
             secure.decrypt(enc, "wrong")
+
+    def test_past_days_are_dropped(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(update, "OUT_DIR", tmp), \
+                mock.patch.object(update, "now_jst", lambda: dt.datetime(2026, 10, 28, 9, 0, tzinfo=update.JST)):
+            for d in ("20261026", "20261027", "20261028", "20261029"):
+                update.write({"date": d, "updated": "x", "venues": []})
+            self.assertEqual(update.load_json(os.path.join(tmp, "index.json"), None)["dates"],
+                             ["20261028", "20261029"])
+            self.assertEqual(sorted(f for f in os.listdir(tmp) if f[0].isdigit()),
+                             ["20261028.json", "20261029.json"])
 
     def test_files_encrypted_with_password(self):
         with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {"BOATRACE_PASSWORD": "pw"}), \
