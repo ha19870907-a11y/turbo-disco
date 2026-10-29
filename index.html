@@ -82,6 +82,22 @@
   }
   .scan { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px; margin-bottom: 12px; background: var(--accent-soft); border-radius: 8px; }
   .scan-status { font-size: 13px; color: var(--muted); flex: 1 1 220px; min-width: 0; }
+  .ocr-review { border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+  .ocr-title { margin: 0 0 8px; font-size: 13.5px; }
+  .ocr-thumb { display: block; max-width: 100%; max-height: 360px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+  .ocr-head, .ocr-row { display: grid; grid-template-columns: 28px 2fr 1.4fr 0.7fr 0.6fr; gap: 6px; align-items: center; }
+  .ocr-head { font-size: 12px; color: var(--muted); }
+  .ocr-row { padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .ocr-row input[type=checkbox] { width: 20px; height: 20px; }
+  .ocr-raw { margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+  .ocr-raw pre { white-space: pre-wrap; word-break: break-all; max-height: 240px; overflow: auto; background: var(--bg); padding: 8px; border-radius: 6px; }
+  @media (max-width: 680px) {
+    .ocr-head { display: none; }
+    .ocr-row { grid-template-columns: 28px 1fr 1fr; grid-template-areas: "chk name name" "chk code code" "chk qty unit"; }
+    .ocr-row > :nth-child(1) { grid-area: chk; } .ocr-row > :nth-child(2) { grid-area: name; } .ocr-row > :nth-child(3) { grid-area: code; }
+    .ocr-row > :nth-child(4) { grid-area: qty; } .ocr-row > :nth-child(5) { grid-area: unit; }
+  }
+  .lookup { display: inline-block; margin-top: 3px; font-size: 12px; color: var(--accent); }
   .line.unregistered input[data-k=cost] { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, var(--surface)); }
   .totals { margin-left: auto; width: 300px; max-width: 100%; margin-top: 12px; display: grid; gap: 4px; }
   .totals div { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
@@ -141,6 +157,27 @@
       <div class="scan" id="scan-box" hidden>
         <span class="file-btn btn primary">仕入先の納品書を写真で読み取る<input id="scan-file" type="file" accept="image/jpeg,image/png,image/webp"></span>
         <span class="scan-status" id="scan-status">渡辺パイプ・小泉などの納品書を撮ると、品名・品番・数量を明細に追加します。</span>
+      </div>
+      <div class="ocr-review" id="ocr-prep" hidden>
+        <p class="ocr-title">文字がまっすぐ読める向きに回してから「読み取る」を押してください。伝票を平らにして、明るい場所で真上から撮ると読み取りやすくなります。</p>
+        <canvas id="ocr-thumb" class="ocr-thumb"></canvas>
+        <div class="actions">
+          <button class="btn" id="ocr-rot-l">↺ 左に回す</button>
+          <button class="btn" id="ocr-rot-r">↻ 右に回す</button>
+          <button class="btn primary" id="ocr-go">この向きで読み取る</button>
+          <button class="btn" id="ocr-prep-close">やめる</button>
+        </div>
+      </div>
+      <div class="ocr-review" id="ocr-review" hidden>
+        <p class="ocr-title">読み取った行です。間違いを直して、追加する行に印を付けてください。</p>
+        <div class="ocr-head"><span></span><span>品名</span><span>品番・規格</span><span class="r">数量</span><span>単位</span></div>
+        <div id="ocr-rows"></div>
+        <div class="actions">
+          <button class="btn primary" id="ocr-add">印を付けた行を明細に追加</button>
+          <button class="btn" id="ocr-blank">空の行を足す</button>
+          <button class="btn" id="ocr-close">閉じる</button>
+        </div>
+        <details class="ocr-raw"><summary>読み取った文字をすべて見る</summary><pre id="ocr-raw"></pre></details>
       </div>
       <div class="lines-head"><span>品番（マスタ検索）</span><span>品名</span><span class="r">数量</span><span>単位</span><span class="r">仕入単価</span><span class="r">販売単価</span><span class="r">金額</span><span></span></div>
       <div id="d-lines"></div>
@@ -440,7 +477,7 @@ function renderLines() {
       <div><span class="lbl">品名</span><input data-k="name" value="${esc(l.name)}"></div>
       <div><span class="lbl">数量</span><input data-k="qty" type="number" step="any" inputmode="decimal" class="r" value="${esc(l.qty)}"></div>
       <div><span class="lbl">単位</span><input data-k="unit" value="${esc(l.unit)}"></div>
-      <div><span class="lbl">仕入単価</span><input data-k="cost" type="number" step="any" inputmode="decimal" class="r" value="${esc(l.cost)}"></div>
+      <div><span class="lbl">仕入単価</span><input data-k="cost" type="number" step="any" inputmode="decimal" class="r" value="${esc(l.cost)}">${lookupLink(l)}</div>
       <div><span class="lbl">販売単価</span><input data-k="price" type="number" step="any" inputmode="decimal" class="r" value="${esc(l.price)}"></div>
       <div class="amount" data-amount>${yen(lineAmount(l))}</div>
       <button class="del" aria-label="この行を削除">×</button>`;
@@ -452,6 +489,7 @@ function renderLines() {
           if (hit) { Object.assign(l, { code: hit.code, name: hit.name, unit: saleUnit(hit), cost: round2(unitCost(hit)), price: sellPrice(unitCost(hit)) }); renderLines(); }
           return;
         }
+        if (k === 'code' || k === 'name') { const a = row.querySelector('.lookup'); const html = lookupLink(l); if (a) a.outerHTML = html || ''; else if (html) row.querySelector('[data-k=cost]').insertAdjacentHTML('afterend', html); }
         if (k === 'cost' && l.cost !== '') { l.price = sellPrice(l.cost); row.querySelector('[data-k=price]').value = l.price; row.classList.remove('unregistered'); }
         row.querySelector('[data-amount]').textContent = yen(lineAmount(l));
         renderTotals();
@@ -465,6 +503,12 @@ function renderLines() {
     box.appendChild(row);
   });
   renderTotals();
+}
+// 渡辺パイプのネットショップ（会員はログインすると価格が見られる）を品番で検索する
+const cizaimonUrl = (q) => `https://www.cizaimon.co.jp/search?q=${encodeURIComponent(q)}`;
+function lookupLink(l) {
+  const q = String(l.code || l.name || '').trim();
+  return q ? `<a class="lookup" href="${esc(cizaimonUrl(q))}" target="_blank" rel="noopener">シザいもんで調べる</a>` : '';
 }
 function renderTotals() {
   const t = calc(current);
@@ -517,7 +561,7 @@ async function saveDoc() {
   current.lines = current.lines.filter((l) => l.name || l.code || l.price);
   if (!current.lines.length) current.lines.push(blankLine());
   current.total = calc(current).total;
-  const learn = current.lines.filter((l) => l.unregistered && l.code && l.cost !== '');
+  const learn = current.lines.filter((l) => l.code && l.cost !== '' && (l.unregistered || !findByCode(l.code, l.supplier)));
   if (learn.length) {
     const list = clone(master);
     learn.forEach((l) => {
@@ -768,11 +812,18 @@ const SCAN_PROMPT = `この画像は設備資材の卸（渡辺パイプ、小�
 明細の各行を読み取り、次の形のJSONだけを返してください。
 {"supplier":"仕入先の会社名（例: 渡辺パイプ）","date":"YYYY-MM-DD","slipNo":"伝票No","site":"現場名（現場・現場名欄。なければ空文字）","items":[{"name":"品名","spec":"規格・品番（そのまま。なければ空文字）","maker":"メーカー名（あれば）","qty":数量の数値,"unit":"単位（個・本・巻・m など）","price":単価の数値（印字がなければ null）}]}
 空行は含めないでください。読めない文字は推測せず、読める範囲で書いてください。`;
-let sample = null;
+let sample = null; let scanMode = null; // 'claude'（claude.ai内）または 'ocr'（スマホ内の文字認識）
 async function initScan() {
+  if (!window.claude) {
+    scanMode = 'ocr';
+    $('scan-status').textContent = 'スマホの中で文字を読み取ります（無料）。読み取った内容を確認してから明細に追加します。初回だけ準備に少し時間がかかります。';
+    $('scan-box').hidden = false;
+    return;
+  }
   sample = await useCap('sample');
   const lim = sample ? await sample.limits().catch(() => null) : null;
-  $('scan-box').hidden = !lim?.images;
+  scanMode = lim?.images ? 'claude' : null;
+  $('scan-box').hidden = !scanMode;
 }
 function normSupplier(s) {
   s = String(s || '').normalize('NFKC');
@@ -780,36 +831,197 @@ function normSupplier(s) {
   if (/小泉/.test(s)) return '小泉';
   return s.replace(/株式会社|\(株\)|㈱/g, '').trim();
 }
+// 読み取った品目を明細に足す。マスタにある品番は単価を入れ、ないものは赤枠にする
+async function addSlipItems({ supplier, site, slipNo, items }) {
+  const list = clone(master); let learned = 0;
+  const lines = items.map((it) => {
+    const code = String(it.spec || it.name || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
+    const name = String(it.name || '').normalize('NFKC').trim();
+    const qty = Number(it.qty) || 1; const unit = String(it.unit || '').trim();
+    let m = findByCode(code, supplier);
+    if (!m && Number(it.price) > 0) { // 単価が印字されていればマスタに登録
+      const item = { supplier, code, name, unit, cost: Number(it.price), len: '' };
+      upsert(list, item); learned++; m = item;
+    }
+    if (m) return lineFromMaster(m, qty, unit);
+    return { code, name, qty, unit, cost: '', price: '', unregistered: true, supplier };
+  });
+  if (learned) await commitMaster(list, `単価 ${learned} 件を単価マスタに登録しました`);
+  current.lines = current.lines.filter((l) => l.name || l.code || l.price).concat(lines);
+  if (!current.subject && site) { current.subject = String(site); $('d-subject').value = current.subject; }
+  renderLines();
+  const missing = lines.filter((l) => l.unregistered).length;
+  return `${supplier || '仕入先'}の伝票${slipNo ? ' No.' + slipNo : ''}から ${lines.length} 行を追加しました。`
+    + (missing ? `赤枠の ${missing} 行は単価が未登録です。「シザいもんで調べる」で価格を確かめて仕入単価を入れ、保存すると次回から自動で入ります。` : '');
+}
+
+// ----- スマホ内の文字認識（Tesseract.js） -----
+const TESSERACT_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+let ocrWorker = null; let ocrProgress = () => {};
+function loadScript(src) {
+  return new Promise((ok, ng) => { const el = document.createElement('script'); el.src = src; el.onload = ok; el.onerror = ng; document.head.appendChild(el); });
+}
+async function getOcrWorker() {
+  if (!window.Tesseract) await loadScript(TESSERACT_URL);
+  if (!ocrWorker) {
+    const w = await window.Tesseract.createWorker('jpn', 1, { logger: (m) => ocrProgress(m) });
+    // 標準の「1つの文章として読む」設定では表がくずれるので、配置を自動で見分ける設定にする
+    await w.setParameters({ tessedit_pageseg_mode: '3', preserve_interword_spaces: '1' });
+    ocrWorker = w;
+  }
+  return ocrWorker;
+}
+const loadImage = (file) => new Promise((ok, ng) => { const im = new Image(); im.onload = () => ok(im); im.onerror = ng; im.src = URL.createObjectURL(file); });
+// 写真を指定の角度で回し、周りの明るさに合わせて白黒にする（影やムラがあっても文字が残るように）
+function prepImage(img, deg, maxSide) {
+  const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+  const w = Math.round(img.naturalWidth * scale), h = Math.round(img.naturalHeight * scale);
+  const c = document.createElement('canvas'); const side = deg % 180 === 0;
+  c.width = side ? w : h; c.height = side ? h : w;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.translate(c.width / 2, c.height / 2); ctx.rotate(deg * Math.PI / 180);
+  ctx.drawImage(img, -w / 2, -h / 2, w, h);
+  const W = c.width, H = c.height; const d = ctx.getImageData(0, 0, W, H); const px = d.data;
+  const g = new Float32Array(W * H);
+  for (let i = 0; i < W * H; i++) g[i] = 0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2];
+  const S = new Float64Array((W + 1) * (H + 1)); // 積分画像で周囲の平均を求める
+  for (let y = 0; y < H; y++) { let row = 0; for (let x = 0; x < W; x++) { row += g[y * W + x]; S[(y + 1) * (W + 1) + x + 1] = S[y * (W + 1) + x + 1] + row; } }
+  const r = Math.max(8, Math.round(Math.max(W, H) / 40));
+  for (let y = 0; y < H; y++) {
+    const y0 = Math.max(0, y - r), y1 = Math.min(H, y + r + 1);
+    for (let x = 0; x < W; x++) {
+      const x0 = Math.max(0, x - r), x1 = Math.min(W, x + r + 1);
+      const mean = (S[y1 * (W + 1) + x1] - S[y0 * (W + 1) + x1] - S[y1 * (W + 1) + x0] + S[y0 * (W + 1) + x0]) / ((x1 - x0) * (y1 - y0));
+      const v = g[y * W + x] < mean * 0.85 ? 0 : 255; const k = (y * W + x) * 4; px[k] = px[k + 1] = px[k + 2] = v;
+    }
+  }
+  ctx.putImageData(d, 0, 0);
+  return c;
+}
+// 表の列が別々に読まれても、高さがそろう文字を1行にまとめ直す
+function wordsToRows(words) {
+  const ws = (words || []).filter((w) => w.text && w.text.trim() && w.confidence >= 30).map((w) => ({ t: w.text.trim(), x: w.bbox.x0, y: (w.bbox.y0 + w.bbox.y1) / 2, h: w.bbox.y1 - w.bbox.y0 }));
+  if (!ws.length) return [];
+  const hs = ws.map((w) => w.h).sort((a, b) => a - b); const mh = hs[Math.floor(hs.length / 2)] || 10;
+  ws.sort((a, b) => a.y - b.y);
+  const rows = [];
+  ws.forEach((w) => { const r = rows[rows.length - 1]; if (r && Math.abs(w.y - r.y) < mh * 0.6) { r.ws.push(w); r.y = (r.y * (r.ws.length - 1) + w.y) / r.ws.length; } else rows.push({ y: w.y, ws: [w] }); });
+  return rows.map((r) => r.ws.sort((a, b) => a.x - b.x).map((w) => w.t).join(' '));
+}
+const UNIT_RE = '個|本|巻|m|式|台|枚|箱|組|ヶ|ケ|セット|袋|缶|kg|丁|対|束|L';
+const ITEM_WORD = /(?:管|継手|エルボ|チーズ|ソケット|バルブ|ブッシング|パイプ|ニップル|ユニオン|フランジ|キャップ|ベンド|レジューサ|水栓|保温|テープ|トラップ|ホース|ポリ)/;
+// 文字認識の結果から明細の行（品名・品番・数量・単位）を拾う
+function parseOcrText(lines) {
+  const norm = (t) => String(t || '').normalize('NFKC')
+    .replace(/([^\x00-\x7F])\s+(?=[^\x00-\x7F])/g, '$1') // 日本語の文字の間に入る空白を詰める
+    .replace(/[|｜\[\]]/g, ' ').replace(/\s+/g, ' ').trim();
+  const all = lines.map(norm).filter(Boolean);
+  const qtyUnit = new RegExp(`\\s(\\d+(?:\\.\\d+)?)\\s*(${UNIT_RE})(?=\\s|$)`, 'i');
+  const rows = [];
+  all.forEach((t) => {
+    if (!/[^\x00-\x7F]/.test(t)) return;
+    if (/品名|数量|単位|合計|小計|消費税|請求|TEL|住所|株式会社|センター|〒|様$/.test(t)) return;
+    let body = ` ${t.replace(/^\d{1,2}\s+/, '')}`; let qty = null, unit = '', price = null; let m;
+    if ((m = body.match(qtyUnit))) { // 「… 3 本」
+      qty = Number(m[1]); unit = /^m$/i.test(m[2]) ? 'm' : m[2];
+      const pm = body.slice(m.index + m[0].length).match(/^\s+([\d,]{3,})/); if (pm) price = Number(pm[1].replace(/,/g, ''));
+      body = body.slice(0, m.index);
+    } else if ((m = body.match(/\s(\d{1,4}(?:\.\d+)?)\s*$/)) && /[A-Za-z0-9]{2,}|[^\x00-\x7F]{3,}/.test(body.slice(0, m.index))) { // 単位が読めず数量だけ
+      qty = Number(m[1]); body = body.slice(0, m.index);
+    } else if (!ITEM_WORD.test(body)) return; // 数量も読めないときは、品名らしい行だけ候補にする
+    body = body.trim(); if (!body) return;
+    // 英数字の固まり（例: 50X20 VPHB）を品番として分ける
+    const cm = body.match(/^(.*?[^\x00-\x7F].*?)\s+([0-9A-Za-z][0-9A-Za-z.\-x×*\/ ]*[0-9A-Za-z])(?:\s+([^\x00-\x7F].*))?$/);
+    rows.push({ name: (cm ? cm[1] : body).trim(), spec: cm ? cm[2].trim() : '', qty: qty ?? 1, unit, price: price > 0 ? price : null, guess: qty == null || !unit });
+  });
+  const text = all.join('\n');
+  const supplier = /渡辺パイプ|SEDIA/i.test(text) ? '渡辺パイプ' : /小泉/.test(text) ? '小泉' : '';
+  const site = (text.match(/現場(?:名)?\s*[:：]?\s*([^\s\d]{2,30})/) || [])[1] || '';
+  return { rows, supplier, site };
+}
+async function runOcr(img, deg) {
+  const status = $('scan-status');
+  ocrProgress = (m) => {
+    if (m.status === 'recognizing text') status.textContent = `文字を読み取り中… ${Math.round((m.progress || 0) * 100)}%`;
+    else if (/load|initializ/i.test(m.status || '')) status.textContent = '読み取りの準備中…（初回は1分ほどかかります）';
+  };
+  status.textContent = '読み取りの準備中…';
+  const worker = await getOcrWorker();
+  const { data } = await worker.recognize(prepImage(img, deg, 3000));
+  const lines = wordsToRows(data.words);
+  return { ...parseOcrText(lines), text: lines.join('\n') };
+}
+// 撮った写真を表示して向きを合わせてもらう
+let ocrImg = null; let ocrDeg = 0;
+function drawThumb() {
+  const c = $('ocr-thumb'); const im = ocrImg; const scale = Math.min(1, 900 / Math.max(im.naturalWidth, im.naturalHeight));
+  const w = Math.round(im.naturalWidth * scale), h = Math.round(im.naturalHeight * scale); const side = ocrDeg % 180 === 0;
+  c.width = side ? w : h; c.height = side ? h : w;
+  const ctx = c.getContext('2d'); ctx.translate(c.width / 2, c.height / 2); ctx.rotate(ocrDeg * Math.PI / 180); ctx.drawImage(im, -w / 2, -h / 2, w, h);
+}
+$('ocr-rot-l').addEventListener('click', () => { ocrDeg = (ocrDeg + 270) % 360; drawThumb(); });
+$('ocr-rot-r').addEventListener('click', () => { ocrDeg = (ocrDeg + 90) % 360; drawThumb(); });
+$('ocr-prep-close').addEventListener('click', () => { $('ocr-prep').hidden = true; });
+$('ocr-go').addEventListener('click', async () => {
+  const status = $('scan-status'); const go = $('ocr-go');
+  go.disabled = true; $('scan-file').disabled = true;
+  try {
+    ocrResult = await runOcr(ocrImg, ocrDeg);
+    $('ocr-prep').hidden = true;
+    $('ocr-raw').textContent = ocrResult.text || '';
+    renderOcrRows(); $('ocr-review').hidden = false;
+    status.textContent = ocrResult.rows.length ? `${ocrResult.rows.length} 行を読み取りました。内容を確認してください。` : '明細の行を見つけられませんでした。';
+    $('ocr-review').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch {
+    status.textContent = '読み取りに失敗しました。通信できる場所でページを開き直してから、もう一度お試しください。';
+  } finally { go.disabled = false; $('scan-file').disabled = false; }
+});
+let ocrResult = null;
+function renderOcrRows() {
+  $('ocr-rows').innerHTML = ocrResult.rows.map((r, i) => `<div class="ocr-row" data-i="${i}">
+    <input type="checkbox" data-k="use" ${r.use === false ? '' : 'checked'} aria-label="この行を追加する">
+    <input data-k="name" value="${esc(r.name)}" placeholder="品名" aria-label="品名">
+    <input data-k="spec" value="${esc(r.spec)}" placeholder="品番・規格" aria-label="品番・規格">
+    <input data-k="qty" type="number" step="any" inputmode="decimal" class="r" value="${esc(r.qty)}" aria-label="数量">
+    <input data-k="unit" value="${esc(r.unit)}" placeholder="単位" aria-label="単位">
+  </div>`).join('') + (ocrResult.rows.some((r) => r.guess) ? '<p class="hint">数量や単位が読めなかった行があります。写真と見比べて直してから追加してください。</p>' : '') || '<p class="hint">「品名 数量 単位」の並びの行を見つけられませんでした。下の「読み取った文字」を見ながら「空の行を足す」で入力するか、明るい場所で真上から撮り直してください。</p>';
+}
+$('ocr-rows').addEventListener('input', (e) => {
+  const row = e.target.closest('.ocr-row'); if (!row) return;
+  const r = ocrResult.rows[+row.dataset.i]; const k = e.target.dataset.k;
+  r[k] = k === 'use' ? e.target.checked : e.target.value;
+});
+$('ocr-blank').addEventListener('click', () => { ocrResult.rows.push({ name: '', spec: '', qty: 1, unit: '個', price: null }); renderOcrRows(); });
+$('ocr-close').addEventListener('click', () => { $('ocr-review').hidden = true; });
+$('ocr-add').addEventListener('click', async () => {
+  const items = ocrResult.rows.filter((r) => r.use !== false && (r.name || r.spec));
+  if (!items.length) { toast('追加する行に印を付けてください'); return; }
+  $('scan-status').textContent = await addSlipItems({ supplier: ocrResult.supplier, site: ocrResult.site, items });
+  $('ocr-review').hidden = true;
+});
+
 $('scan-file').addEventListener('change', async (e) => {
   const file = e.target.files[0]; if (!file) return;
   e.target.value = '';
   const status = $('scan-status'); const input = $('scan-file');
-  input.disabled = true; status.textContent = '読み取り中です（30秒〜1分ほどかかります）…';
+  input.disabled = true;
+  if (scanMode === 'ocr') {
+    try {
+      if (ocrImg) URL.revokeObjectURL(ocrImg.src);
+      ocrImg = await loadImage(file); ocrDeg = 0; drawThumb();
+      $('ocr-review').hidden = true; $('ocr-prep').hidden = false;
+      status.textContent = '写真の向きを合わせてください。';
+      getOcrWorker().catch(() => {}); // 向きを合わせている間に準備しておく
+    } catch { status.textContent = 'この写真は開けませんでした。JPEGかPNGの写真を選んでください。'; }
+    finally { input.disabled = false; }
+    return;
+  }
+  status.textContent = '読み取り中です（30秒〜1分ほどかかります）…';
   try {
     const r = await sample.json(SCAN_PROMPT, { images: [file], cache: false });
     const items = Array.isArray(r?.items) ? r.items.filter((it) => it && (it.name || it.spec)) : [];
     if (!items.length) { status.textContent = '明細を読み取れませんでした。明るい場所で、紙全体が入るように撮り直してください。'; return; }
-    const supplier = normSupplier(r.supplier);
-    const list = clone(master); let learned = 0;
-    const lines = items.map((it) => {
-      const code = String(it.spec || it.name || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
-      const name = String(it.name || '').normalize('NFKC').trim();
-      const qty = Number(it.qty) || 1; const unit = String(it.unit || '').trim();
-      let m = findByCode(code, supplier);
-      if (!m && Number(it.price) > 0) { // 単価が印字されていればマスタに登録
-        const item = { supplier, code, name, unit, cost: Number(it.price), len: '' };
-        upsert(list, item); learned++; m = item;
-      }
-      if (m) return lineFromMaster(m, qty, unit);
-      return { code, name, qty, unit, cost: '', price: '', unregistered: true, supplier };
-    });
-    if (learned) await commitMaster(list, `単価 ${learned} 件を単価マスタに登録しました`);
-    current.lines = current.lines.filter((l) => l.name || l.code || l.price).concat(lines);
-    if (!current.subject && r.site) { current.subject = String(r.site); $('d-subject').value = current.subject; }
-    renderLines();
-    const missing = lines.filter((l) => l.unregistered).length;
-    status.textContent = `${supplier || '仕入先'}の伝票${r.slipNo ? ' No.' + r.slipNo : ''}から ${lines.length} 行を追加しました。`
-      + (missing ? `赤枠の ${missing} 行は単価が未登録です。仕入単価を入れて保存すると、次回から自動で入ります。` : '');
+    status.textContent = await addSlipItems({ supplier: normSupplier(r.supplier), site: r.site, slipNo: r.slipNo, items });
   } catch (err) {
     const msg = {
       not_granted: '写真の読み取りが許可されていません。', sampling_disabled: 'このアカウントでは読み取りが使えません。',
