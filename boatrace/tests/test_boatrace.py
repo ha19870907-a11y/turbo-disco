@@ -279,6 +279,16 @@ class SecureTest(unittest.TestCase):
             self.assertEqual(update.load_json(os.path.join(tmp, "20261028.json"), None)["date"], "20261028")
             self.assertTrue(update.load_json(os.path.join(tmp, "index.json"), None)["encrypted"])
 
+    def test_tomorrow_when_schedule_runs_after_midnight(self):
+        seen = []
+        for hour, day, want in [(18, 29, "20261030"), (1, 30, "20261030"), (7, 30, "20261031")]:
+            now = dt.datetime(2026, 10, day, hour, 0, tzinfo=update.JST)
+            with mock.patch.object(update, "now_jst", lambda now=now: now), \
+                    mock.patch.object(update, "prep", lambda hd, **k: seen.append(hd)), \
+                    mock.patch.dict(os.environ, {"BOATRACE_PASSWORD": "pw"}):
+                update.main(["prep", "--tomorrow"])
+            self.assertEqual(seen[-1], want, f"{hour}時に実行")
+
     def test_actions_requires_password(self):
         env = {k: v for k, v in os.environ.items() if k != "BOATRACE_PASSWORD"}
         env["GITHUB_ACTIONS"] = "true"

@@ -420,7 +420,9 @@ def main(argv=None):
     a = ap.parse_args(argv)
     d = now_jst().date()
     if a.tomorrow:
-        d += dt.timedelta(days=1)
+        # GitHub の定期実行は数時間遅れることがある。深夜0〜6時に動いたときも「前の日から見た翌日」
+        # （＝その日）を作るよう、6時までは前日扱いにする
+        d = (now_jst() - dt.timedelta(hours=6)).date() + dt.timedelta(days=1)
     hd = a.date or d.strftime("%Y%m%d")
     if os.environ.get("GITHUB_ACTIONS") and not secure.password():
         log("BOATRACE_PASSWORD が未設定です。公開ページに平文のデータを置かないよう中止します")
