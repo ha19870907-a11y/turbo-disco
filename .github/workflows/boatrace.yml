@@ -4,8 +4,13 @@ name: ボートレース予想の更新
 # 定期実行が動かない日は、Actions 画面から mode=loop で手動実行すれば同じように動く。
 on:
   schedule:
-    - cron: "20 22 * * *"   # 7:20 JST 当日の前日予想を作り直して loop を始める
-    - cron: "10 9 * * *"    # 18:10 JST 翌日の前日予想（loop が動いている間は終わるまで待つ）
+    # GitHub の定期実行は数時間遅れたり抜けたりするので、朝の loop 開始は何度か仕掛けておく。
+    # loop が動いている間に来た分は待ち状態になり、loop の引き継ぎで置き換わるので二重には動かない
+    - cron: "20 22 * * *"   # 7:20 JST
+    - cron: "40 23 * * *"   # 8:40 JST
+    - cron: "0 1 * * *"     # 10:00 JST
+    - cron: "0 3 * * *"     # 12:00 JST
+    - cron: "10 9 * * *"    # 18:10 JST 翌日の前日予想（loop の後でも22時過ぎに作る）
   workflow_dispatch:
     inputs:
       mode:
@@ -43,7 +48,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           case "$SCHEDULE" in
-            "20 22 * * *") bash boatrace/run.sh loop ;;
             "10 9 * * *") bash boatrace/run.sh prep-tomorrow ;;
+            ?*) bash boatrace/run.sh loop ;;
             *) bash boatrace/run.sh "${MODE:-loop}" ;;
           esac

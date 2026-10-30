@@ -57,6 +57,15 @@ def _first_boat_cell(tr):
     return None
 
 
+def _racer_cell(tds):
+    """選手名のセル（番号, 名前のリンク）。写真も同じ選手ページへのリンクなので、文字のあるリンクを選ぶ。"""
+    for i, td in enumerate(tds):
+        for a in td.find_all("a", href=re.compile(r"toban=\d{4}")):
+            if norm(a.get_text()):
+                return i, a
+    return None, None
+
+
 def _boat_tbodies(sp):
     """1艇ぶんの tbody（枠番の色クラスを含むもの）を枠番つきで返す。"""
     out = []
@@ -121,11 +130,10 @@ def parse_racelist(html):
         out["distance"] = int(m.group(1)) if m else None
 
     for n, tb, tr in _boat_tbodies(sp):
-        link = tr.find("a", href=re.compile(r"toban=\d{4}"))
+        tds = tr.find_all("td", recursive=False)
+        idx, link = _racer_cell(tds)
         if link is None:
             continue
-        tds = tr.find_all("td", recursive=False)
-        idx = next(i for i, td in enumerate(tds) if td.find("a", href=re.compile(r"toban=")))
         info = text(tds[idx])
         b = {
             "waku": n,
@@ -168,9 +176,8 @@ def parse_beforeinfo(html):
     out = {"boats": {}, "start": [], "weather": {}}
     for n, tb, tr in _boat_tbodies(sp):
         tds = tr.find_all("td", recursive=False)
-        try:
-            idx = next(i for i, td in enumerate(tds) if td.find("a", href=re.compile(r"toban=")))
-        except StopIteration:
+        idx, _ = _racer_cell(tds)
+        if idx is None:
             idx = 2
         cells = [text(td) for td in tds[idx + 1:]]
         b = {}

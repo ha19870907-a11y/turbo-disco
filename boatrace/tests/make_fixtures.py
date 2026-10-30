@@ -12,7 +12,7 @@ def racelist():
         w = i + 1
         rows.append(f"""<tbody class="is-fs12"><tr>
 <td class="is-boatColor{w} is-fs14" rowspan="4">{"１２３４５６"[i]}</td>
-<td rowspan="4"><a href="#"><img src="x.jpg"></a></td>
+<td rowspan="4"><a href="/owpc/pc/data/racersearch/profile?toban={4000+w}"><img src="x.jpg"></a></td>
 <td rowspan="4"><div class="is-fs11">{4000+w}<span>/</span><span>{CLS[i]}</span></div>
 <div class="is-fs18 is-fBold"><a href="/owpc/pc/data/racersearch/profile?toban={4000+w}">{NAMES[i]}</a></div>
 <div class="is-fs11">佐賀/佐賀<br>3{w}歳/52.{w}kg</div></td>
@@ -34,7 +34,7 @@ def beforeinfo():
     for i in range(6):
         w = i + 1
         rows.append(f"""<tbody class="is-fs12"><tr>
-<td class="is-boatColor{w}" rowspan="4">{w}</td><td rowspan="4"><img></td>
+<td class="is-boatColor{w}" rowspan="4">{w}</td><td rowspan="4"><a href="/owpc/pc/data/racersearch/profile?toban={4000+w}"><img></a></td>
 <td rowspan="4"><a href="/owpc/pc/data/racersearch/profile?toban={4000+w}">{NAMES[i]}</a></td>
 <td rowspan="2">52.0kg</td><td rowspan="4">{ex[i]:.2f}</td><td rowspan="4">-0.5</td>
 <td rowspan="4"></td><td rowspan="4"></td></tr><tr><td>R</td></tr>
