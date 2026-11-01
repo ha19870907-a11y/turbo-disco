@@ -298,15 +298,16 @@ def parse_result(html):
         tds = tr.find_all("td", recursive=False)
         if len(tds) < 3:
             continue
-        w = _boat_no(tds[1]) if len(tds) > 1 else None
+        w = _boat_no(tds[1])
+        rk = text(tds[0])
+        if not w or not re.fullmatch(r"[1-6]|[FLKS欠失転落エ妨不沈]+", rk):
+            continue
+        # 選手は選手ページへのリンクのことも、登録番号の文字だけのこともある
         link = tr.find("a", href=re.compile(r"toban=\d{4}"))
-        if w and link:
-            rk = text(tds[0])
-            out["order"].append({
-                "rank": int(rk) if rk.isdigit() else rk,
-                "waku": w,
-                "toban": re.search(r"toban=(\d{4})", link["href"]).group(1),
-            })
+        m = re.search(r"toban=(\d{4})", link["href"]) if link else re.search(r"\b(\d{4})\b", text(tds[2]))
+        if not m or len(out["order"]) >= 6:
+            continue
+        out["order"].append({"rank": int(rk) if rk.isdigit() else rk, "waku": w, "toban": m.group(1)})
     for i, unit in enumerate(sp.select(".table1_boatImage1"), start=1):
         no = unit.select_one("[class*=boatImage1Number]")
         tm = unit.select_one("[class*=boatImage1Time]")
