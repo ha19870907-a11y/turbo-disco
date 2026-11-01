@@ -22,7 +22,7 @@ OUT_DIR = os.path.join(ROOT, "docs", "boatrace", "data")
 STATE_DIR = os.path.join(ROOT, "boatrace", "state")
 JST = dt.timezone(dt.timedelta(hours=9))
 
-RESULT_GIVE_UP_MIN = 90  # 締切からこれだけ過ぎても結果が取れなければ諦める
+RESULT_MAX_TRIES = 6  # 結果を取りに行く回数の上限（中止のレースなどで取り続けないように）
 RECENT_TTL_DAYS = 1   # 直近成績の取り直し間隔
 COURSE_TTL_DAYS = 7   # コース別成績の取り直し間隔
 HISTORY_KEEP = 40     # 選手ごとに残す自前の結果記録数
@@ -355,7 +355,10 @@ def _live_race(hd, v, r, now, racers, store, lock):
                 r["odds3t"] = o3
                 r["odds_at"] = now.strftime("%H:%M")
                 got = True
-    if -RESULT_GIVE_UP_MIN <= mins <= -6:
+    # 締切から時間がたっていても、取りに行った回数が上限までなら取りに行く
+    # （読み取りの不具合を直したあと、その日の前のレースの結果も取り直せるように）
+    if mins <= -6 and r.get("result_tries", 0) < RESULT_MAX_TRIES:
+        r["result_tries"] = r.get("result_tries", 0) + 1
         html = fetch.race_page("raceresult", v["jcd"], r["rno"], hd)
         res = parse.parse_result(html) if html else None
         if res and res["order"]:
