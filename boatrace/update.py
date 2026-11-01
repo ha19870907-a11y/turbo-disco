@@ -316,6 +316,7 @@ def live(hd, now=None, online=True):
             if deadline_dt(hd, r.get("deadline")) is not None and not r.get("result")]
     recorded = fetch.pmap(lambda vr: _live_race(hd, vr[0], vr[1], now, day["racers"], store, lock), todo)
     changed_racers = any(recorded)
+    log_status(day, hd, now)
     if changed_racers:
         store.save()
     finish(day, now)
@@ -366,6 +367,19 @@ def _live_race(hd, v, r, now, racers, store, lock):
         r["updated"] = now.strftime("%H:%M")
         repredict(r, racers)
     return recorded
+
+
+def log_status(day, hd, now):
+    """取り込めた情報の件数をログに出す（公式サイトの作りが変わって取れなくなったときに気づけるように）。"""
+    races = [r for v in day["venues"] for r in v["races"]]
+    past = [r for r in races if r.get("deadline") and deadline_dt(hd, r["deadline"]) <= now]
+    named = sum(1 for r in races for b in r.get("boats", []) if b.get("name"))
+    boats = sum(len(r.get("boats", [])) for r in races)
+    log(f"取り込み状況: 選手名 {named}/{boats}、締切済み {len(past)}レース中 "
+        f"展示 {sum(1 for r in past if parse.has_exhibition(r.get('before')))}・"
+        f"単勝 {sum(1 for r in past if r.get('odds_win'))}・"
+        f"3連単 {sum(1 for r in past if r.get('odds3t'))}・"
+        f"結果 {sum(1 for r in past if r.get('result'))}")
 
 
 def _age_min(hhmm, now):

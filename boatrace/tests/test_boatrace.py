@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from unittest import mock
 
+import re
 import time
 
 from boatrace import fetch, parse, predict, secure, update
@@ -58,6 +59,13 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(r["order"][0]["rank"], 1)
         self.assertEqual(r["trifecta"], "1-3-2")
         self.assertEqual(r["payout"], 1230)
+
+    def test_result_without_racer_links(self):
+        html = re.sub(r'<a href="[^"]*toban=(\d{4})">x</a>', r'<span>\1</span> <span>名前</span>', fx("raceresult"))
+        self.assertNotIn("toban=", html)
+        r = parse.parse_result(html)
+        self.assertEqual([o["waku"] for o in r["order"]], [1, 3, 2, 5, 4, 6])
+        self.assertEqual(r["order"][0]["toban"], "4001")
 
     def test_racer_pages(self):
         recent = parse.parse_back3(fx("back3"))
