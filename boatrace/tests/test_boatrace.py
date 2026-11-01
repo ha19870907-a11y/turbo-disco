@@ -5,6 +5,7 @@ import unittest
 from unittest import mock
 
 import re
+import threading
 import time
 
 from boatrace import fetch, parse, predict, secure, update
@@ -124,6 +125,18 @@ class FetchTest(unittest.TestCase):
             fetch.pmap(lambda i: fetch.get("/x", i=i), range(6))
         starts.sort()
         self.assertTrue(all(b - a >= 0.045 for a, b in zip(starts, starts[1:])))
+
+
+class ResultBackfillTest(unittest.TestCase):
+    def test_old_race_without_result_is_fetched_again(self):
+        """読み取りの不具合で結果が取れなかった、締切から数時間たったレースも取り直す。"""
+        race = {"rno": 1, "deadline": "10:00", "boats": parse.parse_racelist(fx("racelist"))["boats"]}
+        v = {"jcd": "01"}
+        store = mock.MagicMock()
+        with mock.patch.object(update.fetch, "race_page", lambda k, j, r, h: fx(k) if k == "raceresult" else None):
+            update._live_race("20261101", v, race, dt.datetime(2026, 11, 1, 17, 0, tzinfo=update.JST),
+                              {}, store, threading.Lock())
+        self.assertEqual(race["result"]["trifecta"], "1-3-2")
 
 
 class BugfixTest(unittest.TestCase):
@@ -250,9 +263,13 @@ class UpdateTest(unittest.TestCase):
         self.assertGreaterEqual(day["hits"]["live"][0], 1)
         store = update.RacerStore()
         self.assertEqual(store.history["4001"][0]["finish"], 1)
-        # 結果が出ないまま締切から90分を過ぎたレースは取りに行かない
+        # 結果が取れないレースは、取りに行った回数が上限に達したらもう取りに行かない
         calls = []
         with mock.patch.object(update.fetch, "race_page", lambda k, j, r, h: calls.append((k, r)) or None):
+            for _ in range(update.RESULT_MAX_TRIES):
+                update.write(update.live(hd, now=dt.datetime(2026, 10, 28, 23, 0, tzinfo=jst)))
+            self.assertTrue(calls)
+            calls.clear()
             update.live(hd, now=dt.datetime(2026, 10, 28, 23, 0, tzinfo=jst))
         self.assertEqual(calls, [])
         self.assertEqual(store.summary("4003")["recent"][0]["course"], 2)
